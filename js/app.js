@@ -41,7 +41,7 @@ const AppState = {
     filters: {},
     searchQuery: '',
     settings: {
-        apiUrl: 'http://30.178.33.14:1234',
+        apiUrl: 'http://169.254.83.107:1234',
         modelName: '',
         temperature: 0.7,
         maxTokens: 2048,
