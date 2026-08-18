@@ -255,8 +255,10 @@ async function callLMApi(role, messages, useStream = true) {
     const { apiUrl, modelName, temperature, maxTokens, systemPrompt } = AppState.settings;
 
     const baseSystem = systemPrompt || role.systemPrompt;
-    // 统一人称规则：用户是第一人称"我"，角色描写内心时用第三人称
-    const personRule = "【人称规则】用户是第一人称\"我\"。你描写自己的内心活动、感受时，用第三人称（她/他/角色名），不用\"我\"。例如不要写\"我忍不住心跳加速\"，而写\"她忍不住心跳加速\"。对话台词中可以用\"我\"自称。\n\n";
+    // 统一人称规则 + 性别强调：角色必须始终保持设定性别，用对应性别的第三人称描写内心活动
+    const gender = role.gender === 'male' ? '男性' : '女性';
+    const pronoun = role.gender === 'male' ? '他' : '她';
+    const personRule = `【性别规则】你是${gender}角色（${role.name}），请始终以${gender}身份、${gender}口吻回应，保持性别特征一致。\n\n【人称规则】用户是第一人称"我"。你描写自己的内心活动、感受时，用第三人称（${pronoun}/${role.name}），不用"我"。例如不要写"我忍不住心跳加速"，而写"${pronoun}忍不住心跳加速"。对话台词中可以用"我"自称。\n\n`;
     const systemMessage = personRule + baseSystem;
 
     const apiMessages = [
