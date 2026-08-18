@@ -1,6 +1,6 @@
 # AI Web 项目开发文档
 
-> 最后更新：2026-08-18 | 项目路径：`D:\Work\AI_Web`
+> 最后更新：2026-08-18 | 项目路径：`D:\Work\AI_Web\AI_Chat`
 
 ## 一、项目概述
 
@@ -8,7 +8,87 @@ Web 端 AI 成人聊天软件，参考小程序"香草 AI | 我的賽博後宮"�
 
 **技术栈**：HTML + CSS + JavaScript（无框架），LocalStorage 持久化，LM Studio API（兼容 OpenAI 格式）
 
-**LM Studio 地址**：`http://30.178.33.14:1234`
+**LM Studio 地址**：`http://localhost:1234`（本地）或 Cloudflare Tunnel URL（公网）
+
+---
+
+## 〇、公网部署指南（Cloudflare Pages + Tunnel）
+
+### 前置条件
+- GitHub 仓库：`https://github.com/eroAlucard/AI_Chat`
+- Cloudflare Pages 已部署（静态网站）
+- LM Studio 已安装并加载模型
+
+### 步骤1：网页已部署到 Cloudflare Pages
+网页通过 GitHub 仓库自动部署，推送代码后 Cloudflare 自动构建。
+
+### 步骤2：安装 cloudflared（在运行 LM Studio 的电脑上）
+
+**Windows（推荐 winget）：**
+```cmd
+winget install Cloudflare.cloudflared
+```
+
+**或下载便携版：**
+```powershell
+Invoke-WebRequest -Uri "https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-windows-amd64.exe" -OutFile "cloudflared.exe"
+```
+
+**Mac：**
+```bash
+brew install cloudflared
+```
+
+**Linux：**
+```bash
+curl -L https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-amd64 -o cloudflared
+chmod +x cloudflared
+```
+
+### 步骤3：确认 LM Studio 在运行
+
+打开浏览器访问 `http://localhost:1234/v1/models`，应返回模型列表 JSON。
+
+### 步骤4：启动 Cloudflare Tunnel
+
+打开 CMD / PowerShell / Terminal，运行：
+```cmd
+cloudflared tunnel --url http://localhost:1234
+```
+
+等待几秒，输出类似：
+```
++--------------------------------------------------------------------------------------------+
+|  Your quick Tunnel has been created! Visit it at:                                         |
+|  https://xxxx-xxxx-xxxx.trycloudflare.com                                                 |
++--------------------------------------------------------------------------------------------+
+```
+
+**复制这个 URL**，这是你的 LM Studio 公网地址。
+
+> ⚠️ Tunnel 窗口必须保持打开，关闭则公网访问断开
+> ⚠️ 每次重启 Tunnel 会生成新的 URL，需要在网页设置中更新
+
+### 步骤5：配置网页 API 地址
+
+1. 打开 AI Chat 网页
+2. 输入登录密码
+3. 点击底部"我的" → 设置
+4. **API 地址**：粘贴 Tunnel URL（如 `https://xxxx-xxxx-xxxx.trycloudflare.com`），不带末尾斜杠
+5. 点击保存
+
+### 步骤6：验证
+
+在聊天界面发送消息，如果 AI 正常回复则配置成功。
+
+### 常见问题
+
+| 问题 | 原因 | 解决 |
+|------|------|------|
+| cloudflared 运行无输出 | 网络无法连接 Cloudflare 服务器（如公司内网拦截） | 换到非受限网络环境运行 |
+| API 调用报 CORS 错误 | LM Studio 未开启 CORS | 在 LM Studio 设置中开启 CORS |
+| Tunnel URL 失效 | Tunnel 窗口被关闭或网络中断 | 重新启动 cloudflared，获取新 URL |
+| 密码错误 | 首次访问需输入登录密码 | 密码在 `js/app.js` 的 `ACCESS_PASSWORD` 常量中 |
 
 ---
 
