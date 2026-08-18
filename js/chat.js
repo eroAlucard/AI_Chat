@@ -292,14 +292,42 @@ async function callLMApi(role, messages, useStream = true) {
         fetchHeaders = { 'Content-Type': 'application/json' };
     }
 
-    const response = await fetch(fetchUrl, {
-        method: 'POST',
-        headers: fetchHeaders,
-        body: JSON.stringify(body)
-    });
+    let response;
+    try {
+        response = await fetch(fetchUrl, {
+            method: 'POST',
+            headers: fetchHeaders,
+            body: JSON.stringify(body)
+        });
+    } catch (e) {
+        // 固定域名不可用时，降级到本地直连
+        if (!isDeployed && apiUrl !== 'http://localhost:1234') {
+            console.warn('[API] 主地址失败，降级到 localhost:1234', e);
+            const fallbackUrl = 'http://localhost:1234/v1/chat/completions';
+            response = await fetch(fallbackUrl, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(body)
+            });
+        } else {
+            throw e;
+        }
+    }
 
     if (!response.ok) {
-        throw new Error(`API returned ${response.status}`);
+        // 固定域名返回错误状态码时，也尝试降级到本地直连
+        if (!isDeployed && apiUrl !== 'http://localhost:1234') {
+            console.warn(`[API] 主地址返回 ${response.status}，降级到 localhost:1234`);
+            const fallbackUrl = 'http://localhost:1234/v1/chat/completions';
+            response = await fetch(fallbackUrl, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(body)
+            });
+            if (!response.ok) throw new Error(`Fallback API returned ${response.status}`);
+        } else {
+            throw new Error(`API returned ${response.status}`);
+        }
     }
 
     if (useStream && response.body) {
