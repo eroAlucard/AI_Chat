@@ -276,7 +276,9 @@ async function callLMApi(role, messages, useStream = true) {
 
     if (modelName) body.model = modelName;
 
-    // 判断是否使用同域代理（Cloudflare Pages 部署时绕过 Clear-Site-Data 头问题）
+    // 判断请求路径：
+    // 1. Cloudflare Pages 部署（https）→ 同域代理，由 Pages Function 转发到 Tunnel
+    // 2. 本地使用（http/file）→ 直连 localhost:1234，避免公网绕行延迟
     const isDeployed = window.location.protocol === 'https:';
     let fetchUrl, fetchHeaders;
     if (isDeployed) {
@@ -287,8 +289,8 @@ async function callLMApi(role, messages, useStream = true) {
             'X-Target-URL': apiUrl  // 告诉代理目标地址
         };
     } else {
-        // 本地开发：直接请求 LM Studio
-        fetchUrl = `${apiUrl}/v1/chat/completions`;
+        // 本地开发：直连 LM Studio，不走 Tunnel 避免公网绕行延迟
+        fetchUrl = 'http://localhost:1234/v1/chat/completions';
         fetchHeaders = { 'Content-Type': 'application/json' };
     }
 
