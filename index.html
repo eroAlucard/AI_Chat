@@ -1,0 +1,391 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>AI Chat - 智能角色聊天</title>
+    <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+    <div id="app">
+        <!-- 顶部导航栏 -->
+        <header class="top-bar">
+            <div class="top-bar-left">
+                <span class="app-logo">✦</span>
+                <span class="app-title">AI Chat</span>
+            </div>
+            <div class="top-bar-right">
+                <button class="icon-btn" id="searchBtn">🔍</button>
+            </div>
+        </header>
+
+        <!-- 搜索栏 -->
+        <div class="search-bar hidden" id="searchBar">
+            <div class="search-bar-inner">
+                <span class="search-icon">🔍</span>
+                <input type="text" class="search-input" id="searchInput" placeholder="搜索角色名称、标签...">
+                <button class="search-clear hidden" id="searchClearBtn">✕</button>
+                <button class="search-cancel" id="searchCancelBtn">取消</button>
+            </div>
+        </div>
+
+        <!-- 页面内容区 -->
+        <main class="page-content">
+            <!-- 首页 - 角色发现 -->
+            <section class="page active" id="page-home">
+                <!-- 分类导航 -->
+                <div class="category-nav">
+                    <div class="category-tabs">
+                        <button class="tab active" data-tab="recommend">猜你喜欢</button>
+                        <button class="tab" data-tab="hot">热门</button>
+                        <button class="tab" data-tab="latest">最新</button>
+                    </div>
+                    <button class="filter-btn" id="filterBtn">
+                        <span>筛选</span>
+                        <span class="filter-icon">⚙</span>
+                    </button>
+                </div>
+
+                <!-- 角色卡片网格 -->
+                <div class="role-grid" id="roleGrid">
+                    <!-- 角色卡片由 JS 动态生成 -->
+                </div>
+
+                <!-- 筛选弹窗 -->
+                <div class="filter-modal" id="filterModal">
+                    <div class="filter-overlay"></div>
+                    <div class="filter-panel">
+                        <div class="filter-header">
+                            <h3>筛选</h3>
+                            <div class="filter-actions">
+                                <span class="filter-count">已选 <span id="filterSelectedCount">0</span></span>
+                                <button class="reset-btn" id="resetFilterBtn">重置</button>
+                            </div>
+                        </div>
+                            <div class="filter-body">
+                            <div class="filter-group">
+                                <h4>受众</h4>
+                                <div class="filter-tags">
+                                    <button class="filter-tag" data-group="audience" data-value="男性向">男性向</button>
+                                    <button class="filter-tag" data-group="audience" data-value="女性向">女性向</button>
+                                </div>
+                            </div>
+                            <div class="filter-group">
+                                <h4>关系</h4>
+                                <div class="filter-tags">
+                                    <button class="filter-tag" data-group="relation" data-value="妈妈">妈妈</button>
+                                    <button class="filter-tag" data-group="relation" data-value="妹妹">妹妹</button>
+                                    <button class="filter-tag" data-group="relation" data-value="姐姐">姐姐</button>
+                                    <button class="filter-tag" data-group="relation" data-value="母子">母子</button>
+                                    <button class="filter-tag" data-group="relation" data-value="人妻">人妻</button>
+                                    <button class="filter-tag" data-group="relation" data-value="青梅竹马">青梅竹马</button>
+                                    <button class="filter-tag" data-group="relation" data-value="后宫">后宫</button>
+                                    <button class="filter-tag" data-group="relation" data-value="百合">百合</button>
+                                </div>
+                            </div>
+                            <div class="filter-group">
+                                <h4>人设</h4>
+                                <div class="filter-tags">
+                                    <button class="filter-tag" data-group="personality" data-value="熟女">熟女</button>
+                                    <button class="filter-tag" data-group="personality" data-value="御姐">御姐</button>
+                                    <button class="filter-tag" data-group="personality" data-value="处女">处女</button>
+                                    <button class="filter-tag" data-group="personality" data-value="仙子">仙子</button>
+                                    <button class="filter-tag" data-group="personality" data-value="魅魔">魅魔</button>
+                                    <button class="filter-tag" data-group="personality" data-value="女S">女S</button>
+                                    <button class="filter-tag" data-group="personality" data-value="男娘">男娘</button>
+                                    <button class="filter-tag" data-group="personality" data-value="傲娇">傲娇</button>
+                                    <button class="filter-tag" data-group="personality" data-value="高冷">高冷</button>
+                                    <button class="filter-tag" data-group="personality" data-value="反差">反差</button>
+                                    <button class="filter-tag" data-group="personality" data-value="爆乳">爆乳</button>
+                                </div>
+                            </div>
+                            <div class="filter-group">
+                                <h4>题材剧情</h4>
+                                <div class="filter-tags">
+                                    <button class="filter-tag" data-group="theme" data-value="调教">调教</button>
+                                    <button class="filter-tag" data-group="theme" data-value="乱伦">乱伦</button>
+                                    <button class="filter-tag" data-group="theme" data-value="绿帽">绿帽</button>
+                                    <button class="filter-tag" data-group="theme" data-value="NTR">NTR</button>
+                                    <button class="filter-tag" data-group="theme" data-value="NTL">NTL</button>
+                                    <button class="filter-tag" data-group="theme" data-value="逆NTR">逆NTR</button>
+                                    <button class="filter-tag" data-group="theme" data-value="羞辱">羞辱</button>
+                                    <button class="filter-tag" data-group="theme" data-value="恶堕">恶堕</button>
+                                    <button class="filter-tag" data-group="theme" data-value="催眠">催眠</button>
+                                    <button class="filter-tag" data-group="theme" data-value="精神控制">精神控制</button>
+                                    <button class="filter-tag" data-group="theme" data-value="隐奸">隐奸</button>
+                                    <button class="filter-tag" data-group="theme" data-value="强迫">强迫</button>
+                                    <button class="filter-tag" data-group="theme" data-value="纯爱">纯爱</button>
+                                    <button class="filter-tag" data-group="theme" data-value="救赎">救赎</button>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="filter-footer">
+                            <button class="btn-cancel" id="cancelFilterBtn">取消</button>
+                            <button class="btn-confirm" id="confirmFilterBtn">查看 <span id="filterResultCount">0</span> 个结果</button>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- 聊天页 - 消息列表 / 对话 -->
+            <section class="page" id="page-chat">
+                <!-- 消息列表视图 -->
+                <div class="chat-list-view" id="chatListView">
+                    <div class="chat-list-header">
+                        <h2>消息</h2>
+                    </div>
+                    <div class="chat-list" id="chatList">
+                        <!-- 聊天列表由 JS 动态生成 -->
+                    </div>
+                    <div class="chat-list-empty" id="chatListEmpty">
+                        <div class="empty-icon">💬</div>
+                        <p>还没有对话</p>
+                        <p class="empty-hint">去首页选择一个角色开始聊天吧</p>
+                    </div>
+                </div>
+
+                <!-- 对话视图 -->
+                <div class="chat-view hidden" id="chatView">
+                    <div class="chat-header">
+                        <button class="back-btn" id="chatBackBtn">←</button>
+                        <div class="chat-role-info">
+                            <img class="chat-role-avatar" id="chatRoleAvatar" src="" alt="">
+                            <div class="chat-role-detail">
+                                <span class="chat-role-name" id="chatRoleName"></span>
+                                <span class="chat-role-status">在线</span>
+                            </div>
+                        </div>
+                        <button class="icon-btn" id="chatMenuBtn">⋯</button>
+                    </div>
+                    <div class="chat-messages" id="chatMessages">
+                        <!-- 消息气泡由 JS 动态生成 -->
+                    </div>
+                    <div class="chat-input-area">
+                        <div class="quick-replies" id="quickReplies">
+                            <!-- 快捷选项由 JS 动态生成 -->
+                        </div>
+                        <div class="chat-input-wrapper">
+                            <textarea class="chat-input" id="chatInput" placeholder="输入消息..." rows="1"></textarea>
+                            <button class="send-btn" id="sendBtn">
+                                <span class="send-icon">➤</span>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- 角色详情页 -->
+            <div class="role-detail-modal hidden" id="roleDetailModal">
+                <div class="role-detail-overlay"></div>
+                <div class="role-detail-panel">
+                    <button class="close-btn" id="closeRoleDetail">✕</button>
+                    <div class="role-detail-hero">
+                        <img class="role-detail-avatar" id="roleDetailAvatar" src="" alt="">
+                        <div class="role-detail-rarity" id="roleDetailRarity"></div>
+                    </div>
+                    <div class="role-detail-info">
+                        <h2 class="role-detail-name" id="roleDetailName"></h2>
+                        <div class="role-detail-tags" id="roleDetailTags"></div>
+                        <p class="role-detail-desc" id="roleDetailDesc"></p>
+                        <div class="role-detail-rules" id="roleDetailRules"></div>
+                        <!-- 场景选择区域 -->
+                        <div class="scene-selector" id="sceneSelector">
+                            <div class="scene-selector-title">选择开场场景 <span class="scene-count" id="sceneCount"></span></div>
+                            <div class="scene-list" id="sceneList"></div>
+                        </div>
+                    </div>
+                    <div class="role-detail-actions">
+                        <button class="btn-start-chat" id="startChatBtn">开始对话</button>
+                        <button class="btn-continue-chat hidden" id="continueChatBtn">继续对话</button>
+                        <button class="btn-collect" id="collectBtn">♡ 收藏</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 绘图页 -->
+            <section class="page" id="page-draw">
+                <div class="draw-page-content">
+                    <h2>AI 绘图</h2>
+                    <p class="draw-hint">功能开发中，敬请期待...</p>
+                    <div class="draw-placeholder">🎨</div>
+                </div>
+            </section>
+
+            <!-- 我的页 -->
+            <section class="page" id="page-mine">
+                <div class="mine-header">
+                    <div class="user-card">
+                        <div class="user-avatar" id="userAvatar">U</div>
+                        <div class="user-info">
+                            <span class="user-name" id="userName">用户</span>
+                            <span class="user-id" id="userId">ID: --</span>
+                        </div>
+                    </div>
+                </div>
+                <div class="mine-shortcuts">
+                    <button class="shortcut-btn" data-action="create-role">
+                        <span class="shortcut-icon">✨</span>
+                        <span>创建角色</span>
+                    </button>
+                    <button class="shortcut-btn" data-action="settings">
+                        <span class="shortcut-icon">⚙️</span>
+                        <span>设置</span>
+                    </button>
+                </div>
+                <div class="mine-section-title">自定义角色</div>
+                <div class="mine-content" id="customRolesContent">
+                    <div class="collection-empty" id="customRolesEmpty">
+                        <div class="empty-icon">🎭</div>
+                        <p>还没有自定义角色</p>
+                        <p class="empty-hint">点击上方"创建角色"开始</p>
+                    </div>
+                    <div class="collection-grid hidden" id="customRolesGrid">
+                    </div>
+                </div>
+                <div class="mine-section-title">我的收藏</div>
+                <div class="mine-content" id="mineContent">
+                    <div class="collection-empty" id="collectionEmpty">
+                        <div class="empty-icon">♡</div>
+                        <p>还没有收藏的角色</p>
+                        <p class="empty-hint">在角色详情页点收藏按钮</p>
+                    </div>
+                    <div class="collection-grid hidden" id="collectionGrid">
+                        <!-- 收藏的角色卡片由 JS 动态生成 -->
+                    </div>
+                </div>
+
+                <!-- 设置面板 -->
+                <div class="settings-panel hidden" id="settingsPanel">
+                    <div class="settings-header">
+                        <button class="back-btn" id="settingsBackBtn">←</button>
+                        <h3>设置</h3>
+                    </div>
+                    <div class="settings-body">
+                        <div class="setting-item">
+                            <span class="setting-label">API 地址</span>
+                            <input type="text" class="setting-input" id="apiUrlInput" value="http://30.178.33.14:1234" placeholder="LM Studio API 地址">
+                        </div>
+                        <div class="setting-item">
+                            <span class="setting-label">模型名称</span>
+                            <input type="text" class="setting-input" id="modelNameInput" value="" placeholder="留空使用默认模型">
+                        </div>
+                        <div class="setting-item">
+                            <span class="setting-label">温度</span>
+                            <input type="range" class="setting-range" id="temperatureInput" min="0" max="2" step="0.1" value="0.7">
+                            <span class="setting-value" id="temperatureValue">0.7</span>
+                        </div>
+                        <div class="setting-item">
+                            <span class="setting-label">最大回复长度</span>
+                            <input type="number" class="setting-input" id="maxTokensInput" value="2048" min="128" max="8192">
+                        </div>
+                        <div class="setting-item">
+                            <span class="setting-label">系统提示词</span>
+                            <textarea class="setting-textarea" id="systemPromptInput" rows="4" placeholder="设置 AI 角色的系统提示词..."></textarea>
+                        </div>
+                        <button class="btn-save-settings" id="saveSettingsBtn">保存设置</button>
+                    </div>
+                </div>
+            </section>
+        </main>
+
+        <!-- 底部导航栏 -->
+        <nav class="bottom-nav">
+            <button class="nav-item active" data-page="home">
+                <span class="nav-icon">🏠</span>
+                <span class="nav-label">首页</span>
+            </button>
+            <button class="nav-item" data-page="chat">
+                <span class="nav-icon">💬</span>
+                <span class="nav-label">聊天</span>
+                <span class="nav-badge hidden" id="chatBadge">0</span>
+            </button>
+            <button class="nav-item" data-page="draw">
+                <span class="nav-icon">✨</span>
+                <span class="nav-label">绘图</span>
+            </button>
+            <button class="nav-item" data-page="mine">
+                <span class="nav-icon">👤</span>
+                <span class="nav-label">我的</span>
+            </button>
+        </nav>
+
+        <!-- Toast 通知 -->
+        <div class="toast hidden" id="toast"></div>
+
+        <!-- 创建角色弹窗 -->
+        <div class="role-detail-modal hidden" id="createRoleModal">
+            <div class="role-detail-overlay"></div>
+            <div class="role-detail-panel" style="max-height:90vh">
+                <button class="close-btn" id="closeCreateRole">✕</button>
+                <div class="role-detail-info" style="padding:20px">
+                    <h2 style="margin-bottom:16px">✨ 创建自定义角色</h2>
+                    <div class="setting-item">
+                        <span class="setting-label">角色名 *</span>
+                        <input type="text" class="setting-input" id="crName" placeholder="给角色取个名字">
+                    </div>
+                    <div class="setting-item">
+                        <span class="setting-label">一句话标题 *</span>
+                        <input type="text" class="setting-input" id="crTitle" placeholder="如：冰山下的湿痕">
+                    </div>
+                    <div class="setting-item">
+                        <span class="setting-label">选择标签（可多选）</span>
+                        <div class="cr-tags-select" id="crTagsSelect">
+                            <div class="cr-tag-group"><span class="cr-tag-group-label">受众</span>
+                                <button class="cr-tag-btn" data-tag="男性向">男性向</button>
+                                <button class="cr-tag-btn" data-tag="女性向">女性向</button>
+                            </div>
+                            <div class="cr-tag-group"><span class="cr-tag-group-label">人设</span>
+                                <button class="cr-tag-btn" data-tag="高冷">高冷</button>
+                                <button class="cr-tag-btn" data-tag="反差">反差</button>
+                                <button class="cr-tag-btn" data-tag="傲娇">傲娇</button>
+                                <button class="cr-tag-btn" data-tag="温柔">温柔</button>
+                                <button class="cr-tag-btn" data-tag="病娇">病娇</button>
+                                <button class="cr-tag-btn" data-tag="魅魔">魅魔</button>
+                                <button class="cr-tag-btn" data-tag="御姐">御姐</button>
+                                <button class="cr-tag-btn" data-tag="熟女">熟女</button>
+                                <button class="cr-tag-btn" data-tag="纯情">纯情</button>
+                                <button class="cr-tag-btn" data-tag="淫荡">淫荡</button>
+                            </div>
+                            <div class="cr-tag-group"><span class="cr-tag-group-label">关系</span>
+                                <button class="cr-tag-btn" data-tag="姐姐">姐姐</button>
+                                <button class="cr-tag-btn" data-tag="妹妹">妹妹</button>
+                                <button class="cr-tag-btn" data-tag="人妻">人妻</button>
+                                <button class="cr-tag-btn" data-tag="青梅竹马">青梅竹马</button>
+                                <button class="cr-tag-btn" data-tag="女仆">女仆</button>
+                                <button class="cr-tag-btn" data-tag="百合">百合</button>
+                            </div>
+                            <div class="cr-tag-group"><span class="cr-tag-group-label">题材</span>
+                                <button class="cr-tag-btn" data-tag="调教">调教</button>
+                                <button class="cr-tag-btn" data-tag="NTR">NTR</button>
+                                <button class="cr-tag-btn" data-tag="恶堕">恶堕</button>
+                                <button class="cr-tag-btn" data-tag="催眠">催眠</button>
+                                <button class="cr-tag-btn" data-tag="纯爱">纯爱</button>
+                                <button class="cr-tag-btn" data-tag="校园">校园</button>
+                                <button class="cr-tag-btn" data-tag="仙侠">仙侠</button>
+                                <button class="cr-tag-btn" data-tag="异世界">异世界</button>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="setting-item">
+                        <span class="setting-label">简介</span>
+                        <textarea class="setting-textarea" id="crDesc" rows="2" placeholder="描述角色的外貌、性格、背景……"></textarea>
+                    </div>
+                    <div class="setting-item">
+                        <span class="setting-label">开场剧情</span>
+                        <textarea class="setting-textarea" id="crOpener" rows="3" placeholder="角色见面的第一段剧情描写（旁白或角色视角）……"></textarea>
+                    </div>
+                    <div class="setting-item">
+                        <span class="setting-label">人设提示词 *</span>
+                        <textarea class="setting-textarea" id="crSystemPrompt" rows="5" placeholder="你是XX，性格XX……&#10;【互动规则】1. 用户XX→你XX&#10;【台词风格】示例台词……"></textarea>
+                    </div>
+                    <button class="btn-save-settings" id="saveCreateRole" style="margin-top:12px;width:100%">创建角色</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="js/roles-data.js"></script>
+    <script src="js/app.js"></script>
+    <script src="js/chat.js"></script>
+</body>
+</html>
