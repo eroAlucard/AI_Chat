@@ -279,7 +279,9 @@ async function callLMApi(role, messages, useStream = true) {
     const response = await fetch(`${apiUrl}/v1/chat/completions`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(body)
+        body: JSON.stringify(body),
+        mode: 'cors',
+        credentials: 'omit'
     });
 
     if (!response.ok) {
