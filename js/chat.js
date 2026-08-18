@@ -276,12 +276,26 @@ async function callLMApi(role, messages, useStream = true) {
 
     if (modelName) body.model = modelName;
 
-    const response = await fetch(`${apiUrl}/v1/chat/completions`, {
+    // 判断是否使用同域代理（Cloudflare Pages 部署时绕过 Clear-Site-Data 头问题）
+    const isDeployed = window.location.protocol === 'https:';
+    let fetchUrl, fetchHeaders;
+    if (isDeployed) {
+        // 同域代理：前端请求 /api/v1/chat/completions，由 Pages Function 转发
+        fetchUrl = `${window.location.origin}/api/v1/chat/completions`;
+        fetchHeaders = {
+            'Content-Type': 'application/json',
+            'X-Target-URL': apiUrl  // 告诉代理目标地址
+        };
+    } else {
+        // 本地开发：直接请求 LM Studio
+        fetchUrl = `${apiUrl}/v1/chat/completions`;
+        fetchHeaders = { 'Content-Type': 'application/json' };
+    }
+
+    const response = await fetch(fetchUrl, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(body),
-        mode: 'cors',
-        credentials: 'omit'
+        headers: fetchHeaders,
+        body: JSON.stringify(body)
     });
 
     if (!response.ok) {
