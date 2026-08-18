@@ -41,7 +41,7 @@ const AppState = {
     filters: {},
     searchQuery: '',
     settings: {
-        apiUrl: 'https://im.eroaichat.io',
+        apiUrl: 'https://eroaichat.de5.net',
         modelName: '',
         temperature: 0.7,
         maxTokens: 2048,
