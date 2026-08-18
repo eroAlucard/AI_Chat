@@ -1,3 +1,110 @@
+/* ==================== 登录页 ==================== */
+.login-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: var(--bg-primary);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 10000;
+}
+
+.login-overlay.hidden {
+    display: none;
+}
+
+.login-box {
+    text-align: center;
+    padding: 40px;
+    max-width: 320px;
+    width: 100%;
+}
+
+.login-logo {
+    font-size: 48px;
+    color: var(--accent-purple);
+    margin-bottom: 16px;
+    animation: pulse 2s ease-in-out infinite;
+}
+
+@keyframes pulse {
+    0%, 100% { opacity: 1; transform: scale(1); }
+    50% { opacity: 0.8; transform: scale(1.05); }
+}
+
+.login-title {
+    font-size: 28px;
+    font-weight: 700;
+    color: var(--text-primary);
+    margin-bottom: 8px;
+}
+
+.login-subtitle {
+    font-size: 14px;
+    color: var(--text-secondary);
+    margin-bottom: 32px;
+}
+
+.login-form {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+}
+
+.login-input {
+    width: 100%;
+    padding: 14px 16px;
+    background: var(--bg-input);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-md);
+    color: var(--text-primary);
+    font-size: 16px;
+    outline: none;
+    transition: border-color 0.2s;
+}
+
+.login-input:focus {
+    border-color: var(--accent-purple);
+}
+
+.login-input::placeholder {
+    color: var(--text-muted);
+}
+
+.login-btn {
+    width: 100%;
+    padding: 14px;
+    background: var(--accent-gradient);
+    border: none;
+    border-radius: var(--radius-md);
+    color: white;
+    font-size: 16px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: opacity 0.2s, transform 0.1s;
+}
+
+.login-btn:hover {
+    opacity: 0.9;
+}
+
+.login-btn:active {
+    transform: scale(0.98);
+}
+
+.login-error {
+    color: #ff6b6b;
+    font-size: 13px;
+    margin: 0;
+}
+
+.login-error.hidden {
+    display: none;
+}
+
 /* ==================== CSS Variables ==================== */
 :root {
     --bg-primary: #0a0a0f;

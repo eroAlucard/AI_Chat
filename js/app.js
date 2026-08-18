@@ -1,3 +1,37 @@
+// ==================== Login Auth ====================
+const ACCESS_PASSWORD = 'aichat2024';
+
+function checkLogin() {
+    const authed = sessionStorage.getItem('ai_chat_authed');
+    if (authed === '1') {
+        document.getElementById('loginOverlay').classList.add('hidden');
+        return true;
+    }
+    return false;
+}
+
+function initLogin() {
+    if (checkLogin()) return;
+
+    const form = document.getElementById('loginForm');
+    const input = document.getElementById('loginPassword');
+    const error = document.getElementById('loginError');
+
+    form.addEventListener('submit', (e) => {
+        e.preventDefault();
+        const pwd = input.value.trim();
+        if (pwd === ACCESS_PASSWORD) {
+            sessionStorage.setItem('ai_chat_authed', '1');
+            document.getElementById('loginOverlay').classList.add('hidden');
+        } else {
+            error.classList.remove('hidden');
+            input.value = '';
+            input.focus();
+            setTimeout(() => error.classList.add('hidden'), 3000);
+        }
+    });
+}
+
 // ==================== App State ====================
 const AppState = {
     currentPage: 'home',
@@ -21,6 +55,7 @@ const $$ = (sel) => document.querySelectorAll(sel);
 
 // ==================== Initialize ====================
 document.addEventListener('DOMContentLoaded', () => {
+    initLogin();
     loadState();
     loadCustomRoles();
     initNavigation();
