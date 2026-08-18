@@ -1,5 +1,5 @@
 // ==================== Login Auth ====================
-const ACCESS_PASSWORD = 'aichat2024';
+const ACCESS_PASSWORD = 'hh1234';
 
 function checkLogin() {
     const authed = sessionStorage.getItem('ai_chat_authed');
