@@ -77,6 +77,11 @@ function showChatView(roleId) {
     if (oldStream) oldStream.remove();
     hideTypingIndicator();
 
+    // 优化：如果同一角色的后台流式请求还在跑，显示"正在生成回复…"提示
+    if (currentStreamAbort && currentStreamRoleId === roleId) {
+        showTypingIndicator();
+    }
+
     $('#chatListView').style.display = 'none';
     $('#chatView').classList.remove('hidden');
 
@@ -145,11 +150,16 @@ function renderMessages(roleId) {
         const isUser = msg.role === 'user';
         const time = new Date(msg.time);
         const timeStr = `${time.getHours().toString().padStart(2, '0')}:${time.getMinutes().toString().padStart(2, '0')}`;
+        // 如果有思考过程，渲染折叠的思考过程 + 正文
+        let bubbleContent = formatMessage(msg.content);
+        if (!isUser && msg.reasoning) {
+            bubbleContent = `<details style="margin-bottom:8px;"><summary style="color:#888;font-style:italic;cursor:pointer;font-size:0.9em;">💭 思考过程</summary><span style="color:#aaa;font-style:italic;font-size:0.9em;">${formatMessage(msg.reasoning)}</span></details>${bubbleContent}`;
+        }
         return `
             <div class="message ${isUser ? 'user' : 'ai'}">
                 <div class="message-avatar-placeholder">${isUser ? '👤' : role.emoji}</div>
                 <div>
-                    <div class="message-bubble">${formatMessage(msg.content)}</div>
+                    <div class="message-bubble">${bubbleContent}</div>
                     <div class="message-time">${timeStr}</div>
                 </div>
             </div>
@@ -216,7 +226,9 @@ async function sendMessage() {
         hideTypingIndicator();
 
         // 流式调用：实时逐字显示
-        const fullContent = await callLMApi(role, session.messages, true);
+        const result = await callLMApi(role, session.messages, true);
+        const fullContent = result.content;
+        const reasoningContent = result.reasoning;
 
         // 被中断的请求返回 '...'，不保存无意义内容
         if (fullContent && fullContent !== '...') {
@@ -236,13 +248,23 @@ async function sendMessage() {
                 }
             }
 
-            session.messages.push({
+            const msgData = {
                 role: 'assistant',
                 content: fullContent,
                 time: new Date().toISOString()
-            });
+            };
+            // 保存思考过程（如果有）
+            if (reasoningContent) {
+                msgData.reasoning = reasoningContent;
+            }
+            session.messages.push(msgData);
             session.lastTime = new Date().toISOString();
             saveState();
+
+            // 如果用户当前正在查看该角色，刷新消息列表（后台完成时DOM可能已不存在）
+            if (AppState.currentChat === roleId) {
+                renderMessages(roleId);
+            }
         }
     } catch (error) {
         hideTypingIndicator();
@@ -360,7 +382,7 @@ async function callLMApi(role, messages, useStream = true) {
         });
     } catch (e) {
         // 被主动取消不算错误
-        if (e.name === 'AbortError') return '...';
+        if (e.name === 'AbortError') return { content: '...', reasoning: '' };
         // 固定域名不可用时，降级到本地直连
         if (!isDeployed && apiUrl !== 'http://localhost:1234') {
             console.warn('[API] 主地址失败，降级到 localhost:1234', e);
@@ -398,7 +420,7 @@ async function callLMApi(role, messages, useStream = true) {
     } else {
         // 非流式响应
         const data = await response.json();
-        return data.choices?.[0]?.message?.content || '...';
+        return { content: data.choices?.[0]?.message?.content || '...', reasoning: '' };
     }
 }
 
@@ -488,7 +510,8 @@ async function readStreamResponse(response, role) {
     }
 
     // 流式消息元素保留在DOM中，由 sendMessage 转为正式消息
-    return fullContent || '...';
+    // 返回正文和思考过程，供 sendMessage 保存到 session
+    return { content: fullContent || '...', reasoning: reasoningContent || '' };
 }
 
 // ==================== Fallback Reply ====================
