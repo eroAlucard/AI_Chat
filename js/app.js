@@ -46,7 +46,7 @@ const AppState = {
         temperature: 0.7,
         maxTokens: 2048,
         systemPrompt: '',
-        enableThinking: true  // 思考模式开关
+
     }
 };
 
