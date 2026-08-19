@@ -506,13 +506,26 @@ async function readStreamResponse(response, role) {
                         }
                     }
 
-                    // 处理正式回复 content（只累积数据，不实时更新 DOM，等完成后整段显示）
+                    // 处理正式回复 content（实时更新 DOM）
                     if (delta.content) {
                         if (isReasoning) {
                             // 思考结束，开始正式回复
                             isReasoning = false;
                         }
                         fullContent += delta.content;
+                        
+                        // 实时更新正文显示
+                        let bubble = $('#streamBubble');
+                        if (bubble) {
+                            if (reasoningContent) {
+                                // 有思考过程：折叠思考，显示正文
+                                bubble.innerHTML = `<details style="margin-bottom:8px;"><summary style="color:#888;font-size:0.85em;cursor:pointer;">💭 思考过程</summary><div style="color:#aaa;font-style:italic;font-size:0.9em;margin-top:4px;padding-left:8px;">${formatMessage(reasoningContent)}</div></details>${formatMessage(fullContent)}`;
+                            } else {
+                                // 无思考过程：直接显示正文
+                                bubble.innerHTML = formatMessage(fullContent);
+                            }
+                            scrollToBottom();
+                        }
                     }
                 } catch (e) {
                     // 忽略解析错误
