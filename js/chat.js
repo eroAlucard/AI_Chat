@@ -66,6 +66,16 @@ function showChatView(roleId) {
     const role = ROLES_DATA.find(r => r.id === roleId);
     if (!role) return;
 
+    // 取消前一个流式请求（防止旧流写入新角色的DOM）
+    if (currentStreamAbort) {
+        currentStreamAbort.abort();
+        currentStreamAbort = null;
+    }
+    // 清理残留的流式消息元素
+    const oldStream = $('#streamMessage');
+    if (oldStream) oldStream.remove();
+    hideTypingIndicator();
+
     $('#chatListView').style.display = 'none';
     $('#chatView').classList.remove('hidden');
 
@@ -164,10 +174,19 @@ function scrollToBottom() {
     }, 50);
 }
 
+// 全局 AbortController：用于取消前一个流式请求
+let currentStreamAbort = null;
+
 async function sendMessage() {
     const input = $('#chatInput');
     const text = input.value.trim();
     if (!text || !AppState.currentChat) return;
+
+    // 取消前一个流式请求（防止切换角色后旧流仍在跑）
+    if (currentStreamAbort) {
+        currentStreamAbort.abort();
+        currentStreamAbort = null;
+    }
 
     const roleId = AppState.currentChat;
     const session = AppState.chatSessions[roleId];
@@ -321,14 +340,21 @@ async function callLMApi(role, messages, useStream = true) {
         fetchHeaders = { 'Content-Type': 'application/json' };
     }
 
+    // 创建新的 AbortController，用于取消此请求
+    currentStreamAbort = new AbortController();
+    const abortSignal = currentStreamAbort.signal;
+
     let response;
     try {
         response = await fetch(fetchUrl, {
             method: 'POST',
             headers: fetchHeaders,
-            body: JSON.stringify(body)
+            body: JSON.stringify(body),
+            signal: abortSignal
         });
     } catch (e) {
+        // 被主动取消不算错误
+        if (e.name === 'AbortError') return '...';
         // 固定域名不可用时，降级到本地直连
         if (!isDeployed && apiUrl !== 'http://localhost:1234') {
             console.warn('[API] 主地址失败，降级到 localhost:1234', e);
@@ -336,7 +362,8 @@ async function callLMApi(role, messages, useStream = true) {
             response = await fetch(fallbackUrl, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(body)
+                body: JSON.stringify(body),
+                signal: abortSignal
             });
         } else {
             throw e;
