@@ -544,6 +544,11 @@ async function readStreamResponse(response, role) {
 
     // 流式消息元素保留在DOM中，由 sendMessage 转为正式消息
     // 返回正文和思考过程，供 sendMessage 保存到 session
+    // 如果正文为空但思考过程有内容（Qwen3 有时把回复写在 reasoning 中），把思考内容作为正文
+    if (!fullContent && reasoningContent) {
+        fullContent = reasoningContent;
+        reasoningContent = '';
+    }
     return { content: fullContent || '...', reasoning: reasoningContent || '' };
 }
 
