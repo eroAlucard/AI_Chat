@@ -66,12 +66,13 @@ function showChatView(roleId) {
     const role = ROLES_DATA.find(r => r.id === roleId);
     if (!role) return;
 
-    // 取消前一个流式请求（防止旧流写入新角色的DOM）
-    if (currentStreamAbort) {
+    // 只在切换到不同角色时取消前一个流式请求（返回列表再回来时不取消，让请求在后台完成）
+    if (currentStreamAbort && currentStreamRoleId !== roleId) {
         currentStreamAbort.abort();
         currentStreamAbort = null;
+        currentStreamRoleId = null;
     }
-    // 清理残留的流式消息元素
+    // 清理残留的流式消息元素（切换角色时旧流的DOM元素已无意义）
     const oldStream = $('#streamMessage');
     if (oldStream) oldStream.remove();
     hideTypingIndicator();
@@ -176,6 +177,7 @@ function scrollToBottom() {
 
 // 全局 AbortController：用于取消前一个流式请求
 let currentStreamAbort = null;
+let currentStreamRoleId = null; // 当前流式请求所属的角色ID
 
 async function sendMessage() {
     const input = $('#chatInput');
@@ -216,29 +218,32 @@ async function sendMessage() {
         // 流式调用：实时逐字显示
         const fullContent = await callLMApi(role, session.messages, true);
 
-        // 流式消息元素已由 readStreamResponse 创建并实时更新
-        // 流式完成后，将临时元素转为正式消息
-        const streamEl = $('#streamMessage');
-        if (streamEl) {
-            // 移除临时ID，使其成为正式消息
-            streamEl.removeAttribute('id');
-            const streamBubble = streamEl.querySelector('#streamBubble');
-            if (streamBubble) streamBubble.removeAttribute('id');
-            const streamTime = streamEl.querySelector('#streamTime');
-            if (streamTime) {
-                streamTime.removeAttribute('id');
-                const now = new Date();
-                streamTime.textContent = `${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}`;
+        // 被中断的请求返回 '...'，不保存无意义内容
+        if (fullContent && fullContent !== '...') {
+            // 流式消息元素已由 readStreamResponse 创建并实时更新
+            // 流式完成后，将临时元素转为正式消息
+            const streamEl = $('#streamMessage');
+            if (streamEl) {
+                // 移除临时ID，使其成为正式消息
+                streamEl.removeAttribute('id');
+                const streamBubble = streamEl.querySelector('#streamBubble');
+                if (streamBubble) streamBubble.removeAttribute('id');
+                const streamTime = streamEl.querySelector('#streamTime');
+                if (streamTime) {
+                    streamTime.removeAttribute('id');
+                    const now = new Date();
+                    streamTime.textContent = `${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}`;
+                }
             }
-        }
 
-        session.messages.push({
-            role: 'assistant',
-            content: fullContent,
-            time: new Date().toISOString()
-        });
-        session.lastTime = new Date().toISOString();
-        saveState();
+            session.messages.push({
+                role: 'assistant',
+                content: fullContent,
+                time: new Date().toISOString()
+            });
+            session.lastTime = new Date().toISOString();
+            saveState();
+        }
     } catch (error) {
         hideTypingIndicator();
         console.warn('API call failed, using fallback:', error);
@@ -342,6 +347,7 @@ async function callLMApi(role, messages, useStream = true) {
 
     // 创建新的 AbortController，用于取消此请求
     currentStreamAbort = new AbortController();
+    currentStreamRoleId = role.id;
     const abortSignal = currentStreamAbort.signal;
 
     let response;
@@ -404,19 +410,21 @@ async function readStreamResponse(response, role) {
     let buffer = '';
     let isReasoning = false; // 标记是否在输出思考过程
 
-    // 创建流式消息气泡
+    // 创建流式消息气泡（如果容器存在的话）
     const container = $('#chatMessages');
-    const streamMsgEl = document.createElement('div');
-    streamMsgEl.className = 'message ai';
-    streamMsgEl.id = 'streamMessage';
-    streamMsgEl.innerHTML = `
-        <div class="message-avatar-placeholder" style="background:var(--accent-gradient)">${role.emoji}</div>
-        <div>
-            <div class="message-bubble" id="streamBubble"></div>
-            <div class="message-time" id="streamTime"></div>
-        </div>
-    `;
-    container.appendChild(streamMsgEl);
+    if (container) {
+        const streamMsgEl = document.createElement('div');
+        streamMsgEl.className = 'message ai';
+        streamMsgEl.id = 'streamMessage';
+        streamMsgEl.innerHTML = `
+            <div class="message-avatar-placeholder" style="background:var(--accent-gradient)">${role.emoji}</div>
+            <div>
+                <div class="message-bubble" id="streamBubble"></div>
+                <div class="message-time" id="streamTime"></div>
+            </div>
+        `;
+        container.appendChild(streamMsgEl);
+    }
 
     try {
         while (true) {
