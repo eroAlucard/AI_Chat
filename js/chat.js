@@ -32,6 +32,14 @@ function initChatView() {
         toggleChatMenu();
     });
 
+    // 思考模式开关
+    const thinkingSwitch = $('#thinkingSwitch');
+    thinkingSwitch.addEventListener('change', () => {
+        AppState.settings.enableThinking = thinkingSwitch.checked;
+        saveState();
+        showToast(thinkingSwitch.checked ? '思考模式已开启' : '思考模式已关闭（更快）');
+    });
+
     // 点击其他地方关闭菜单
     document.addEventListener('click', () => {
         closeChatMenu();
@@ -121,6 +129,12 @@ function showChatView(roleId) {
 
     // 渲染快捷选项
     renderQuickReplies(roleId);
+
+    // 同步思考模式开关状态
+    const thinkingSwitch = $('#thinkingSwitch');
+    if (thinkingSwitch) {
+        thinkingSwitch.checked = AppState.settings.enableThinking !== false;
+    }
 
     // 滚动到底部
     scrollToBottom();
@@ -323,7 +337,7 @@ function hideTypingIndicator() {
 
 // ==================== LM Studio API ====================
 async function callLMApi(role, messages, useStream = true) {
-    const { apiUrl, modelName, temperature, maxTokens, systemPrompt } = AppState.settings;
+    const { apiUrl, modelName, temperature, maxTokens, systemPrompt, enableThinking } = AppState.settings;
 
     const baseSystem = systemPrompt || role.systemPrompt;
     // 统一人称规则 + 性别强调：角色必须始终保持设定性别，用对应性别的第三人称描写内心活动
@@ -348,11 +362,17 @@ async function callLMApi(role, messages, useStream = true) {
         }))
     ];
 
+    // 思考模式：开启时使用 Qwen3 官方思考模式参数，关闭时使用非思考模式参数
+    const thinkingEnabled = enableThinking !== false;  // 默认开启
     const body = {
         messages: apiMessages,
-        temperature: temperature,
+        temperature: thinkingEnabled ? 1.0 : 0.7,
+        top_p: thinkingEnabled ? 0.95 : 0.80,
+        top_k: thinkingEnabled ? 20 : 40,
+        presence_penalty: thinkingEnabled ? 0 : 1.5,
         max_tokens: maxTokens,
-        stream: useStream
+        stream: useStream,
+        enable_thinking: thinkingEnabled
     };
 
     if (modelName) body.model = modelName;

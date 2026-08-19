@@ -45,7 +45,8 @@ const AppState = {
         modelName: '',
         temperature: 0.7,
         maxTokens: 2048,
-        systemPrompt: ''
+        systemPrompt: '',
+        enableThinking: true  // 思考模式开关
     }
 };
 
