@@ -475,7 +475,23 @@ async function readStreamResponse(response, role) {
                     if (delta.reasoning_content) {
                         reasoningContent += delta.reasoning_content;
                         isReasoning = true;
-                        const bubble = $('#streamBubble');
+                        // 如果 bubble 被清空（用户离开又返回），重新创建流式消息 DOM
+                        let bubble = $('#streamBubble');
+                        if (!bubble && $('#chatMessages')) {
+                            hideTypingIndicator();
+                            const streamMsgEl = document.createElement('div');
+                            streamMsgEl.className = 'message ai';
+                            streamMsgEl.id = 'streamMessage';
+                            streamMsgEl.innerHTML = `
+                                <div class="message-avatar-placeholder" style="background:var(--accent-gradient)">${role.emoji}</div>
+                                <div>
+                                    <div class="message-bubble" id="streamBubble"></div>
+                                    <div class="message-time" id="streamTime"></div>
+                                </div>
+                            `;
+                            $('#chatMessages').appendChild(streamMsgEl);
+                            bubble = $('#streamBubble');
+                        }
                         if (bubble) {
                             // 思考过程用灰色斜体显示
                             bubble.innerHTML = `<span style="color:#888;font-style:italic;">💭 思考中…</span><br><span style="color:#aaa;font-style:italic;font-size:0.9em;">${formatMessage(reasoningContent)}</span>`;
@@ -490,7 +506,23 @@ async function readStreamResponse(response, role) {
                             isReasoning = false;
                         }
                         fullContent += delta.content;
-                        const bubble = $('#streamBubble');
+                        // 如果 bubble 被清空（用户离开又返回），重新创建流式消息 DOM
+                        let bubble = $('#streamBubble');
+                        if (!bubble && $('#chatMessages')) {
+                            hideTypingIndicator();
+                            const streamMsgEl = document.createElement('div');
+                            streamMsgEl.className = 'message ai';
+                            streamMsgEl.id = 'streamMessage';
+                            streamMsgEl.innerHTML = `
+                                <div class="message-avatar-placeholder" style="background:var(--accent-gradient)">${role.emoji}</div>
+                                <div>
+                                    <div class="message-bubble" id="streamBubble"></div>
+                                    <div class="message-time" id="streamTime"></div>
+                                </div>
+                            `;
+                            $('#chatMessages').appendChild(streamMsgEl);
+                            bubble = $('#streamBubble');
+                        }
                         if (bubble) {
                             // 如果有思考过程，先显示思考再显示回复
                             if (reasoningContent) {
