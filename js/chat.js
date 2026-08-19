@@ -373,7 +373,9 @@ async function readStreamResponse(response, role) {
     const reader = response.body.getReader();
     const decoder = new TextDecoder();
     let fullContent = '';
+    let reasoningContent = '';
     let buffer = '';
+    let isReasoning = false; // 标记是否在输出思考过程
 
     // 创建流式消息气泡
     const container = $('#chatMessages');
@@ -405,12 +407,39 @@ async function readStreamResponse(response, role) {
 
                 try {
                     const data = JSON.parse(trimmed.slice(6));
-                    const delta = data.choices?.[0]?.delta?.content;
-                    if (delta) {
-                        fullContent += delta;
+                    const choice = data.choices?.[0];
+                    if (!choice) continue;
+
+                    const delta = choice.delta;
+                    if (!delta) continue;
+
+                    // 处理 reasoning_content（思考过程，如 Qwen3 的思维链）
+                    if (delta.reasoning_content) {
+                        reasoningContent += delta.reasoning_content;
+                        isReasoning = true;
                         const bubble = $('#streamBubble');
                         if (bubble) {
-                            bubble.innerHTML = formatMessage(fullContent);
+                            // 思考过程用灰色斜体显示
+                            bubble.innerHTML = `<span style="color:#888;font-style:italic;">💭 思考中…</span><br><span style="color:#aaa;font-style:italic;font-size:0.9em;">${formatMessage(reasoningContent)}</span>`;
+                            scrollToBottom();
+                        }
+                    }
+
+                    // 处理正式回复 content
+                    if (delta.content) {
+                        if (isReasoning) {
+                            // 思考结束，开始正式回复
+                            isReasoning = false;
+                        }
+                        fullContent += delta.content;
+                        const bubble = $('#streamBubble');
+                        if (bubble) {
+                            // 如果有思考过程，先显示思考再显示回复
+                            if (reasoningContent) {
+                                bubble.innerHTML = `<details style="margin-bottom:8px;"><summary style="color:#888;font-style:italic;cursor:pointer;font-size:0.9em;">💭 思考过程</summary><span style="color:#aaa;font-style:italic;font-size:0.9em;">${formatMessage(reasoningContent)}</span></details>${formatMessage(fullContent)}`;
+                            } else {
+                                bubble.innerHTML = formatMessage(fullContent);
+                            }
                             scrollToBottom();
                         }
                     }
