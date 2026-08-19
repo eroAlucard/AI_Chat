@@ -369,14 +369,6 @@ async function callLMApi(role, messages, useStream = true) {
     // - 开启思考：不追加任何指令（模型默认启用思考）
     const thinkingEnabled = enableThinking !== false;  // 默认开启
 
-    const apiMessages = [
-        { role: 'system', content: systemMessage },
-        ...messages.map(m => ({
-            role: m.role,
-            content: m.content
-        }))
-    ];
-
     // 关闭思考模式时，在最后一条 user 消息末尾注入 /no_think 指令
     if (!thinkingEnabled) {
         const lastUserIdx = apiMessages.map(m => m.role).lastIndexOf('user');
