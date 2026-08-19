@@ -192,17 +192,34 @@ async function sendMessage() {
     // 尝试调用 API
     try {
         const role = ROLES_DATA.find(r => r.id === roleId);
-        const aiReply = await callLMApi(role, session.messages);
         hideTypingIndicator();
+
+        // 流式调用：实时逐字显示
+        const fullContent = await callLMApi(role, session.messages, true);
+
+        // 流式消息元素已由 readStreamResponse 创建并实时更新
+        // 流式完成后，将临时元素转为正式消息
+        const streamEl = $('#streamMessage');
+        if (streamEl) {
+            // 移除临时ID，使其成为正式消息
+            streamEl.removeAttribute('id');
+            const streamBubble = streamEl.querySelector('#streamBubble');
+            if (streamBubble) streamBubble.removeAttribute('id');
+            const streamTime = streamEl.querySelector('#streamTime');
+            if (streamTime) {
+                streamTime.removeAttribute('id');
+                const now = new Date();
+                streamTime.textContent = `${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}`;
+            }
+        }
 
         session.messages.push({
             role: 'assistant',
-            content: aiReply,
+            content: fullContent,
             time: new Date().toISOString()
         });
         session.lastTime = new Date().toISOString();
         saveState();
-        renderMessages(roleId);
     } catch (error) {
         hideTypingIndicator();
         console.warn('API call failed, using fallback:', error);
@@ -259,7 +276,15 @@ async function callLMApi(role, messages, useStream = true) {
     const gender = role.gender === 'male' ? '男性' : '女性';
     const pronoun = role.gender === 'male' ? '他' : '她';
     const personRule = `【性别规则】你是${gender}角色（${role.name}），请始终以${gender}身份、${gender}口吻回应，保持性别特征一致。\n\n【人称规则】用户是第一人称"我"。你描写自己的内心活动、感受时，用第三人称（${pronoun}/${role.name}），不用"我"。例如不要写"我忍不住心跳加速"，而写"${pronoun}忍不住心跳加速"。对话台词中可以用"我"自称。\n\n`;
-    const systemMessage = personRule + baseSystem;
+
+    // 女性向角色专属规则：男性角色优先使用细致的爱抚私处描写
+    let femaleRule = '';
+    const isFemaleOriented = role.tags && role.tags.includes('女性向');
+    if (isFemaleOriented && role.gender === 'male') {
+        femaleRule = `【女性向爱抚规则】你是面向女性用户的男性角色。在亲密互动场景中，除非用户有特殊要求，否则优先使用细致的爱抚私处描写。描写要求：\n1. 不能只写"抚摸""爱抚"等模糊词，必须具体描述手指/舌尖的动作轨迹、力度、节奏、角度\n2. 重点描写对阴蒂的爱抚：画圈揉搓、上下拨弄、左右轻扫、指腹按压、两指夹揉、舌尖舔舐吮吸等\n3. 描写女性身体的反应：花核充血挺立、花瓣翕张、蜜液溢出、腰肢颤抖、大腿夹紧等\n4. 描写你自己的感受和反应：手指被蜜液浸湿、感受花核的跳动、闻到她的体香等\n5. 互动要有层次感：从轻柔试探→逐渐加力→节奏变化→根据她的反应调整\n示例：「他的指腹沿着她的花缝缓缓滑过，找到那颗微微挺立的花核后，用中指指腹以极轻的力道画着小圈揉搓。每画一圈就稍微加重一点力，感受着那粒小小的肉珠在指腹下跳动、充血变硬。她的蜜液已经浸湿了他的手指，他沾着那滑腻的液体继续拨弄，拇指按住花核上方轻轻上下摩擦，同时食指从下方托住轻揉——两根手指配合着，一上一下夹揉那颗敏感的肉珠。」\n\n`;
+    }
+
+    const systemMessage = personRule + femaleRule + baseSystem;
 
     const apiMessages = [
         { role: 'system', content: systemMessage },
@@ -398,10 +423,7 @@ async function readStreamResponse(response, role) {
         console.warn('Stream read error:', e);
     }
 
-    // 移除流式消息元素
-    const streamEl = $('#streamMessage');
-    if (streamEl) streamEl.remove();
-
+    // 流式消息元素保留在DOM中，由 sendMessage 转为正式消息
     return fullContent || '...';
 }
 
@@ -716,6 +738,19 @@ const QUICK_REPLIES_MAP = {
         "魅夜": ["我好像在做梦", "梦里什么都可以做吗", "别让我醒来", "梦境性交是什么感觉"],
         "许渊": ["这个实验是什么", "催眠我吧", "我的身体不受控制了", "实验数据记录好了"],
     },
+    // 女性向专属快捷选项（爱抚阴蒂及相关）
+    femaleOriented: [
+        "用指尖轻轻画圈揉我的阴蒂",
+        "帮我脱掉内裤慢慢抚摸下面",
+        "用拇指按住阴蒂上下摩擦",
+        "分开花瓣用指腹轻扫花核",
+        "两根手指夹住阴蒂慢慢揉搓",
+        "舌尖舔舐阴蒂的同时手指插进来",
+        "把阴蒂含在嘴里吮吸",
+        "手指沾湿后快速拨弄花核",
+        "用指腹轻柔地左右拨弄阴蒂",
+        "一边揉阴蒂一边亲吻大腿内侧"
+    ],
     // 通用快捷选项（所有角色都有）
     common: [
         "你好", "今天想聊什么", "讲讲你自己", "我喜欢你"
@@ -730,6 +765,15 @@ function renderQuickReplies(roleId) {
     container.innerHTML = '';
 
     const replies = [];
+
+    // 0. 女性向专属选项优先
+    const isFemaleOriented = role.tags && role.tags.includes('女性向');
+    if (isFemaleOriented && QUICK_REPLIES_MAP.femaleOriented) {
+        // 随机选3-4条女性向选项
+        const femaleOptions = [...QUICK_REPLIES_MAP.femaleOriented];
+        const shuffled = femaleOptions.sort(() => Math.random() - 0.5);
+        replies.push(...shuffled.slice(0, 4));
+    }
 
     // 1. 角色专属选项
     if (QUICK_REPLIES_MAP.roles[role.name]) {
