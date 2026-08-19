@@ -232,6 +232,11 @@ async function sendMessage() {
         const reasoningContent = result.reasoning;
 
         // 被中断的请求返回 '...'，不保存无意义内容
+        // 流式完成，清理 abort 状态和 typing indicator
+        currentStreamAbort = null;
+        currentStreamRoleId = null;
+        hideTypingIndicator();
+
         if (fullContent && fullContent !== '...') {
             // 流式消息元素已由 readStreamResponse 创建并实时更新
             // 流式完成后，将临时元素转为正式消息
@@ -268,6 +273,8 @@ async function sendMessage() {
             }
         }
     } catch (error) {
+        currentStreamAbort = null;
+        currentStreamRoleId = null;
         hideTypingIndicator();
         console.warn('API call failed, using fallback:', error);
 
@@ -499,39 +506,13 @@ async function readStreamResponse(response, role) {
                         }
                     }
 
-                    // 处理正式回复 content
+                    // 处理正式回复 content（只累积数据，不实时更新 DOM，等完成后整段显示）
                     if (delta.content) {
                         if (isReasoning) {
                             // 思考结束，开始正式回复
                             isReasoning = false;
                         }
                         fullContent += delta.content;
-                        // 如果 bubble 被清空（用户离开又返回），重新创建流式消息 DOM
-                        let bubble = $('#streamBubble');
-                        if (!bubble && $('#chatMessages')) {
-                            hideTypingIndicator();
-                            const streamMsgEl = document.createElement('div');
-                            streamMsgEl.className = 'message ai';
-                            streamMsgEl.id = 'streamMessage';
-                            streamMsgEl.innerHTML = `
-                                <div class="message-avatar-placeholder" style="background:var(--accent-gradient)">${role.emoji}</div>
-                                <div>
-                                    <div class="message-bubble" id="streamBubble"></div>
-                                    <div class="message-time" id="streamTime"></div>
-                                </div>
-                            `;
-                            $('#chatMessages').appendChild(streamMsgEl);
-                            bubble = $('#streamBubble');
-                        }
-                        if (bubble) {
-                            // 如果有思考过程，先显示思考再显示回复
-                            if (reasoningContent) {
-                                bubble.innerHTML = `<details style="margin-bottom:8px;"><summary style="color:#888;font-style:italic;cursor:pointer;font-size:0.9em;">💭 思考过程</summary><span style="color:#aaa;font-style:italic;font-size:0.9em;">${formatMessage(reasoningContent)}</span></details>${formatMessage(fullContent)}`;
-                            } else {
-                                bubble.innerHTML = formatMessage(fullContent);
-                            }
-                            scrollToBottom();
-                        }
                     }
                 } catch (e) {
                     // 忽略解析错误
