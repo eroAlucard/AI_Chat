@@ -77,11 +77,6 @@ function showChatView(roleId) {
     if (oldStream) oldStream.remove();
     hideTypingIndicator();
 
-    // 优化：如果同一角色的后台流式请求还在跑，显示"正在生成回复…"提示
-    if (currentStreamAbort && currentStreamRoleId === roleId) {
-        showTypingIndicator();
-    }
-
     $('#chatListView').style.display = 'none';
     $('#chatView').classList.remove('hidden');
 
@@ -104,6 +99,12 @@ function showChatView(roleId) {
 
     // 渲染消息
     renderMessages(roleId);
+
+    // 优化：如果同一角色的后台流式请求还在跑，显示"正在生成回复…"提示
+    // 必须在 renderMessages 之后调用，否则会被 innerHTML 清空
+    if (currentStreamAbort && currentStreamRoleId === roleId) {
+        showTypingIndicator();
+    }
 
     // 如果没有消息，发送欢迎消息
     const session = AppState.chatSessions[roleId];
