@@ -112,8 +112,8 @@ const BuiltinCards = (function() {
                     const blob = await loadResource(cardUrl, 'blob');
                     const file = new File([blob], filename, { type: 'image/png' });
 
-                    // 用 CardParser 解析
-                    const role = await CardParser.importCard(file);
+                    // 用 CardParser 解析（内置角色保留原始路径，不转base64）
+                    const role = await CardParser.importCard(file, true, cardUrl);
 
                     // 标记为内置角色
                     role.isBuiltin = true;

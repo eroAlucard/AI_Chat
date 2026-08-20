@@ -123,7 +123,7 @@ const CardParser = (function() {
      * @param {File} file — 原始 PNG 文件（用于生成图片 blob URL）
      * @returns {Promise<Object>} 内部角色数据对象
      */
-    async function mapCardToRole(cardData, file) {
+    async function mapCardToRole(cardData, file, preservePath = false, sourcePath = '') {
         const spec = cardData.spec || 'chara_card_v2';
         const specVersion = cardData.spec_version || '2.0';
         
@@ -202,17 +202,23 @@ const CardParser = (function() {
         // === 标签 ===
         const tags = (data.tags || []).slice(0, 10);
         
-        // === 图片（转为 base64 data URL 以持久化到 localStorage）===
+        // === 图片处理 ===
         let imageUrl = '';
-        try {
-            imageUrl = await new Promise((resolve, reject) => {
-                const reader = new FileReader();
-                reader.onload = () => resolve(reader.result);
-                reader.onerror = () => reject(new Error('FileReader 读取失败'));
-                reader.readAsDataURL(file);
-            });
-        } catch (e) {
-            console.warn('无法将图片转为 base64:', e);
+        if (preservePath && sourcePath) {
+            // 内置角色：直接使用相对路径，不转 base64（避免撑爆 localStorage）
+            imageUrl = sourcePath;
+        } else {
+            // 用户手动导入：转为 base64 data URL 以持久化到 localStorage
+            try {
+                imageUrl = await new Promise((resolve, reject) => {
+                    const reader = new FileReader();
+                    reader.onload = () => resolve(reader.result);
+                    reader.onerror = () => reject(new Error('FileReader 读取失败'));
+                    reader.readAsDataURL(file);
+                });
+            } catch (e) {
+                console.warn('无法将图片转为 base64:', e);
+            }
         }
         
         // === 生成渐变色 ===
@@ -262,16 +268,18 @@ const CardParser = (function() {
 
     /**
      * 一站式：解析 PNG 文件并映射为角色数据
-     * @param {File} file
+     * @param {File} file - PNG 文件
+     * @param {boolean} [preservePath=false] - 是否保留原始文件路径（内置角色用 true，避免 base64 撑爆 localStorage）
+     * @param {string} [sourcePath=''] - 原始文件相对路径（当 preservePath=true 时使用）
      * @returns {Promise<Object>} 角色数据
      */
-    async function importCard(file) {
+    async function importCard(file, preservePath = false, sourcePath = '') {
         if (!file || !file.name.toLowerCase().endsWith('.png')) {
             throw new Error('请选择 PNG 格式的人物卡文件');
         }
         
         const cardData = await parseCard(file);
-        const role = await mapCardToRole(cardData, file);
+        const role = await mapCardToRole(cardData, file, preservePath, sourcePath);
         
         return role;
     }
