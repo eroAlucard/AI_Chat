@@ -50,6 +50,22 @@ const AppState = {
     }
 };
 
+// ==================== ROLES_DATA (动态合并内置+自定义) ====================
+/**
+ * 全局角色数组 —— 每次访问都从 localStorage 实时合并
+ * 内置角色来自 ai_builtin_roles（由 BuiltinCards.autoImport 写入）
+ * 自定义角色来自 ai_custom_roles
+ */
+Object.defineProperty(window, 'ROLES_DATA', {
+    get() {
+        const builtin = JSON.parse(localStorage.getItem('ai_builtin_roles') || '[]');
+        const custom = JSON.parse(localStorage.getItem('ai_custom_roles') || '[]');
+        return [...builtin, ...custom];
+    },
+    configurable: true,
+    enumerable: true,
+});
+
 // ==================== DOM Elements ====================
 const $ = (sel) => document.querySelector(sel);
 const $$ = (sel) => document.querySelectorAll(sel);
@@ -60,8 +76,6 @@ document.addEventListener('DOMContentLoaded', async () => {
     loadState();
     // 首次加载时自动导入内置角色卡（在 loadCustomRoles 之前）
     await BuiltinCards.autoImport();
-    // 加载内置角色到 ROLES_DATA
-    loadBuiltinRoles();
     loadCustomRoles();
     initNavigation();
     initSearch();
