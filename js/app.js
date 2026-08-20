@@ -60,6 +60,8 @@ document.addEventListener('DOMContentLoaded', async () => {
     loadState();
     // 首次加载时自动导入内置角色卡（在 loadCustomRoles 之前）
     await BuiltinCards.autoImport();
+    // 加载内置角色到 ROLES_DATA
+    loadBuiltinRoles();
     loadCustomRoles();
     initNavigation();
     initSearch();
@@ -884,6 +886,25 @@ function renderCustomRoles() {
 }
 
 // 加载自定义角色
+// ==================== Load Builtin Roles ====================
+function loadBuiltinRoles() {
+    try {
+        const builtinRoles = JSON.parse(localStorage.getItem('ai_builtin_roles') || '[]');
+        if (builtinRoles.length > 0) {
+            console.log(`[App] 加载 ${builtinRoles.length} 个内置角色`);
+            // 合并到 ROLES_DATA（去重，按 id 判断）
+            const existingIds = new Set(ROLES_DATA.map(r => r.id));
+            for (const role of builtinRoles) {
+                if (!existingIds.has(role.id)) {
+                    ROLES_DATA.push(role);
+                }
+            }
+        }
+    } catch (e) {
+        console.warn('[App] 加载内置角色失败:', e);
+    }
+}
+
 function loadCustomRoles() {
     const customRoles = JSON.parse(localStorage.getItem('ai_custom_roles') || '[]');
     customRoles.forEach(role => {

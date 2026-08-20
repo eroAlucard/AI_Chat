@@ -94,13 +94,13 @@ const BuiltinCards = (function() {
 
             console.log(`[BuiltinCards] 找到 ${cardFiles.length} 张角色卡`);
 
-            // 2. 获取已有角色名列表（避免重复导入）
+            // 2. 获取已有内置角色名列表（避免重复导入）
             const existingNames = new Set(
-                (JSON.parse(localStorage.getItem('ai_custom_roles') || '[]')).map(r => r.name)
+                (JSON.parse(localStorage.getItem('ai_builtin_roles') || '[]')).map(r => r.name)
             );
 
             let imported = 0;
-            const customRoles = JSON.parse(localStorage.getItem('ai_custom_roles') || '[]');
+            const builtinRoles = JSON.parse(localStorage.getItem('ai_builtin_roles') || '[]');
 
             // 3. 逐个导入
             for (let i = 0; i < cardFiles.length; i++) {
@@ -115,17 +115,20 @@ const BuiltinCards = (function() {
                     // 用 CardParser 解析
                     const role = await CardParser.importCard(file);
 
+                    // 标记为内置角色
+                    role.isBuiltin = true;
+
                     // 检查是否已存在
                     if (existingNames.has(role.name)) {
                         console.log(`[BuiltinCards] 跳过已存在的角色: ${role.name}`);
                         continue;
                     }
 
-                    // 存入 localStorage
-                    customRoles.push(role);
+                    // 存入内置角色列表
+                    builtinRoles.push(role);
                     existingNames.add(role.name);
 
-                    // 添加到 ROLES_DATA
+                    // 添加到 ROLES_DATA（用于前端展示）
                     if (typeof ROLES_DATA !== 'undefined') {
                         ROLES_DATA.push(role);
                     }
@@ -138,10 +141,10 @@ const BuiltinCards = (function() {
                 }
             }
 
-            // 4. 保存到 localStorage
+            // 4. 保存到独立的 localStorage key
             if (imported > 0) {
-                localStorage.setItem('ai_custom_roles', JSON.stringify(customRoles));
-                console.log(`[BuiltinCards] 已保存 ${customRoles.length} 个角色到 localStorage`);
+                localStorage.setItem('ai_builtin_roles', JSON.stringify(builtinRoles));
+                console.log(`[BuiltinCards] 已保存 ${builtinRoles.length} 个内置角色到 ai_builtin_roles`);
             }
 
             // 5. 标记已导入
