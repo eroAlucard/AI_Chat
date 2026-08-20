@@ -313,6 +313,9 @@ function renderRoleGrid() {
 }
 
 function renderRoleCard(role) {
+    // 防御性检查：跳过无效角色
+    if (!role || !role.id) return '';
+    
     const coverHtml = role.image
         ? `<img class="role-card-cover" src="${role.image}" alt="${role.name}" loading="lazy" onerror="this.style.display='none';this.nextElementSibling.style.display='flex'"><div class="role-card-cover-placeholder" style="background:${role.gradient};display:none"><span>${role.emoji}</span></div>`
         : `<div class="role-card-cover-placeholder" style="background:${role.gradient}"><span>${role.emoji}</span></div>`;
