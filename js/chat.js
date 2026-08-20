@@ -300,20 +300,29 @@ async function sendMessage() {
         currentStreamAbort = null;
         currentStreamRoleId = null;
         hideTypingIndicator();
-        console.warn('API call failed, using fallback:', error);
+        console.warn('API call failed:', error);
 
-        // 使用本地 fallback 回复
-        const role = ROLES_DATA.find(r => String(r.id) === String(roleId));
-        const fallbackReply = getFallbackReply(role, text);
-
-        session.messages.push({
-            role: 'assistant',
-            content: fallbackReply,
-            time: new Date().toISOString()
-        });
-        session.lastTime = new Date().toISOString();
-        saveState();
-        renderMessages(roleId);
+        // 不在 session 中保存 fallback，避免覆盖可能稍后到达的远程响应
+        // 在 DOM 上显示临时错误提示气泡（带重试按钮）
+        const container = $('#chatMessages');
+        if (container && AppState.currentChat === roleId) {
+            const errorMsgEl = document.createElement('div');
+            errorMsgEl.className = 'message ai';
+            errorMsgEl.innerHTML = `
+                <div class="message-avatar-placeholder" style="background:var(--accent-gradient)">✦</div>
+                <div class="message-content">
+                    <div id="streamBubble" style="color:#f87171;font-size:0.9em;">
+                        ️ 请求失败，可能是网络中断或模型服务暂不可用。<br>
+                        <button onclick="retryLastMessage('${roleId}', ${JSON.stringify(text).replace(/'/g, "\'")})" 
+                                style="margin-top:8px;padding:4px 12px;background:var(--accent-gradient);border:none;border-radius:6px;color:#fff;cursor:pointer;font-size:0.85em;">
+                            🔄 重试
+                        </button>
+                    </div>
+                </div>
+            `;
+            container.appendChild(errorMsgEl);
+            scrollToBottom();
+        }
     }
 
     // 更新聊天列表
@@ -647,6 +656,11 @@ async function readStreamResponse(response, role) {
             </div>
         `;
         container.appendChild(streamMsgEl);
+        // 显示等待提示气泡，让用户知道系统正在处理
+        const streamBubble = $('#streamBubble');
+        if (streamBubble) {
+            streamBubble.innerHTML = '<span style="color:#aaa;font-style:italic;">💭 正在思考中…</span>';
+        }
     }
 
     let chunkCount = 0;
@@ -822,6 +836,21 @@ function getFallbackReply(role, userMessage) {
 
     const roleReplies = replies[name] || ["嗯，我在听。", "继续说吧。", "我明白了。", "你说得有道理。", "嗯嗯。"];
     return roleReplies[Math.floor(Math.random() * roleReplies.length)];
+}
+
+// ==================== Retry Failed Message ====================
+function retryLastMessage(roleId, userText) {
+    // 删除当前的错误提示气泡
+    const container = $('#chatMessages');
+    if (container) {
+        const errorMsg = container.querySelector('.message.ai:last-child');
+        if (errorMsg && errorMsg.querySelector('#streamBubble')) {
+            errorMsg.remove();
+        }
+    }
+    
+    // 重新发送消息
+    sendMessage(roleId, userText);
 }
 
 // ==================== Chat List ====================
