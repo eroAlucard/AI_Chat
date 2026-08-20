@@ -58,8 +58,8 @@ const AppState = {
  */
 Object.defineProperty(window, 'ROLES_DATA', {
     get() {
-        const builtin = JSON.parse(localStorage.getItem('ai_builtin_roles') || '[]');
-        const custom = JSON.parse(localStorage.getItem('ai_custom_roles') || '[]');
+        const builtin = (JSON.parse(localStorage.getItem('ai_builtin_roles') || '[]')).filter(r => r && r.id);
+        const custom = (JSON.parse(localStorage.getItem('ai_custom_roles') || '[]')).filter(r => r && r.id);
         return [...builtin, ...custom];
     },
     configurable: true,

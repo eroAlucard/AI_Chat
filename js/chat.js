@@ -696,7 +696,7 @@ function renderChatList() {
     sessions.sort((a, b) => new Date(b.lastTime) - new Date(a.lastTime));
 
     list.innerHTML = sessions.map(session => {
-        const role = ROLES_DATA.find(r => r.id === session.roleId);
+        const role = ROLES_DATA.find(r => r && r.id === session.roleId);
         if (!role) return '';
 
         const lastMsg = session.messages[session.messages.length - 1];

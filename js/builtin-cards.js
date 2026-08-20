@@ -14,7 +14,6 @@ const BuiltinCards = (function() {
 
     const STORAGE_KEY = 'ai_builtin_cards_imported';
     const MANIFEST_PATH = 'cards/manifest.json';
-    const IMAGES_DIR = 'images/';
 
     /**
      * 检查是否已导入内置角色卡
@@ -167,56 +166,6 @@ const BuiltinCards = (function() {
                 console.error('[BuiltinCards] 提示: 请先运行 tmp/generate-card-metadata.py 生成元数据');
             }
 
-            // ========== 第二部分：导入 images/ 目录（逐个解析 PNG）==========
-            console.log('[BuiltinCards]  扫描 images/ 目录...');
-            try {
-                // 列出 images/ 下所有 PNG 文件
-                const pngFiles = await listDirectory(IMAGES_DIR);
-                const imagePngs = pngFiles.filter(f => f.toLowerCase().endsWith('.png'));
-
-                if (imagePngs.length > 0) {
-                    console.log(`[BuiltinCards] 找到 ${imagePngs.length} 张 images/ 角色卡`);
-
-                    for (let i = 0; i < imagePngs.length; i++) {
-                        const filename = imagePngs[i];
-                        
-                        if (i > 0 && i % 3 === 0) {
-                            await new Promise(r => setTimeout(r, 0));
-                        }
-
-                        try {
-                            // 用 CardParser 解析 PNG 文件
-                            const blob = await loadResource(IMAGES_DIR + filename, 'blob');
-                            const file = new File([blob], filename, { type: 'image/png' });
-                            
-                            const role = await CardParser.importCard(file, true, IMAGES_DIR + filename);
-
-                            // 去重检查
-                            if (existingNames.has(role.name)) {
-                                console.log(`[BuiltinCards] [images] 跳过已存在: ${role.name}`);
-                                continue;
-                            }
-
-                            role.isBuiltin = true;
-                            role._sourceFile = filename;
-                            role.id = Date.now() + 10000 + i; // 避免与 cards/ ID 冲突
-
-                            builtinRoles.push(role);
-                            existingNames.add(role.name);
-                            imported++;
-                            console.log(`[BuiltinCards] [images] [${i+1}/${imagePngs.length}] ✓ ${role.name}`);
-
-                        } catch (err) {
-                            console.warn(`[BuiltinCards] [images] [${i+1}/${imagePngs.length}] ✗ ${filename}:`, err.message);
-                        }
-                    }
-                } else {
-                    console.log('[BuiltinCards] images/ 目录下没有 PNG 文件');
-                }
-            } catch (err) {
-                console.error('[BuiltinCards] images/ 导入失败:', err.message);
-            }
-
             // ========== 保存并标记完成 ==========
             if (imported > 0) {
                 localStorage.setItem('ai_builtin_roles', JSON.stringify(builtinRoles));
@@ -231,51 +180,6 @@ const BuiltinCards = (function() {
             console.error('[BuiltinCards] ❌ 自动导入失败:', err);
             return 0;
         }
-    }
-
-    /**
-     * 列出目录下的文件名（通过 fetch 目录索引或使用预定义列表）
-     * 注意：file:// 协议下无法直接列目录，这里使用回退策略
-     * @param {string} dirPath
-     * @returns {Promise<string[]>}
-     */
-    async function listDirectory(dirPath) {
-        // 策略：尝试 fetch 一个预定义的索引文件，如果不存在则返回空数组
-        // 对于 images/ 目录，我们硬编码已知文件列表作为回退
-        const FALLBACK_IMAGES = [
-            'role_001.png', 'role_002.png', 'role_003.png', 'role_004.png', 'role_005.png',
-            'role_006.png', 'role_007.png', 'role_008.png', 'role_009.png', 'role_010.png',
-        ];
-
-        try {
-            // 先尝试 fetch 目录（某些服务器支持目录索引）
-            const resp = await fetch(dirPath);
-            if (resp.ok && resp.headers.get('content-type')?.includes('text/html')) {
-                // 解析 HTML 目录索引，提取文件名
-                const html = await resp.text();
-                const matches = html.match(/href=["']([^"']+\.png)["']/gi);
-                if (matches) {
-                    return matches.map(m => m.replace(/href=["']/i, '').replace(/["']/g, ''));
-                }
-            }
-        } catch (e) {
-            // fetch 目录失败，使用回退列表
-        }
-
-        // 回退：验证每个文件是否存在
-        const existing = [];
-        for (const fname of FALLBACK_IMAGES) {
-            try {
-                const resp = await fetch(dirPath + fname, { method: 'HEAD' });
-                if (resp.ok) {
-                    existing.push(fname);
-                }
-            } catch (e) {
-                // 文件不存在，跳过
-            }
-        }
-
-        return existing;
     }
 
     return {
