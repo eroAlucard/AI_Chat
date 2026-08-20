@@ -72,6 +72,8 @@ function showChatView(roleId) {
         currentStreamAbort.abort();
         currentStreamAbort = null;
         currentStreamRoleId = null;
+        // 清除生成候选标记，防止阻塞后续手动发送
+        delete AppState._generatingSwipeFor;
     }
     // 清理残留的流式消息元素（切换角色时旧流的DOM元素已无意义）
     const oldStream = $('#streamMessage');
@@ -190,8 +192,11 @@ function renderMessages(roleId) {
         return `
             <div class="message ${isUser ? 'user' : 'ai'}" data-msg-idx="${idx}">
                 <div class="message-avatar-placeholder">${isUser ? '👤' : role.emoji}</div>
-                <div>
-                    <div class="message-bubble">${bubbleContent}</div>
+                <div style="flex:1;position:relative;">
+                    <div class="message-bubble">
+                        ${bubbleContent}
+                        <button class="message-menu-btn" data-msg-idx="${idx}" title="更多操作" style="position:absolute;right:8px;bottom:8px;margin:0;">⋮</button>
+                    </div>
                     <div class="message-time">${timeStr}</div>
                     ${swipeControls}
                 </div>
@@ -202,6 +207,9 @@ function renderMessages(roleId) {
     // 绑定长按事件
     attachMessageLongPress();
 
+    // 绑定菜单按钮点击事件
+    attachMessageMenuButtons();
+
     // 绑定 Swipe 滑动事件
     attachSwipeEvents();
 
@@ -209,6 +217,36 @@ function renderMessages(roleId) {
     attachSwipeButtonEvents();
 
     scrollToBottom();
+}
+
+// ==================== Message Menu Button ====================
+function attachMessageMenuButtons() {
+    const menuButtons = $$('.message-menu-btn');
+
+    menuButtons.forEach(btn => {
+        // 移除旧的监听器，避免重复绑定
+        btn.replaceWith(btn.cloneNode(true));
+    });
+
+    // 重新获取克隆后的按钮
+    $$('.message-menu-btn').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+
+            const msgIdx = parseInt(btn.dataset.msgIdx);
+            const msgEl = btn.closest('.message');
+
+            // 如果菜单已存在且点击的是同一个按钮，关闭菜单
+            const existingMenu = $('.message-context-menu');
+            if (existingMenu && existingMenu.dataset.msgIdx === String(msgIdx)) {
+                existingMenu.remove();
+                return;
+            }
+
+            showMessageContextMenu(msgEl, msgIdx, btn);
+        });
+    });
 }
 
 // ==================== Message Long Press Menu ====================
@@ -288,9 +326,36 @@ function attachMessageLongPress() {
     });
 }
 
-function showMessageContextMenu(msgIdx, x, y) {
+function showMessageContextMenu(msgIdxOrElement, xOrMsgIdx, yOrButton) {
     const session = AppState.chatSessions[AppState.currentChat];
     if (!session) return;
+
+    let msgIdx, x, yPos;
+
+    // 判断调用方式：从按钮点击 (element, msgIdx, button) 或长按/右键 (msgIdx, x, y)
+    if (typeof msgIdxOrElement === 'object' && msgIdxOrElement.nodeType === 1) {
+        // 从按钮点击：msgIdxOrElement 是消息 DOM 元素，yOrButton 是按钮元素
+        const msgEl = msgIdxOrElement;
+        msgIdx = xOrMsgIdx;
+        const button = yOrButton;
+
+        // 计算菜单位置：以按钮位置为基准
+        if (button && button.getBoundingClientRect) {
+            const btnRect = button.getBoundingClientRect();
+            x = btnRect.left;
+            yPos = btnRect.bottom + 5;  // 在按钮下方 5px
+        } else {
+            // 降级方案：使用消息气泡位置
+            const rect = msgEl.getBoundingClientRect();
+            x = rect.right - 100;
+            yPos = rect.top + 10;
+        }
+    } else {
+        // 从长按/右键：传统的 (msgIdx, x, y) 参数
+        msgIdx = msgIdxOrElement;
+        x = xOrMsgIdx;
+        yPos = yOrButton;
+    }
 
     const msg = session.messages[msgIdx];
     if (!msg) return;
@@ -306,8 +371,9 @@ function showMessageContextMenu(msgIdx, x, y) {
     // 创建菜单
     const menu = document.createElement('div');
     menu.className = 'message-context-menu';
+    menu.dataset.msgIdx = msgIdx;  // 记录菜单对应的消息索引
     menu.style.left = x + 'px';
-    menu.style.top = y + 'px';
+    menu.style.top = yPos + 'px';
 
     let menuHTML = '';
 
@@ -341,6 +407,10 @@ function showMessageContextMenu(msgIdx, x, y) {
     }
     if (rect.bottom > window.innerHeight) {
         menu.style.top = (window.innerHeight - rect.height - 10) + 'px';
+    }
+    // 防止菜单超出顶部
+    if (rect.top < 0) {
+        menu.style.top = '10px';
     }
 
     // 点击外部关闭菜单
@@ -496,6 +566,9 @@ function regenerateMessage(msgIdx) {
 
     $('.message-context-menu')?.remove();
 
+    // 清除可能残留的 swipe 生成标记
+    delete AppState._generatingSwipeFor;
+
     // 删除该消息及之后的所有消息
     session.messages = session.messages.slice(0, msgIdx);
 
@@ -577,6 +650,9 @@ function swipeToPrevious(msgIdx) {
     msg.content = msg.swipes[newIdx].content;
     msg.reasoning = msg.swipes[newIdx].reasoning;
 
+    // 清除可能残留的生成标记
+    delete AppState._generatingSwipeFor;
+
     saveState();
     renderMessages(AppState.currentChat);
     showToast(`候选 ${newIdx + 1}/${msg.swipes.length}`);
@@ -595,6 +671,9 @@ function swipeToNext(msgIdx) {
     msg.swipe_id = newIdx;
     msg.content = msg.swipes[newIdx].content;
     msg.reasoning = msg.swipes[newIdx].reasoning;
+
+    // 清除可能残留的生成标记
+    delete AppState._generatingSwipeFor;
 
     saveState();
     renderMessages(AppState.currentChat);
@@ -616,14 +695,22 @@ function addSwipeVariant(msgIdx) {
 
     console.log('addSwipeVariant: 开始生成新候选', msgIdx);
 
-    // 删除该消息之后的所有消息
-    session.messages = session.messages.slice(0, msgIdx);
+    // 初始化 swipes 数组（如果不存在）
+    if (!msg.swipes) {
+        msg.swipes = [{ content: msg.content, reasoning: msg.reasoning }];
+        msg.swipe_id = 0;
+    }
+
+    // 删除该消息之后的所有消息（保留 AI 消息本身）
+    session.messages = session.messages.slice(0, msgIdx + 1);
 
     saveState();
-    renderMessages(AppState.currentChat);
 
     // 重新生成一个新的候选回复
     showToast('正在生成新的候选回复...');
+
+    // 标记当前正在为哪条消息生成新候选（用于后续保存）
+    AppState._generatingSwipeFor = msgIdx;
 
     // 调用 sendMessage 重新生成
     console.log('addSwipeVariant: 调用 sendMessage');
@@ -714,6 +801,8 @@ async function sendMessage(skipInputCheck = false) {
     if (currentStreamAbort) {
         currentStreamAbort.abort();
         currentStreamAbort = null;
+        // 清除生成候选标记，防止阻塞后续手动发送
+        delete AppState._generatingSwipeFor;
     }
 
     const roleId = AppState.currentChat;
@@ -739,14 +828,27 @@ async function sendMessage(skipInputCheck = false) {
         input.value = '';
         input.style.height = 'auto';
         renderMessages(roleId);
+
+        // 清除可能残留的生成标记（添加消息后再清除，确保消息历史正确）
+        delete AppState._generatingSwipeFor;
     } else {
         // 跳过输入检查模式：用于重新生成、生成新候选等场景
-        // 确保最后一条消息是用户消息，否则无法生成
         const lastMsg = session.messages[session.messages.length - 1];
-        if (!lastMsg || lastMsg.role !== 'user') {
-            console.warn('[sendMessage] skipInputCheck 模式下，最后一条消息必须是用户消息');
-            showToast('无法生成：消息历史异常');
-            return;
+        if (AppState._generatingSwipeFor === undefined || AppState._generatingSwipeFor === null) {
+            // 普通重新生成/继续生成：确保最后一条消息是用户消息
+            if (!lastMsg || lastMsg.role !== 'user') {
+                console.warn('[sendMessage] skipInputCheck 模式下，最后一条消息必须是用户消息');
+                showToast('无法生成：消息历史异常');
+                return;
+            }
+        } else {
+            // 生成新候选：最后一条应该是 AI 消息（会被更新）
+            if (!lastMsg || lastMsg.role !== 'assistant') {
+                console.warn('[sendMessage] 生成新候选时，最后一条消息必须是 AI 消息');
+                showToast('无法生成：消息历史异常');
+                delete AppState._generatingSwipeFor;
+                return;
+            }
         }
     }
 
@@ -807,22 +909,50 @@ async function sendMessage(skipInputCheck = false) {
                 }
             }
 
-            const msgData = {
-                role: 'assistant',
-                content: fullContent,
-                time: new Date().toISOString(),
-                swipes: [{ content: fullContent, reasoning: reasoningContent }],
-                swipe_id: 0
-            };
-            // 保存思考过程（如果有）
-            if (reasoningContent) {
-                msgData.reasoning = reasoningContent;
+            // 检查是否正在为某条消息生成新候选
+            if (AppState._generatingSwipeFor !== undefined) {
+                const msgIdx = AppState._generatingSwipeFor;
+                const targetMsg = session.messages[msgIdx];
+
+                if (targetMsg && targetMsg.role === 'assistant') {
+                    // 追加到 swipes 数组
+                    if (!targetMsg.swipes) {
+                        targetMsg.swipes = [{ content: targetMsg.content, reasoning: targetMsg.reasoning }];
+                    }
+                    targetMsg.swipes.push({ content: fullContent, reasoning: reasoningContent });
+                    targetMsg.swipe_id = targetMsg.swipes.length - 1; // 切换到新候选
+                    targetMsg.content = fullContent; // 更新当前显示内容
+                    targetMsg.reasoning = reasoningContent;
+
+                    console.log(`addSwipeVariant: 新候选已添加，现在有 ${targetMsg.swipes.length} 个候选`);
+                    showToast(`已生成新候选 (${targetMsg.swipes.length}/${targetMsg.swipes.length})`);
+                }
+
+                // 清除标记
+                delete AppState._generatingSwipeFor;
+            } else {
+                // 正常消息：创建新消息
+                const msgData = {
+                    role: 'assistant',
+                    content: fullContent,
+                    time: new Date().toISOString(),
+                    swipes: [{ content: fullContent, reasoning: reasoningContent }],
+                    swipe_id: 0
+                };
+                // 保存思考过程（如果有）
+                if (reasoningContent) {
+                    msgData.reasoning = reasoningContent;
+                }
+                // 标记为未完成（如果流中断）
+                if (interrupted) {
+                    msgData.interrupted = true;
+                }
+                session.messages.push(msgData);
+
+                // 确保标记被清除
+                delete AppState._generatingSwipeFor;
             }
-            // 标记为未完成（如果流中断）
-            if (interrupted) {
-                msgData.interrupted = true;
-            }
-            session.messages.push(msgData);
+
             session.lastTime = new Date().toISOString();
             saveState();
 
@@ -835,6 +965,9 @@ async function sendMessage(skipInputCheck = false) {
         currentStreamAbort = null;
         currentStreamRoleId = null;
         console.warn('API call failed:', error);
+
+        // 清除生成候选标记，防止阻塞后续手动发送
+        delete AppState._generatingSwipeFor;
 
         // 移除等待气泡，显示错误提示
         const streamEl = $('#streamMessage');
@@ -1061,9 +1194,19 @@ async function callLMApi(role, messages, useStream = true) {
         console.warn(`[callLMApi] ⚠️ systemMessage 超长！${systemMessage.length}字符 ≈ ${Math.round(systemMessage.length/1.5)}tokens，可能超出模型 context window 导致无响应`);
     }
 
+    // 生成新候选时，需要排除最后一条 AI 消息（只发送之前的对话历史）
+    let messagesToSend = messages;
+    if (AppState._generatingSwipeFor !== undefined) {
+        const lastMsg = messages[messages.length - 1];
+        if (lastMsg && lastMsg.role === 'assistant') {
+            messagesToSend = messages.slice(0, -1);
+            console.log('[callLMApi] 生成新候选，排除最后一条 AI 消息');
+        }
+    }
+
     const apiMessages = [
         { role: 'system', content: systemMessage },
-        ...messages.map(m => ({
+        ...messagesToSend.map(m => ({
             role: m.role,
             content: m.content
         }))
@@ -1436,6 +1579,9 @@ function retryLastMessage(roleId, userText) {
 async function continueGeneration(roleId) {
     const session = AppState.chatSessions[roleId];
     if (!session || session.messages.length === 0) return;
+
+    // 清除可能残留的 swipe 生成标记，确保继续生成不会误触发 swipe 逻辑
+    delete AppState._generatingSwipeFor;
 
     // 找到最后一条消息
     let lastMsg = session.messages[session.messages.length - 1];

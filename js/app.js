@@ -258,10 +258,12 @@ function loadState() {
 
 function saveState() {
     try {
+        // 排除以 _ 开头的临时属性（如 _generatingSwipeFor），避免持久化临时标记
         localStorage.setItem(getStateKey(), JSON.stringify({
             chatSessions: AppState.chatSessions,
             collections: [...AppState.collections],
             settings: AppState.settings
+            // 不保存 _generatingSwipeFor 等临时标记
         }));
     } catch (e) { console.warn('Failed to save state:', e); }
 }
