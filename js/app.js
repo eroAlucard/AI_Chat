@@ -1024,8 +1024,16 @@ async function confirmImportCard() {
     try {
         const role = await CardParser.importCard(_pendingImportRole.file);
 
+        // 防御性检查：跳过解析失败的角色
+        if (!role || !role.name) {
+            alert('导入失败：无法解析该 PNG 文件，请确认是有效的 SillyTavern 人物卡');
+            confirmBtn.textContent = '确认导入';
+            confirmBtn.disabled = false;
+            return;
+        }
+
         // 检查是否已存在同名角色
-        const existing = ROLES_DATA.find(r => r.name === role.name && r.isCustom);
+        const existing = ROLES_DATA.find(r => r && r.name === role.name && r.isCustom);
         if (existing) {
             if (!confirm(`已存在同名角色"${role.name}"，是否覆盖？`)) {
                 confirmBtn.textContent = '确认导入';
