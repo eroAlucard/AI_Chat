@@ -50,21 +50,26 @@ const AppState = {
     }
 };
 
-// ==================== ROLES_DATA (动态合并内置+自定义) ====================
+// ==================== ROLES_DATA (从 localStorage 初始化) ====================
 /**
- * 全局角色数组 —— 每次访问都从 localStorage 实时合并
- * 内置角色来自 ai_builtin_roles（由 BuiltinCards.autoImport 写入）
- * 自定义角色来自 ai_custom_roles
+ * 全局角色数组
+ * - 自定义角色：从 localStorage (ai_custom_roles) 加载
+ * - 内置角色：由 BuiltinCards.autoImport() 运行时从 cards-metadata.json 动态加载
+ *   不存 localStorage，避免 5MB 限制
+ * 
+ * 注意：必须是可写普通数组，app.js 中多处直接 push/splice/修改属性
  */
-Object.defineProperty(window, 'ROLES_DATA', {
-    get() {
-        const builtin = (JSON.parse(localStorage.getItem('ai_builtin_roles') || '[]')).filter(r => r && r.id);
-        const custom = (JSON.parse(localStorage.getItem('ai_custom_roles') || '[]')).filter(r => r && r.id);
-        return [...builtin, ...custom];
-    },
-    configurable: true,
-    enumerable: true,
-});
+(function() {
+    // 保留 roles-data.js 中的自制角色（id 1-10），图片路径已修正为 cards/role_00X.png
+    const builtinSelfMade = (typeof ROLES_DATA !== 'undefined' && Array.isArray(ROLES_DATA)) ? [...ROLES_DATA].filter(r => r && r.id) : [];
+    const custom = (JSON.parse(localStorage.getItem('ai_custom_roles') || '[]')).filter(r => r && r.id);
+    Object.defineProperty(window, 'ROLES_DATA', {
+        value: [...builtinSelfMade, ...custom],
+        writable: true,
+        configurable: true,
+        enumerable: true,
+    });
+})();
 
 // ==================== DOM Elements ====================
 const $ = (sel) => document.querySelector(sel);
@@ -82,6 +87,13 @@ document.addEventListener('DOMContentLoaded', async () => {
     initCategoryTabs();
     initFilterModal();
     renderRoleGrid();
+    // 异步从 IndexedDB 加载自定义角色图片
+    if (typeof ImageStore !== 'undefined') {
+        setTimeout(() => {
+            ImageStore.applyImages(document.getElementById('roleGrid'));
+            ImageStore.applyImages(document.getElementById('customRolesGrid'));
+        }, 200);
+    }
     renderChatList();
     initChatView();
     initRoleDetailModal();
@@ -297,16 +309,16 @@ function renderRoleGrid() {
     }
 
     if (AppState.searchQuery && roles.length > 0) {
-        grid.innerHTML = `<div class="search-results-hint">找到 ${roles.length} 个角色</div>` + roles.map(role => renderRoleCard(role)).join('');
+        grid.innerHTML = `<div class="search-results-hint">找到 ${roles.length} 个角色</div>` + roles.filter(r => r && r.id).map(role => renderRoleCard(role)).join('');
     } else if (roles.length === 0) {
         grid.innerHTML = '<div style="grid-column:1/-1;text-align:center;padding:40px;color:var(--text-muted);">没有找到匹配的角色</div>';
     } else {
-        grid.innerHTML = roles.map(role => renderRoleCard(role)).join('');
+        grid.innerHTML = roles.filter(r => r && r.id).map(role => renderRoleCard(role)).join('');
     }
 
     $$('.role-card').forEach(card => {
         card.addEventListener('click', () => {
-            const roleId = parseInt(card.dataset.roleId);
+            const roleId = card.dataset.roleId;
             openRoleDetail(roleId);
         });
     });
@@ -322,13 +334,13 @@ function renderRoleCard(role) {
     return `
         <div class="role-card" data-role-id="${role.id}">
             ${coverHtml}
-            <span class="role-card-rarity rarity-${role.rarity.toLowerCase()}">${role.rarity}</span>
+            <span class="role-card-rarity rarity-${(role.rarity || "N").toLowerCase()}">${role.rarity}</span>
             ${role.isNew ? '<span class="role-card-new">✨ NEW</span>' : ''}
             <div class="role-card-info">
                 <div class="role-card-title">${role.title}</div>
                 <div class="role-card-desc">${role.desc}</div>
                 <div class="role-card-tags">
-                    ${role.tags.map(t => `<span class="role-card-tag">${t}</span>`).join('')}
+                    ${(role.tags || []).map(t => `<span class="role-card-tag">${t}</span>`).join('')}
                 </div>
             </div>
         </div>
@@ -350,7 +362,7 @@ function initRoleDetailModal() {
 
     // 开始新对话（重新开始）
     startChatBtn.addEventListener('click', () => {
-        const roleId = parseInt(startChatBtn.dataset.roleId);
+        const roleId = startChatBtn.dataset.roleId;
         // 如果已有对话，确认覆盖
         if (AppState.chatSessions[roleId]) {
             if (!confirm('重新开始将覆盖该角色已有的对话记录，确定继续？')) return;
@@ -365,19 +377,19 @@ function initRoleDetailModal() {
 
     // 继续对话
     continueChatBtn.addEventListener('click', () => {
-        const roleId = parseInt(continueChatBtn.dataset.roleId);
+        const roleId = continueChatBtn.dataset.roleId;
         modal.classList.add('hidden');
         startChat(roleId);
     });
 
     collectBtn.addEventListener('click', () => {
-        const roleId = parseInt(collectBtn.dataset.roleId);
+        const roleId = collectBtn.dataset.roleId;
         toggleCollect(roleId);
     });
 }
 
 function openRoleDetail(roleId) {
-    const role = ROLES_DATA.find(r => r.id === roleId);
+    const role = ROLES_DATA.find(r => String(r.id) === String(roleId));
     if (!role) return;
 
     const modal = $('#roleDetailModal');
@@ -389,18 +401,18 @@ function openRoleDetail(roleId) {
         heroEl.innerHTML = `
             <img src="${role.image}" alt="${role.name}" style="width:100%;height:100%;object-fit:cover;object-position:center top" onerror="this.style.display='none';this.nextElementSibling.style.display='flex'">
             <div style="display:none;width:100%;height:100%;align-items:center;justify-content:center;font-size:80px;background:${role.gradient}">${role.emoji}</div>
-            <div class="role-detail-rarity rarity-${role.rarity.toLowerCase()}">${role.rarity}</div>
+            <div class="role-detail-rarity rarity-${(role.rarity || "N").toLowerCase()}">${role.rarity}</div>
         `;
     } else {
         heroEl.style.background = role.gradient;
         heroEl.innerHTML = `
             <div class="role-detail-avatar" style="display:flex;align-items:center;justify-content:center;font-size:80px;height:100%">${role.emoji}</div>
-            <div class="role-detail-rarity rarity-${role.rarity.toLowerCase()}">${role.rarity}</div>
+            <div class="role-detail-rarity rarity-${(role.rarity || "N").toLowerCase()}">${role.rarity}</div>
         `;
     }
 
     $('#roleDetailName').textContent = role.name;
-    $('#roleDetailTags').innerHTML = role.tags.map(t => `<span class="role-card-tag">${t}</span>`).join('');
+    $('#roleDetailTags').innerHTML = (role.tags || []).map(t => `<span class="role-card-tag">${t}</span>`).join('');
     $('#roleDetailDesc').textContent = role.desc;
 
     // 解析 systemPrompt 中的玩法规则并显示
@@ -552,7 +564,7 @@ function renderCollections() {
         return `
         <div class="role-card" data-role-id="${role.id}">
             ${coverHtml}
-            <span class="role-card-rarity rarity-${role.rarity.toLowerCase()}">${role.rarity}</span>
+            <span class="role-card-rarity rarity-${(role.rarity || "N").toLowerCase()}">${role.rarity}</span>
             <div class="role-card-info">
                 <div class="role-card-title">${role.name}</div>
                 <div class="role-card-desc">${role.title}</div>
@@ -562,7 +574,7 @@ function renderCollections() {
 
     $$('#collectionGrid .role-card').forEach(card => {
         card.addEventListener('click', () => {
-            const roleId = parseInt(card.dataset.roleId);
+            const roleId = card.dataset.roleId;
             openRoleDetail(roleId);
         });
     });
@@ -652,7 +664,7 @@ function renderSceneSelector(role) {
 
 // 带场景开场白启动对话
 function startChatWithScene(roleId, sceneOpenerEncoded) {
-    const role = ROLES_DATA.find(r => r.id === roleId);
+    const role = ROLES_DATA.find(r => String(r.id) === String(roleId));
     if (!role) return;
 
     // 初始化聊天会话
@@ -835,10 +847,14 @@ function deleteCustomRole(roleId) {
     if (!confirm('确定删除这个自定义角色？删除后无法恢复。')) return;
     // 从 localStorage 移除
     let customRoles = JSON.parse(localStorage.getItem('ai_custom_roles') || '[]');
-    customRoles = customRoles.filter(r => r.id !== roleId);
+    customRoles = customRoles.filter(r => String(r.id) !== String(roleId));
     localStorage.setItem('ai_custom_roles', JSON.stringify(customRoles));
+    // 从 IndexedDB 删除角色图片
+    if (typeof ImageStore !== 'undefined') {
+        ImageStore.remove(roleId).catch(() => {});
+    }
     // 从 ROLES_DATA 移除
-    const idx = ROLES_DATA.findIndex(r => r.id === roleId);
+    const idx = ROLES_DATA.findIndex(r => String(r.id) === String(roleId));
     if (idx >= 0) ROLES_DATA.splice(idx, 1);
     // 刷新
     renderRoleGrid();
@@ -863,8 +879,11 @@ function renderCustomRoles() {
 
     gridEl.innerHTML = customRoles.map(role => `
         <div class="custom-role-card" data-role-id="${role.id}">
-            <div class="role-card-cover-placeholder" style="background:${role.gradient};width:40px;height:40px;border-radius:8px;flex-shrink:0">
-                <span style="font-size:18px">${role.emoji}</span>
+            <div class="role-card-cover-wrapper" style="width:40px;height:40px;border-radius:8px;flex-shrink:0;overflow:hidden;position:relative">
+                ${role.image ? `<img src="${role.image}" style="width:100%;height:100%;object-fit:cover" onerror="this.style.display='none';this.nextElementSibling.style.display='flex'">` : ''}
+                <div class="role-card-cover-placeholder" style="background:${role.gradient};width:100%;height:100%;${role.image ? 'display:none' : ''}">
+                    <span style="font-size:18px">${role.emoji}</span>
+                </div>
             </div>
             <div class="custom-role-info">
                 <div class="role-card-title">${role.name}</div>
@@ -881,10 +900,10 @@ function renderCustomRoles() {
     gridEl.querySelectorAll('.cr-action-btn').forEach(btn => {
         btn.addEventListener('click', (e) => {
             e.stopPropagation();
-            const roleId = parseInt(btn.dataset.id);
+            const roleId = btn.dataset.id;
             const action = btn.dataset.action;
             if (action === 'edit') {
-                const role = ROLES_DATA.find(r => r.id === roleId);
+                const role = ROLES_DATA.find(r => String(r.id) === String(roleId));
                 if (role) openCreateRoleModal(role);
             } else if (action === 'delete') {
                 deleteCustomRole(roleId);
@@ -896,39 +915,27 @@ function renderCustomRoles() {
     gridEl.querySelectorAll('.custom-role-card').forEach(card => {
         card.addEventListener('click', (e) => {
             if (e.target.closest('.cr-action-btn')) return;
-            const roleId = parseInt(card.dataset.roleId);
+            const roleId = card.dataset.roleId;
             openRoleDetail(roleId);
         });
     });
 }
 
-// 加载自定义角色
-// ==================== Load Builtin Roles ====================
-function loadBuiltinRoles() {
-    try {
-        const builtinRoles = JSON.parse(localStorage.getItem('ai_builtin_roles') || '[]');
-        if (builtinRoles.length > 0) {
-            console.log(`[App] 加载 ${builtinRoles.length} 个内置角色`);
-            // 合并到 ROLES_DATA（去重，按 id 判断）
-            const existingIds = new Set(ROLES_DATA.map(r => r.id));
-            for (const role of builtinRoles) {
-                if (!existingIds.has(role.id)) {
-                    ROLES_DATA.push(role);
-                }
-            }
-        }
-    } catch (e) {
-        console.warn('[App] 加载内置角色失败:', e);
-    }
-}
-
+// ==================== Load Custom Roles ====================
 function loadCustomRoles() {
     const customRoles = JSON.parse(localStorage.getItem('ai_custom_roles') || '[]');
     customRoles.forEach(role => {
-        if (!ROLES_DATA.find(r => r.id === role.id)) {
+        if (!ROLES_DATA.find(r => String(r.id) === String(role.id))) {
             ROLES_DATA.push(role);
         }
     });
+    // 异步从 IndexedDB 加载自定义角色图片
+    if (typeof ImageStore !== 'undefined') {
+        setTimeout(() => {
+            ImageStore.applyImages(document.getElementById('customRolesGrid'));
+            ImageStore.applyImages(document.getElementById('roleGrid'));
+        }, 200);
+    }
 }
 
 // ==================== Import Card Logic ====================
@@ -944,6 +951,12 @@ function openImportCardModal() {
     $('#importCardError').classList.add('hidden');
     $('#importCardLoading').classList.add('hidden');
     _pendingImportRole = null;
+    // 重置按钮状态（防止上次导入后按钮卡在"导入中"）
+    const confirmBtn = $('#confirmImportCard');
+    if (confirmBtn) {
+        confirmBtn.textContent = '确认导入';
+        confirmBtn.disabled = false;
+    }
 }
 
 function closeImportCardModal() {
@@ -1040,25 +1053,80 @@ async function confirmImportCard() {
                 confirmBtn.disabled = false;
                 return;
             }
-            // 删除旧角色
+            // 删除旧角色（同时从 IndexedDB 删除旧图片）
             let customRoles = JSON.parse(localStorage.getItem('ai_custom_roles') || '[]');
             customRoles = customRoles.filter(r => r.name !== role.name);
             localStorage.setItem('ai_custom_roles', JSON.stringify(customRoles));
-            const idx = ROLES_DATA.findIndex(r => r.id === existing.id);
+            if (typeof ImageStore !== 'undefined') {
+                ImageStore.remove(existing.id).catch(() => {});
+            }
+            const idx = ROLES_DATA.findIndex(r => String(r.id) === String(existing.id));
             if (idx >= 0) ROLES_DATA.splice(idx, 1);
         }
 
-        // 存入 localStorage
-        const customRoles = JSON.parse(localStorage.getItem('ai_custom_roles') || '[]');
-        customRoles.push(role);
-        localStorage.setItem('ai_custom_roles', JSON.stringify(customRoles));
+        // 将 base64 图片存到 IndexedDB，角色对象 image 设为空（避免 localStorage 超限）
+        if (role.image && role.image.length > 1000 && typeof ImageStore !== 'undefined') {
+            try {
+                await ImageStore.save(role.id, role.image);
+                console.log(`[confirmImportCard] 图片已存 IndexedDB: ${role.name}`);
+            } catch (idbErr) {
+                console.warn('[confirmImportCard] IndexedDB 保存失败，图片将不显示:', idbErr);
+            }
+        }
 
-        // 添加到 ROLES_DATA
+        // 存入 localStorage（精简数据避免超限）
+        // 移除 sourceData（characterBook 等大字段）和 base64 图片
+        const slimRole = {
+            ...role,
+            sourceData: undefined,  // 不存 characterBook 等大字段
+            image: '',  // base64 图片已存 IndexedDB，localStorage 不存
+        };
+        const customRoles = JSON.parse(localStorage.getItem('ai_custom_roles') || '[]');
+        customRoles.push(slimRole);
+        try {
+            localStorage.setItem('ai_custom_roles', JSON.stringify(customRoles));
+        } catch (storageErr) {
+            // localStorage 超限：进一步精简后重试
+            console.warn('[confirmImportCard] localStorage 超限，精简数据重试...');
+            const ultraSlimRoles = customRoles.map(r => ({
+                id: r.id,
+                name: r.name,
+                title: r.title || r.name,
+                desc: (r.desc || '').substring(0, 100),
+                rarity: r.rarity || 'R',
+                isNew: r.isNew || false,
+                tags: (r.tags || []).slice(0, 5),
+                emoji: r.emoji || '',
+                image: '',
+                gradient: r.gradient || '',
+                systemPrompt: (r.systemPrompt || '').substring(0, 500),
+                scenes: [],
+                isCustom: true,
+                createdAt: r.createdAt,
+            }));
+            try {
+                localStorage.setItem('ai_custom_roles', JSON.stringify(ultraSlimRoles));
+            } catch (err2) {
+                throw new Error('存储空间不足，无法导入更多角色。请删除一些旧角色后重试。');
+            }
+        }
+
+        // 添加到 ROLES_DATA（保留完整 role 对象，含 image 用于当前会话显示）
         ROLES_DATA.push(role);
 
         // 刷新列表
         renderCustomRoles();
         renderRoleGrid();
+
+        // 异步从 IndexedDB 加载自定义角色图片
+        if (typeof ImageStore !== 'undefined') {
+            ImageStore.applyImages(document.getElementById('roleGrid'));
+            ImageStore.applyImages(document.getElementById('customRolesGrid'));
+        }
+
+        // 恢复按钮状态（必须在关闭弹窗之前，否则下次打开弹窗按钮还是"导入中"）
+        confirmBtn.textContent = '确认导入';
+        confirmBtn.disabled = false;
 
         // 关闭弹窗
         closeImportCardModal()

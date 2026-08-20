@@ -1,66 +1,82 @@
 /**
- * builtin-cards.js — 内置角色卡自动导入（增强版）
+ * builtin-cards.js — 内置角色卡运行时加载
  * 
- * 首次加载时（localStorage 中没有 ai_builtin_cards_imported 标记），
- * 自动从以下两个目录导入角色卡：
- *   1. cards/ — 基于预生成的 manifest.json（SillyTavern 标准卡）
- *   2. images/ — 逐个解析 PNG 文件的 tEXt chara chunk（自包含角色卡）
- * 
- * 导入完成后设置标记，后续不再重复导入。
- * 用户可以在设置中清除标记来重新导入。
+ * 内置角色数据从 cards-metadata.json 动态加载，不存入 localStorage（避免 5MB 限制）。
+ * 加载策略（按优先级）：
+ *   1. 全局变量 CARDS_METADATA（由 js/cards-metadata.js 通过 <script> 标签加载）
+ *   2. fetch（HTTP 服务器环境）
+ *   3. XMLHttpRequest 回退（兼容部分 file:// 环境）
+ * 只有自定义角色才存 localStorage。
  */
 
 const BuiltinCards = (function() {
 
     const STORAGE_KEY = 'ai_builtin_cards_imported';
-    const MANIFEST_PATH = 'cards/manifest.json';
+
+    // 缓存：内存中的内置角色列表
+    let _builtinRolesCache = null;
 
     /**
-     * 检查是否已导入内置角色卡
+     * 加载 metadata JSON（三级回退策略）
      */
-    function isImported() {
-        return localStorage.getItem(STORAGE_KEY) === 'true';
+    async function loadMetadata() {
+        // 优先级 1：全局变量（由 <script src="js/cards-metadata.js"> 加载，file:// 安全）
+        if (typeof window.CARDS_METADATA !== 'undefined' && Array.isArray(window.CARDS_METADATA) && window.CARDS_METADATA.length > 0) {
+            console.log(`[BuiltinCards] 从全局变量 CARDS_METADATA 加载 ${window.CARDS_METADATA.length} 张角色卡`);
+            return window.CARDS_METADATA;
+        }
+
+        // 优先级 2：fetch（HTTP 服务器环境）
+        try {
+            const resp = await fetch('cards/cards-metadata.json');
+            if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+            const data = await resp.json();
+            if (data && data.length > 0) {
+                console.log(`[BuiltinCards] 从 fetch 加载 ${data.length} 张角色卡`);
+                return data;
+            }
+        } catch (fetchErr) {
+            console.log('[BuiltinCards] fetch 失败:', fetchErr.message);
+        }
+
+        // 优先级 3：XMLHttpRequest 回退
+        try {
+            const data = await new Promise((resolve, reject) => {
+                const xhr = new XMLHttpRequest();
+                xhr.open('GET', 'cards/cards-metadata.json', true);
+                xhr.responseType = 'json';
+                xhr.onload = () => {
+                    if ((xhr.status >= 200 && xhr.status < 300) || xhr.status === 0) {
+                        resolve(xhr.response);
+                    } else {
+                        reject(new Error(`HTTP ${xhr.status}`));
+                    }
+                };
+                xhr.onerror = () => reject(new Error('网络错误'));
+                xhr.send();
+            });
+            if (data && data.length > 0) {
+                console.log(`[BuiltinCards] 从 XHR 加载 ${data.length} 张角色卡`);
+                return data;
+            }
+        } catch (xhrErr) {
+            console.log('[BuiltinCards] XHR 也失败:', xhrErr.message);
+        }
+
+        console.error('[BuiltinCards] 所有加载方式均失败，无法加载内置角色');
+        return [];
     }
 
     /**
-     * 标记已导入
+     * 从 metadata 构建 systemPrompt
      */
-    function markImported() {
-        localStorage.setItem(STORAGE_KEY, 'true');
-    }
-
-    /**
-     * 清除导入标记（用于重新导入）
-     */
-    function resetImport() {
-        localStorage.removeItem(STORAGE_KEY);
-    }
-
-    /**
-     * 用 XMLHttpRequest 加载资源（绕过 file:// 协议的 CORS 限制）
-     * @param {string} url
-     * @param {string} responseType - 'json' | 'blob'
-     * @returns {Promise<any>}
-     */
-    function loadResource(url, responseType) {
-        return new Promise((resolve, reject) => {
-            const xhr = new XMLHttpRequest();
-            xhr.open('GET', url, true);
-            xhr.responseType = responseType;
-            
-            xhr.onload = () => {
-                if (xhr.status >= 200 && xhr.status < 300) {
-                    resolve(xhr.response);
-                } else {
-                    reject(new Error(`HTTP ${xhr.status}: ${url}`));
-                }
-            };
-            
-            xhr.onerror = () => reject(new Error(`网络错误: ${url}`));
-            xhr.ontimeout = () => reject(new Error(`请求超时: ${url}`));
-            
-            xhr.send();
-        });
+    function buildSystemPrompt(meta) {
+        let prompt = '';
+        if (meta.system_prompt) prompt += meta.system_prompt + '\n\n';
+        if (meta.description) prompt += meta.description + '\n\n';
+        if (meta.personality) prompt += '【性格】' + meta.personality + '\n\n';
+        if (meta.scenario) prompt += '【场景】' + meta.scenario + '\n\n';
+        return prompt.trim();
     }
 
     /**
@@ -78,108 +94,92 @@ const BuiltinCards = (function() {
     }
 
     /**
-     * 从 metadata 构建 systemPrompt（cards/ 目录用）
+     * 从 metadata 构建角色对象数组
      */
-    function buildSystemPrompt(meta) {
-        let prompt = '';
-        if (meta.system_prompt) prompt += meta.system_prompt + '\n\n';
-        if (meta.description) prompt += meta.description + '\n\n';
-        if (meta.personality) prompt += '【性格】' + meta.personality + '\n\n';
-        if (meta.scenario) prompt += '【场景】' + meta.scenario + '\n\n';
-        return prompt.trim();
+    function buildRolesFromMetadata(metadataList) {
+        const roles = [];
+        for (let i = 0; i < metadataList.length; i++) {
+            const meta = metadataList[i];
+            try {
+                const role = {
+                    id: 'builtin_' + i,
+                    name: meta.name,
+                    title: meta.name,
+                    desc: (meta.description || '').substring(0, 200),
+                    rarity: 'SSR',
+                    isNew: true,
+                    tags: meta.tags || [],
+                    emoji: '',
+                    image: `cards/${encodeURIComponent(meta.filename)}`,
+                    gradient: getRandomGradient(),
+                    systemPrompt: buildSystemPrompt(meta),
+                    scenes: meta.first_mes ? [{
+                        opener: meta.first_mes,
+                        preview: meta.first_mes.substring(0, 60) + (meta.first_mes.length > 60 ? '……' : '')
+                    }] : [],
+                    isBuiltin: true,
+                    _sourceFile: meta.filename,
+                };
+                roles.push(role);
+            } catch (err) {
+                console.warn(`[BuiltinCards] 构建 ${meta.filename} 失败:`, err.message);
+            }
+        }
+        return roles;
     }
 
     /**
-     * 自动导入内置角色卡
-     * @returns {Promise<number>} 成功导入的角色数量
+     * 加载内置角色（结果缓存在内存）
+     */
+    async function loadBuiltinRoles() {
+        if (_builtinRolesCache) {
+            return _builtinRolesCache;
+        }
+
+        const metadataList = await loadMetadata();
+        if (metadataList.length === 0) {
+            return [];
+        }
+
+        const roles = buildRolesFromMetadata(metadataList);
+        _builtinRolesCache = roles;
+        return roles;
+    }
+
+    /**
+     * 自动导入（每次页面加载都执行，内置角色不存 localStorage）
      */
     async function autoImport() {
-        if (isImported()) {
-            console.log('[BuiltinCards] 已导入过内置角色卡，跳过');
-            return 0;
-        }
+        const builtinRoles = await loadBuiltinRoles();
+        if (builtinRoles.length === 0) return 0;
 
-        console.log('[BuiltinCards] 首次加载，开始自动导入内置角色卡…');
-
-        try {
-            // 获取已有内置角色名列表（避免重复导入）
-            const existingNames = new Set(
-                (JSON.parse(localStorage.getItem('ai_builtin_roles') || '[]')).map(r => r.name)
-            );
-
-            let imported = 0;
-            const builtinRoles = JSON.parse(localStorage.getItem('ai_builtin_roles') || '[]');
-
-            // ========== 第一部分：导入 cards/ 目录（基于 manifest.json）==========
-            console.log('[BuiltinCards]  扫描 cards/ 目录...');
-            try {
-                const resp = await loadResource(MANIFEST_PATH, 'json');
-                const metadataList = resp;
-
-                if (metadataList && metadataList.length > 0) {
-                    console.log(`[BuiltinCards] 找到 ${metadataList.length} 张 cards/ 角色卡`);
-
-                    for (let i = 0; i < metadataList.length; i++) {
-                        const meta = metadataList[i];
-                        
-                        if (i > 0 && i % 5 === 0) {
-                            await new Promise(r => setTimeout(r, 0));
-                        }
-
-                        try {
-                            if (existingNames.has(meta.name)) {
-                                continue;
-                            }
-
-                            const role = {
-                                id: Date.now() + i,
-                                name: meta.name,
-                                title: meta.name,
-                                desc: meta.description || '',
-                                rarity: 'SSR',
-                                isNew: true,
-                                tags: meta.tags || [],
-                                emoji: '',
-                                image: `cards/${encodeURIComponent(meta.filename)}`,
-                                gradient: getRandomGradient(),
-                                systemPrompt: buildSystemPrompt(meta),
-                                scenes: meta.first_mes ? [{
-                                    opener: meta.first_mes,
-                                    preview: meta.first_mes.substring(0, 60) + (meta.first_mes.length > 60 ? '……' : '')
-                                }] : [],
-                                isBuiltin: true,
-                                _sourceFile: meta.filename,
-                            };
-
-                            builtinRoles.push(role);
-                            existingNames.add(meta.name);
-                            imported++;
-                            console.log(`[BuiltinCards] [cards] [${i+1}/${metadataList.length}] ✓ ${meta.name}`);
-
-                        } catch (err) {
-                            console.warn(`[BuiltinCards] [cards] [${i+1}/${metadataList.length}] ✗ ${meta.filename}:`, err.message);
-                        }
-                    }
+        // 将内置角色合并到 ROLES_DATA（去重）
+        if (typeof ROLES_DATA !== 'undefined') {
+            const existingNames = new Set(ROLES_DATA.filter(r => r && r.name).map(r => r.name));
+            let added = 0;
+            for (const role of builtinRoles) {
+                if (!existingNames.has(role.name)) {
+                    ROLES_DATA.push(role);
+                    existingNames.add(role.name);
+                    added++;
                 }
-            } catch (err) {
-                console.error('[BuiltinCards] cards/ 导入失败:', err.message);
-                console.error('[BuiltinCards] 提示: 请先运行 tmp/generate-card-metadata.py 生成元数据');
             }
-
-            // ========== 保存并标记完成 ==========
-            if (imported > 0) {
-                localStorage.setItem('ai_builtin_roles', JSON.stringify(builtinRoles));
-                console.log(`[BuiltinCards] 已保存 ${builtinRoles.length} 个内置角色到 ai_builtin_roles`);
-            }
-
-            markImported();
-            console.log(`[BuiltinCards] ✅ 自动导入完成，共成功 ${imported} 张`);
-            return imported;
-
-        } catch (err) {
-            console.error('[BuiltinCards] ❌ 自动导入失败:', err);
-            return 0;
+            console.log(`[BuiltinCards] ✅ 已加载 ${added} 个内置角色到 ROLES_DATA`);
         }
+
+        markImported();
+        return builtinRoles.length;
+    }
+
+    function isImported() {
+        return localStorage.getItem(STORAGE_KEY) === 'true';
+    }
+    function markImported() {
+        localStorage.setItem(STORAGE_KEY, 'true');
+    }
+    function resetImport() {
+        localStorage.removeItem(STORAGE_KEY);
+        _builtinRolesCache = null;
     }
 
     return {
@@ -187,5 +187,6 @@ const BuiltinCards = (function() {
         markImported,
         resetImport,
         autoImport,
+        loadBuiltinRoles,
     };
 })();

@@ -39,7 +39,7 @@ function initChatView() {
 }
 
 function startChat(roleId) {
-    const role = ROLES_DATA.find(r => r.id === roleId);
+    const role = ROLES_DATA.find(r => String(r.id) === String(roleId));
     if (!role) return;
 
     // 初始化聊天会话
@@ -63,7 +63,7 @@ function showChatListView() {
 }
 
 function showChatView(roleId) {
-    const role = ROLES_DATA.find(r => r.id === roleId);
+    const role = ROLES_DATA.find(r => String(r.id) === String(roleId));
     if (!role) return;
 
     // 只在切换到不同角色时取消前一个流式请求（返回列表再回来时不取消，让请求在后台完成）
@@ -144,7 +144,7 @@ function renderMessages(roleId) {
     const session = AppState.chatSessions[roleId];
     if (!session) return;
 
-    const role = ROLES_DATA.find(r => r.id === roleId);
+    const role = ROLES_DATA.find(r => String(r.id) === String(roleId));
     const container = $('#chatMessages');
 
     container.innerHTML = session.messages.map(msg => {
@@ -223,7 +223,7 @@ async function sendMessage() {
 
     // 尝试调用 API
     try {
-        const role = ROLES_DATA.find(r => r.id === roleId);
+        const role = ROLES_DATA.find(r => String(r.id) === String(roleId));
         hideTypingIndicator();
 
         // 流式调用：实时逐字显示
@@ -279,7 +279,7 @@ async function sendMessage() {
         console.warn('API call failed, using fallback:', error);
 
         // 使用本地 fallback 回复
-        const role = ROLES_DATA.find(r => r.id === roleId);
+        const role = ROLES_DATA.find(r => String(r.id) === String(roleId));
         const fallbackReply = getFallbackReply(role, text);
 
         session.messages.push({
@@ -696,7 +696,7 @@ function renderChatList() {
     sessions.sort((a, b) => new Date(b.lastTime) - new Date(a.lastTime));
 
     list.innerHTML = sessions.map(session => {
-        const role = ROLES_DATA.find(r => r && r.id === session.roleId);
+        const role = ROLES_DATA.find(r => r && String(r.id) === String(session.roleId));
         if (!role) return '';
 
         const lastMsg = session.messages[session.messages.length - 1];
@@ -965,7 +965,7 @@ const QUICK_REPLIES_MAP = {
 };
 
 function renderQuickReplies(roleId) {
-    const role = ROLES_DATA.find(r => r.id === roleId);
+    const role = ROLES_DATA.find(r => String(r.id) === String(roleId));
     if (!role) return;
 
     const container = $('#quickReplies');

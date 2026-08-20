@@ -1,4 +1,11 @@
-[
+/**
+ * cards-metadata.js — 内置角色卡元数据（自动生成，请勿手动编辑）
+ * 由 tmp/regenerate-metadata.py 从 cards/ 目录下的 PNG 文件生成
+ * 
+ * 用途：在 file:// 协议下也能正常加载内置角色数据
+ * （fetch/XHR 在 file:// 下被 CORS 阻止，<script> 标签不受限制）
+ */
+window.CARDS_METADATA = [
   {
     "filename": "main_1d4dc25e-ff01-4730-bd35-65f77222af73_spec_v2.png",
     "name": "Lim",
@@ -1762,4 +1769,4 @@
     "spec_version": "3.0",
     "creator": ""
   }
-]
+];
