@@ -1040,20 +1040,9 @@ body {
 }
 
 /* ==================== 折叠组件 ==================== */
-/* 描述折叠：默认3行 */
-.role-detail-desc.collapsible.collapsed {
-    max-height: 4.5em;
-    overflow: hidden;
-    position: relative;
-}
-
-.role-detail-desc.collapsible:not(.collapsed) {
-    max-height: none;
-}
-
-/* 玩法规则折叠：默认3行 */
+/* 玩法规则折叠：默认8行，超出时折叠 */
 .role-detail-rules.collapsible.collapsed {
-    max-height: 6em;
+    max-height: 13em;  /* 约8行 */
     overflow: hidden;
     position: relative;
 }

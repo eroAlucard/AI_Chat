@@ -798,55 +798,58 @@ function initCollapsible() {
     const modal = document.getElementById('roleDetailModal');
     if (!modal) return;
     
-    modal.querySelectorAll('.collapsible').forEach(el => {
-        // 移除之前可能添加的 toggle 按钮和遮罩
-        el.querySelectorAll('.collapse-toggle, .collapse-gradient').forEach(c => c.remove());
-        
-        // 先临时展开测量内容高度
-        el.classList.remove('collapsed');
-        const scrollH = el.scrollHeight;
-        const isDesc = el.classList.contains('role-detail-desc');
-        const isRules = el.classList.contains('role-detail-rules');
-        const limit = isDesc ? 72 : isRules ? 96 : 48;  // px
-        
-        if (scrollH <= limit + 10) {
-            // 内容没超出，不需要折叠
-            el.classList.remove('collapsible');
-            return;
-        }
-        
-        // 内容超出，启用折叠
-        el.classList.add('collapsed');
-        
-        // 添加渐变遮罩（折叠时显示）
-        const gradient = document.createElement('div');
-        gradient.className = 'collapse-gradient';
-        el.appendChild(gradient);
-        
-        // 添加展开/收起按钮
-        const toggle = document.createElement('button');
-        toggle.className = 'collapse-toggle';
-        toggle.textContent = '展开 ▾';
-        toggle.type = 'button';
-        toggle.addEventListener('click', (e) => {
-            e.stopPropagation();
-            const isCollapsed = el.classList.contains('collapsed');
-            if (isCollapsed) {
-                el.classList.remove('collapsed');
-                toggle.textContent = '收起 ▴';
-                gradient.style.display = 'none';
-            } else {
-                el.classList.add('collapsed');
-                toggle.textContent = '展开 ▾';
-                gradient.style.display = '';
+    // 用 requestAnimationFrame 确保 DOM 渲染完成后再测量高度
+    requestAnimationFrame(() => {
+        modal.querySelectorAll('.collapsible').forEach(el => {
+            // 移除之前可能添加的 toggle 按钮和遮罩
+            const oldToggle = el.nextElementSibling;
+            if (oldToggle && oldToggle.classList.contains('collapse-toggle')) {
+                oldToggle.remove();
             }
+            el.querySelectorAll('.collapse-gradient').forEach(c => c.remove());
+            
+            // 先临时展开测量
+            el.classList.remove('collapsed');
+            const scrollH = el.scrollHeight;
+            // rules 折叠阈值：13em ≈ 208px（8行）
+            const limit = 208;
+            
+            if (scrollH <= limit + 20) {
+                // 内容不超长，不需要折叠
+                el.classList.remove('collapsible');
+                return;
+            }
+            
+            // 内容超长，启用折叠
+            el.classList.add('collapsed');
+            
+            // 添加渐变遮罩
+            const gradient = document.createElement('div');
+            gradient.className = 'collapse-gradient';
+            el.appendChild(gradient);
+            
+            // 添加展开/收起按钮
+            const toggle = document.createElement('button');
+            toggle.className = 'collapse-toggle';
+            toggle.textContent = '展开 ▾';
+            toggle.type = 'button';
+            toggle.addEventListener('click', (e) => {
+                e.stopPropagation();
+                const isCollapsed = el.classList.contains('collapsed');
+                if (isCollapsed) {
+                    el.classList.remove('collapsed');
+                    toggle.textContent = '收起 ▴';
+                    gradient.style.display = 'none';
+                } else {
+                    el.classList.add('collapsed');
+                    toggle.textContent = '展开 ▾';
+                    gradient.style.display = '';
+                }
+            });
+            el.parentNode.insertBefore(toggle, el.nextSibling);
         });
-        // 插入到 collapsible 元素后面
-        el.parentNode.insertBefore(toggle, el.nextSibling);
     });
 }
-
-
 
 function toggleCollect(roleId) {
     if (AppState.collections.has(roleId)) {
