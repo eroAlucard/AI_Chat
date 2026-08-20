@@ -48,9 +48,9 @@ const CardParser = (function() {
                     nullPos++;
                 }
                 
-                const keyword = new TextDecoder('latin-1').decode(uint8.slice(dataStart, nullPos));
+                const keyword = new TextDecoder('iso-8859-1').decode(uint8.slice(dataStart, nullPos));
                 const textData = uint8.slice(nullPos + 1, dataStart + length);
-                const textStr = new TextDecoder('latin-1').decode(textData);
+                const textStr = new TextDecoder('iso-8859-1').decode(textData);
                 
                 if (keyword === 'chara') {
                     chunks.chara = textStr;
