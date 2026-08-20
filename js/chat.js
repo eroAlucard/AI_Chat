@@ -486,9 +486,7 @@ async function callLMApi(role, messages, useStream = true) {
             let droppedCount = 0;
             
             for (const entry of constantEntries) {
-                const entryContent = CardParser.replaceTemplateVars(entry.content, role.name, '用户') + '
-
-';
+                const entryContent = CardParser.replaceTemplateVars(entry.content, role.name, '用户') + '\n\n';
                 if (remaining >= entryContent.length) {
                     truncatedCB += entryContent;
                     remaining -= entryContent.length;
@@ -503,9 +501,7 @@ async function callLMApi(role, messages, useStream = true) {
             }
             
             // 重建 baseSystem：角色描述 + 原始 systemPrompt + 截断后的常驻条目
-            baseSystem = descPart + baseWithoutCB + '
-
-' + truncatedCB;
+            baseSystem = descPart + baseWithoutCB + '\n\n' + truncatedCB;
         }
     }
 
