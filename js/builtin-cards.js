@@ -114,8 +114,8 @@ const BuiltinCards = (function() {
             try {
                 // 从 tags 推断性别
                 const tags = meta.tags || [];
-                const hasMaleTag = tags.some(t => t === 'Male' || t === 'male' || t === '男性');
-                const hasFemaleTag = tags.some(t => t === 'Female' || t === 'female' || t === '女性');
+                const hasMaleTag = tags.some(t => t === 'Male' || t === 'male' || t === '男性' || t === '男性向');
+                const hasFemaleTag = tags.some(t => t === 'Female' || t === 'female' || t === '女性' || t === '女性向');
                 const inferredGender = hasMaleTag ? 'male' : (hasFemaleTag ? 'female' : 'female');
                 
                 const role = {
