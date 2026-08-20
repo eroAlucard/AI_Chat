@@ -394,6 +394,22 @@ async function callLMApi(role, messages, useStream = true) {
         }))
     ];
 
+    // 导入角色的 post_history_instructions：在对话历史最后注入
+    if (role.sourceData && role.sourceData.postHistoryInstructions) {
+        const phi = role.sourceData.postHistoryInstructions.trim();
+        if (phi) {
+            const replacedPhi = CardParser.replaceTemplateVars(phi, role.name, '用户');
+            // 注入到最后一条用户消息的末尾
+            const lastUserMsg = apiMessages.findLast(m => m.role === 'user');
+            if (lastUserMsg) {
+                lastUserMsg.content += '\n\n[Instruction: ' + replacedPhi + ']';
+            } else {
+                // 如果没有用户消息，作为系统消息追加
+                apiMessages.push({ role: 'system', content: replacedPhi });
+            }
+        }
+    }
+
     const body = {
         messages: apiMessages,
         temperature: 1.0,

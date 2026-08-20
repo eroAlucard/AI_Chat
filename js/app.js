@@ -477,6 +477,8 @@ function initMinePage() {
                 openSettings();
             } else if (action === 'create-role') {
                 openCreateRoleModal();
+            } else if (action === 'import-card') {
+                openImportCardModal();
             }
         });
     });
@@ -485,6 +487,7 @@ function initMinePage() {
     renderCollections();
     renderCustomRoles();
     updateChatBadge();
+    initImportCardEvents();
 }
 
 function loadUserInfo() {
@@ -882,3 +885,178 @@ function loadCustomRoles() {
         }
     });
 }
+
+// ==================== Import Card Logic ====================
+
+let _pendingImportRole = null;
+
+function openImportCardModal() {
+    const modal = $('#importCardModal');
+    modal.classList.remove('hidden');
+    // 重置状态
+    $('#importCardDrop').classList.remove('hidden');
+    $('#importCardPreview').classList.add('hidden');
+    $('#importCardError').classList.add('hidden');
+    $('#importCardLoading').classList.add('hidden');
+    _pendingImportRole = null;
+}
+
+function closeImportCardModal() {
+    $('#importCardModal').classList.add('hidden');
+    _pendingImportRole = null;
+}
+
+function showImportError(msg) {
+    $('#importCardError').textContent = msg;
+    $('#importCardError').classList.remove('hidden');
+    $('#importCardPreview').classList.add('hidden');
+    $('#importCardLoading').classList.add('hidden');
+}
+
+async function handleImportFile(file) {
+    if (!file || !file.name.toLowerCase().endsWith('.png')) {
+        showImportError('请选择 PNG 格式的人物卡文件');
+        return;
+    }
+
+    // 显示加载状态
+    $('#importCardDrop').classList.add('hidden');
+    $('#importCardPreview').classList.add('hidden');
+    $('#importCardError').classList.add('hidden');
+    $('#importCardLoading').classList.remove('hidden');
+
+    try {
+        const preview = await CardParser.previewCard(file);
+        _pendingImportRole = { file: file, preview: preview };
+
+        // 填充预览信息
+        $('#importPreviewName').textContent = preview.name;
+        $('#importPreviewSpec').textContent = `${preview.spec} v${preview.specVersion}` + (preview.creator ? ` · by ${preview.creator}` : '');
+        $('#importPreviewDesc').textContent = preview.description || '（无描述）';
+
+        // 统计信息
+        let infoParts = [];
+        if (preview.hasFirstMes) infoParts.push('有开场白');
+        if (preview.greetingCount > 1) infoParts.push(`${preview.greetingCount} 条开场白`);
+        if (preview.hasScenario) infoParts.push('有场景');
+        if (preview.hasSystemPrompt) infoParts.push('有系统提示');
+        if (preview.hasMesExample) infoParts.push('有对话示例');
+        if (preview.hasPostHistory) infoParts.push('有历史指令');
+        if (preview.charbookInfo) {
+            infoParts.push(`世界书 ${preview.charbookInfo.total} 条（常驻 ${preview.charbookInfo.constant}）`);
+        }
+        $('#importPreviewInfo').textContent = infoParts.join(' · ');
+
+        // 标签
+        const tagsEl = $('#importPreviewTags');
+        tagsEl.innerHTML = (preview.tags || []).map(t =>
+            `<span style="padding:2px 8px;border-radius:4px;background:rgba(255,255,255,0.1);font-size:11px;color:rgba(255,255,255,0.6)">${t}</span>`
+        ).join('');
+
+        // 头像
+        const avatarEl = $('#importPreviewAvatar');
+        if (preview.imageUrl) {
+            avatarEl.innerHTML = `<img src="${preview.imageUrl}" style="width:100%;height:100%;object-fit:cover">`;
+        }
+
+        // 显示预览
+        $('#importCardLoading').classList.add('hidden');
+        $('#importCardPreview').classList.remove('hidden');
+
+    } catch (err) {
+        console.error('导入人物卡失败:', err);
+        showImportError('解析失败：' + (err.message || '未知错误'));
+    }
+}
+
+async function confirmImportCard() {
+    if (!_pendingImportRole) return;
+
+    const confirmBtn = $('#confirmImportCard');
+    confirmBtn.textContent = '导入中…';
+    confirmBtn.disabled = true;
+
+    try {
+        const role = await CardParser.importCard(_pendingImportRole.file);
+
+        // 检查是否已存在同名角色
+        const existing = ROLES_DATA.find(r => r.name === role.name && r.isCustom);
+        if (existing) {
+            if (!confirm(`已存在同名角色"${role.name}"，是否覆盖？`)) {
+                confirmBtn.textContent = '确认导入';
+                confirmBtn.disabled = false;
+                return;
+            }
+            // 删除旧角色
+            let customRoles = JSON.parse(localStorage.getItem('ai_custom_roles') || '[]');
+            customRoles = customRoles.filter(r => r.name !== role.name);
+            localStorage.setItem('ai_custom_roles', JSON.stringify(customRoles));
+            const idx = ROLES_DATA.findIndex(r => r.id === existing.id);
+            if (idx >= 0) ROLES_DATA.splice(idx, 1);
+        }
+
+        // 存入 localStorage
+        const customRoles = JSON.parse(localStorage.getItem('ai_custom_roles') || '[]');
+        customRoles.push(role);
+        localStorage.setItem('ai_custom_roles', JSON.stringify(customRoles));
+
+        // 添加到 ROLES_DATA
+        ROLES_DATA.push(role);
+
+        // 刷新列表
+        renderCustomRoles();
+
+        // 关闭弹窗
+        closeImportCardModal();
+        showToast(`角色"${role.name}"导入成功！`);
+
+    } catch (err) {
+        console.error('导入失败:', err);
+        showImportError('导入失败：' + (err.message || '未知错误'));
+        confirmBtn.textContent = '确认导入';
+        confirmBtn.disabled = false;
+    }
+}
+
+// 绑定导入卡片相关事件
+function initImportCardEvents() {
+    // 关闭按钮
+    $('#closeImportCard').addEventListener('click', closeImportCardModal);
+    // 点击遮罩关闭
+    $('#importCardModal').querySelector('.role-detail-overlay').addEventListener('click', closeImportCardModal);
+    // 确认导入
+    $('#confirmImportCard').addEventListener('click', confirmImportCard);
+
+    // 点击拖放区域触发文件选择
+    const dropEl = $('#importCardDrop');
+    const fileInput = document.createElement('input');
+    fileInput.type = 'file';
+    fileInput.accept = '.png';
+    fileInput.style.display = 'none';
+    document.body.appendChild(fileInput);
+
+    dropEl.addEventListener('click', () => fileInput.click());
+
+    fileInput.addEventListener('change', (e) => {
+        if (e.target.files && e.target.files[0]) {
+            handleImportFile(e.target.files[0]);
+        }
+    });
+
+    // 拖放支持
+    dropEl.addEventListener('dragover', (e) => {
+        e.preventDefault();
+        dropEl.style.borderColor = 'rgba(255,255,255,0.5)';
+    });
+    dropEl.addEventListener('dragleave', () => {
+        dropEl.style.borderColor = 'rgba(255,255,255,0.2)';
+    });
+    dropEl.addEventListener('drop', (e) => {
+        e.preventDefault();
+        dropEl.style.borderColor = 'rgba(255,255,255,0.2)';
+        if (e.dataTransfer.files && e.dataTransfer.files[0]) {
+            handleImportFile(e.dataTransfer.files[0]);
+        }
+    });
+}
+
