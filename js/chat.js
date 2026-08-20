@@ -651,19 +651,12 @@ async function readStreamResponse(response, role) {
         streamMsgEl.innerHTML = `
             <div class="message-avatar-placeholder" style="background:var(--accent-gradient)">${role.emoji}</div>
             <div>
-                <div class="message-bubble" id="streamBubble"></div>
+                <div class="message-bubble" id="streamBubble"><span style="color:#aaa;font-style:italic;">💭 正在思考中…</span></div>
                 <div class="message-time" id="streamTime"></div>
             </div>
         `;
         container.appendChild(streamMsgEl);
         console.log('[Stream] streamMessage appended, children count:', container.children.length);
-        // 显示等待提示气泡，让用户知道系统正在处理
-        const streamBubble = $('#streamBubble');
-        if (streamBubble) {
-            streamBubble.innerHTML = '<span style="color:#aaa;font-style:italic;">💭 正在思考中…</span>';
-        } else {
-            console.warn('[Stream] streamBubble 元素未找到！');
-        }
     }
 
     let chunkCount = 0;
@@ -702,7 +695,7 @@ async function readStreamResponse(response, role) {
                     if (delta.reasoning_content) {
                         reasoningContent += delta.reasoning_content;
                         isReasoning = true;
-                        // 如果 bubble 被清空（用户离开又返回），重新创建流式消息 DOM
+                        // 如果 bubble 被清空（用户离开又返回），重新创建流式消息 DOM 并恢复已累积的内容
                         let bubble = $('#streamBubble');
                         if (!bubble && $('#chatMessages')) {
                             hideTypingIndicator();
@@ -733,9 +726,24 @@ async function readStreamResponse(response, role) {
                             isReasoning = false;
                         }
                         fullContent += delta.content;
-                        
-                        // 实时更新正文显示
+
+                        // 实时更新正文显示，如果 bubble 不存在则重建并恢复内容
                         let bubble = $('#streamBubble');
+                        if (!bubble && $('#chatMessages')) {
+                            hideTypingIndicator();
+                            const streamMsgEl = document.createElement('div');
+                            streamMsgEl.className = 'message ai';
+                            streamMsgEl.id = 'streamMessage';
+                            streamMsgEl.innerHTML = `
+                                <div class="message-avatar-placeholder" style="background:var(--accent-gradient)">${role.emoji}</div>
+                                <div>
+                                    <div class="message-bubble" id="streamBubble"></div>
+                                    <div class="message-time" id="streamTime"></div>
+                                </div>
+                            `;
+                            $('#chatMessages').appendChild(streamMsgEl);
+                            bubble = $('#streamBubble');
+                        }
                         if (bubble) {
                             if (reasoningContent) {
                                 // 有思考过程：折叠思考，显示正文
