@@ -487,7 +487,7 @@ function saveEditedMessage(msgIdx) {
 
     // 重新生成 AI 回复
     showToast('正在重新生成回复...');
-    sendChatRequest(AppState.currentChat);
+    sendMessage(true);  // 跳过输入检查
 }
 
 function regenerateMessage(msgIdx) {
@@ -505,7 +505,7 @@ function regenerateMessage(msgIdx) {
 
     // 重新生成
     showToast('正在重新生成...');
-    sendChatRequest(AppState.currentChat);
+    sendMessage(true);  // 跳过输入检查
 }
 
 // ==================== Swipe Feature (Multiple Responses) ====================
@@ -603,10 +603,18 @@ function swipeToNext(msgIdx) {
 
 function addSwipeVariant(msgIdx) {
     const session = AppState.chatSessions[AppState.currentChat];
-    if (!session) return;
+    if (!session) {
+        console.log('addSwipeVariant: 没有找到 session');
+        return;
+    }
 
     const msg = session.messages[msgIdx];
-    if (!msg || msg.role !== 'assistant') return;
+    if (!msg || msg.role !== 'assistant') {
+        console.log('addSwipeVariant: 消息不存在或不是 AI 消息', msg);
+        return;
+    }
+
+    console.log('addSwipeVariant: 开始生成新候选', msgIdx);
 
     // 删除该消息之后的所有消息
     session.messages = session.messages.slice(0, msgIdx);
@@ -617,8 +625,9 @@ function addSwipeVariant(msgIdx) {
     // 重新生成一个新的候选回复
     showToast('正在生成新的候选回复...');
 
-    // 修改 sendChatRequest 以支持添加到 swipes
-    sendChatRequest(AppState.currentChat, true, msgIdx);
+    // 调用 sendMessage 重新生成
+    console.log('addSwipeVariant: 调用 sendMessage');
+    sendMessage(true);  // 跳过输入检查
 }
 
 // 别名函数，保持兼容性
@@ -698,10 +707,8 @@ function scrollToBottom() {
 let currentStreamAbort = null;
 let currentStreamRoleId = null; // 当前流式请求所属的角色ID
 
-async function sendMessage() {
-    const input = $('#chatInput');
-    const text = input.value.trim();
-    if (!text || !AppState.currentChat) return;
+async function sendMessage(skipInputCheck = false) {
+    if (!AppState.currentChat) return;
 
     // 取消前一个流式请求（防止切换角色后旧流仍在跑）
     if (currentStreamAbort) {
@@ -713,18 +720,35 @@ async function sendMessage() {
     const session = AppState.chatSessions[roleId];
     if (!session) return;
 
-    // 添加用户消息
-    session.messages.push({
-        role: 'user',
-        content: text,
-        time: new Date().toISOString()
-    });
-    session.lastTime = new Date().toISOString();
-    saveState();
+    const input = $('#chatInput');
+    const text = input.value.trim();
 
-    input.value = '';
-    input.style.height = 'auto';
-    renderMessages(roleId);
+    // 如果不跳过输入检查，需要验证输入框有内容
+    if (!skipInputCheck) {
+        if (!text) return;
+
+        // 添加用户消息
+        session.messages.push({
+            role: 'user',
+            content: text,
+            time: new Date().toISOString()
+        });
+        session.lastTime = new Date().toISOString();
+        saveState();
+
+        input.value = '';
+        input.style.height = 'auto';
+        renderMessages(roleId);
+    } else {
+        // 跳过输入检查模式：用于重新生成、生成新候选等场景
+        // 确保最后一条消息是用户消息，否则无法生成
+        const lastMsg = session.messages[session.messages.length - 1];
+        if (!lastMsg || lastMsg.role !== 'user') {
+            console.warn('[sendMessage] skipInputCheck 模式下，最后一条消息必须是用户消息');
+            showToast('无法生成：消息历史异常');
+            return;
+        }
+    }
 
     // 立即创建流式气泡，让用户看到等待提示
     const role = ROLES_DATA.find(r => String(r.id) === String(roleId));
@@ -1405,7 +1429,7 @@ function retryLastMessage(roleId, userText) {
     }
 
     // 重新发送消息
-    sendMessage(roleId, userText);
+    sendMessage(true);  // 跳过输入检查
 }
 
 // ==================== Continue Generation ====================
@@ -1413,11 +1437,21 @@ async function continueGeneration(roleId) {
     const session = AppState.chatSessions[roleId];
     if (!session || session.messages.length === 0) return;
 
-    // 找到最后一条 AI 消息
-    const lastMsg = session.messages[session.messages.length - 1];
-    if (lastMsg.role !== 'assistant' || !lastMsg.interrupted) return;
+    // 找到最后一条消息
+    let lastMsg = session.messages[session.messages.length - 1];
 
-    // 移除中断标记和按钮
+    // 如果最后一条不是 AI 消息，说明需要生成新的 AI 回复
+    if (lastMsg.role !== 'assistant') {
+        // 直接调用 sendMessage 生成新回复
+        showToast('正在生成回复...');
+        sendMessage(true);
+        return;
+    }
+
+    // 如果最后一条是 AI 消息，需要让 AI 续写
+    // 策略：添加一个"请继续"的用户消息，然后生成新的 AI 回复（独立气泡）
+
+    // 移除中断标记和按钮（如果有）
     const container = $('#chatMessages');
     if (container) {
         const lastAIMsg = container.querySelector('.message.ai:last-child');
@@ -1426,59 +1460,25 @@ async function continueGeneration(roleId) {
             if (bubble) {
                 // 移除"⚠️ 流中断"和"继续生成"按钮
                 bubble.innerHTML = bubble.innerHTML.replace(/<br><span style="color:#f59e0b[^>]*>⚠️ 流中断<\/span>/g, '').replace(/<br><button onclick="continueGeneration[^>]*>.*?<\/button>/g, '');
-                // 添加等待提示
-                bubble.innerHTML += '<br><span style="color:#aaa;font-style:italic;">💭 继续生成中…</span>';
             }
         }
     }
 
-    // 调用 API 继续生成（AI 会基于上下文自然续写）
-    try {
-        const role = ROLES_DATA.find(r => String(r.id) === String(roleId));
+    // 临时添加"请继续"用户消息
+    session.messages.push({
+        role: 'user',
+        content: '[继续上文]',
+        time: new Date().toISOString()
+    });
 
-        // 创建临时的流式气泡（用于接收新内容）
-        if (container && role) {
-            const streamMsgEl = document.createElement('div');
-            streamMsgEl.className = 'message ai';
-            streamMsgEl.id = 'streamMessage';
-            streamMsgEl.innerHTML = `
-                <div class="message-avatar-placeholder" style="background:var(--accent-gradient)">${role.emoji}</div>
-                <div>
-                    <div class="message-bubble" id="streamBubble"><span style="color:#aaa;font-style:italic;">💭 正在思考中…</span></div>
-                    <div class="message-time" id="streamTime"></div>
-                </div>
-            `;
-            container.appendChild(streamMsgEl);
-            scrollToBottom();
-        }
+    session.lastTime = new Date().toISOString();
+    saveState();
+    renderMessages(roleId);
 
-        const result = await callLMApi(role, session.messages, true);
-        const newContent = result.content;
-        const interrupted = result.interrupted;
+    showToast('正在继续生成...');
 
-        currentStreamAbort = null;
-        currentStreamRoleId = null;
-
-        if (newContent && newContent !== '...') {
-            // 将新内容追加到原有消息
-            lastMsg.content += newContent;
-            lastMsg.interrupted = interrupted || false;
-
-            // 移除临时流式气泡
-            const streamEl = $('#streamMessage');
-            if (streamEl) {
-                streamEl.remove();
-            }
-
-            saveState();
-            renderMessages(roleId);
-        }
-    } catch (error) {
-        console.warn('Continue generation failed:', error);
-        showToast('继续生成失败，请重试');
-        // 恢复"继续生成"按钮
-        renderMessages(roleId);
-    }
+    // 调用 sendMessage 生成续写内容（会创建新的独立气泡）
+    sendMessage(true);
 }
 
 // ==================== Chat List ====================
