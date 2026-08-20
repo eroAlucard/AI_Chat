@@ -12,7 +12,7 @@ function initChatView() {
         showChatListView();
     });
 
-    sendBtn.addEventListener('click', sendMessage);
+    sendBtn.addEventListener('click', () => sendMessage(false));
 
     chatInput.addEventListener('keydown', (e) => {
         if (e.key === 'Enter' && !e.shiftKey) {
@@ -795,6 +795,12 @@ let currentStreamAbort = null;
 let currentStreamRoleId = null; // 当前流式请求所属的角色ID
 
 async function sendMessage(skipInputCheck = false) {
+    // 如果被 addEventListener 直接调用，浏览器会把事件对象传进来。
+    // 事件对象不应该被当作 skipInputCheck=true，否则会误入“重新生成/继续生成”逻辑。
+    if (skipInputCheck && typeof skipInputCheck === 'object') {
+        skipInputCheck = false;
+    }
+
     if (!AppState.currentChat) return;
 
     // 取消前一个流式请求（防止切换角色后旧流仍在跑）
