@@ -55,9 +55,11 @@ const $ = (sel) => document.querySelector(sel);
 const $$ = (sel) => document.querySelectorAll(sel);
 
 // ==================== Initialize ====================
-document.addEventListener('DOMContentLoaded', () => {
+document.addEventListener('DOMContentLoaded', async () => {
     initLogin();
     loadState();
+    // 首次加载时自动导入内置角色卡（在 loadCustomRoles 之前）
+    await BuiltinCards.autoImport();
     loadCustomRoles();
     initNavigation();
     initSearch();
@@ -268,7 +270,12 @@ function renderRoleGrid() {
         if (tabName === 'hot') {
             // 热度排序已移除，改为默认排序
         } else if (tabName === 'latest') {
-            roles.sort((a, b) => (b.isNew ? 1 : 0) - (a.isNew ? 1 : 0));
+            // 按创建时间降序，最新导入/创建的排前面
+            roles.sort((a, b) => {
+                const tA = a.createdAt || a.id;
+                const tB = b.createdAt || b.id;
+                return (tB > tA) ? 1 : (tB < tA) ? -1 : 0;
+            });
         }
         // recommend 保持原始顺序
     }
@@ -1005,9 +1012,10 @@ async function confirmImportCard() {
 
         // 刷新列表
         renderCustomRoles();
+        renderRoleGrid();
 
         // 关闭弹窗
-        closeImportCardModal();
+        closeImportCardModal()
         showToast(`角色"${role.name}"导入成功！`);
 
     } catch (err) {

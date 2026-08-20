@@ -249,6 +249,7 @@ const CardParser = (function() {
                 createData: cardData.create_date || '',
             },
             isCustom: true,
+            createdAt: Date.now(),
         };
         
         return role;
