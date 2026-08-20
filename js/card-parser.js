@@ -202,12 +202,17 @@ const CardParser = (function() {
         // === 标签 ===
         const tags = (data.tags || []).slice(0, 10);
         
-        // === 图片 ===
+        // === 图片（转为 base64 data URL 以持久化到 localStorage）===
         let imageUrl = '';
         try {
-            imageUrl = URL.createObjectURL(file);
+            imageUrl = await new Promise((resolve, reject) => {
+                const reader = new FileReader();
+                reader.onload = () => resolve(reader.result);
+                reader.onerror = () => reject(new Error('FileReader 读取失败'));
+                reader.readAsDataURL(file);
+            });
         } catch (e) {
-            console.warn('无法创建图片 blob URL:', e);
+            console.warn('无法将图片转为 base64:', e);
         }
         
         // === 生成渐变色 ===
@@ -307,7 +312,12 @@ const CardParser = (function() {
             spec: cardData.spec || 'chara_card_v2',
             specVersion: cardData.spec_version || '2.0',
             creator: data.creator || '',
-            imageUrl: URL.createObjectURL(file),
+            imageUrl: await new Promise((resolve, reject) => {
+                const reader = new FileReader();
+                reader.onload = () => resolve(reader.result);
+                reader.onerror = () => reject(new Error('FileReader 读取失败'));
+                reader.readAsDataURL(file);
+            }),
         };
     }
 

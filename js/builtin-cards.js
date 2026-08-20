@@ -35,6 +35,33 @@ const BuiltinCards = (function() {
     }
 
     /**
+     * 用 XMLHttpRequest 加载资源（绕过 file:// 协议的 CORS 限制）
+     * @param {string} url
+     * @param {string} responseType - 'json' | 'blob'
+     * @returns {Promise<any>}
+     */
+    function loadResource(url, responseType) {
+        return new Promise((resolve, reject) => {
+            const xhr = new XMLHttpRequest();
+            xhr.open('GET', url, true);
+            xhr.responseType = responseType;
+            
+            xhr.onload = () => {
+                if (xhr.status >= 200 && xhr.status < 300) {
+                    resolve(xhr.response);
+                } else {
+                    reject(new Error(`HTTP ${xhr.status}: ${url}`));
+                }
+            };
+            
+            xhr.onerror = () => reject(new Error(`网络错误: ${url}`));
+            xhr.ontimeout = () => reject(new Error(`请求超时: ${url}`));
+            
+            xhr.send();
+        });
+    }
+
+    /**
      * 自动导入内置角色卡
      * @returns {Promise<number>} 成功导入的角色数量
      */
@@ -45,21 +72,27 @@ const BuiltinCards = (function() {
         }
 
         console.log('[BuiltinCards] 首次加载，开始自动导入内置角色卡…');
+        console.log(`[BuiltinCards] 当前协议: ${window.location.protocol}`);
 
         try {
-            // 1. 获取 manifest
-            const resp = await fetch(MANIFEST_PATH);
-            if (!resp.ok) {
-                console.warn('[BuiltinCards] 无法获取 manifest.json，跳过自动导入');
+            // 1. 获取 manifest（使用 XMLHttpRequest 绕过 file:// CORS）
+            let manifest;
+            try {
+                const manifestData = await loadResource(MANIFEST_PATH, 'json');
+                manifest = manifestData;
+            } catch (err) {
+                console.error('[BuiltinCards] 无法加载 manifest.json:', err.message);
+                console.error('[BuiltinCards] 提示: 如果使用 file:// 协议打开网页，请改用本地服务器（如 Live Server 或 python -m http.server）');
                 return 0;
             }
-            const manifest = await resp.json();
-            const cardFiles = manifest.cards || [];
 
+            const cardFiles = manifest.cards || [];
             if (cardFiles.length === 0) {
                 console.log('[BuiltinCards] manifest 中无角色卡');
                 return 0;
             }
+
+            console.log(`[BuiltinCards] 找到 ${cardFiles.length} 张角色卡`);
 
             // 2. 获取已有角色名列表（避免重复导入）
             const existingNames = new Set(
@@ -70,16 +103,13 @@ const BuiltinCards = (function() {
             const customRoles = JSON.parse(localStorage.getItem('ai_custom_roles') || '[]');
 
             // 3. 逐个导入
-            for (const filename of cardFiles) {
+            for (let i = 0; i < cardFiles.length; i++) {
+                const filename = cardFiles[i];
                 try {
                     const cardUrl = `cards/${encodeURIComponent(filename)}`;
-                    const cardResp = await fetch(cardUrl);
-                    if (!cardResp.ok) {
-                        console.warn(`[BuiltinCards] 无法加载 ${filename}: ${cardResp.status}`);
-                        continue;
-                    }
-
-                    const blob = await cardResp.blob();
+                    
+                    // 使用 XMLHttpRequest 加载 PNG
+                    const blob = await loadResource(cardUrl, 'blob');
                     const file = new File([blob], filename, { type: 'image/png' });
 
                     // 用 CardParser 解析
@@ -101,26 +131,27 @@ const BuiltinCards = (function() {
                     }
 
                     imported++;
-                    console.log(`[BuiltinCards] 导入成功: ${role.name}`);
+                    console.log(`[BuiltinCards] [${i+1}/${cardFiles.length}] 导入成功: ${role.name}`);
 
                 } catch (err) {
-                    console.warn(`[BuiltinCards] 导入 ${filename} 失败:`, err.message);
+                    console.warn(`[BuiltinCards] [${i+1}/${cardFiles.length}] 导入 ${filename} 失败:`, err.message);
                 }
             }
 
             // 4. 保存到 localStorage
             if (imported > 0) {
                 localStorage.setItem('ai_custom_roles', JSON.stringify(customRoles));
+                console.log(`[BuiltinCards] 已保存 ${customRoles.length} 个角色到 localStorage`);
             }
 
             // 5. 标记已导入
             markImported();
 
-            console.log(`[BuiltinCards] 自动导入完成，成功 ${imported}/${cardFiles.length} 张`);
+            console.log(`[BuiltinCards] ✅ 自动导入完成，成功 ${imported}/${cardFiles.length} 张`);
             return imported;
 
         } catch (err) {
-            console.error('[BuiltinCards] 自动导入失败:', err);
+            console.error('[BuiltinCards] ❌ 自动导入失败:', err);
             return 0;
         }
     }
