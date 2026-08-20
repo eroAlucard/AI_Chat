@@ -471,17 +471,103 @@ body {
 .chat-menu-item.danger { color: #ef4444; }
 .chat-menu-item.danger:hover { background: rgba(239, 68, 68, 0.1); }
 
-/* 消息删除按钮 */
-.msg-delete-btn {
-    position: absolute; top: 4px; right: 4px;
-    width: 24px; height: 24px; border-radius: var(--radius-full);
-    background: rgba(239, 68, 68, 0.9); color: white; border: none;
-    font-size: 12px; cursor: pointer; display: none;
-    align-items: center; justify-content: center; z-index: 10;
+/* 消息长按菜单 */
+.message-context-menu {
+    position: fixed;
+    background: var(--bg-card);
+    border: 1px solid var(--border-light);
+    border-radius: var(--radius-md);
+    box-shadow: 0 8px 24px rgba(0,0,0,0.15);
+    z-index: 1000;
+    min-width: 160px;
+    padding: 6px;
+    animation: fadeInScale 0.15s ease;
 }
-.delete-mode .message { position: relative; }
-.delete-mode .msg-delete-btn { display: flex; }
-.delete-mode .message:hover { opacity: 0.7; }
+
+@keyframes fadeInScale {
+    from {
+        opacity: 0;
+        transform: scale(0.95);
+    }
+    to {
+        opacity: 1;
+        transform: scale(1);
+    }
+}
+
+.context-menu-item {
+    display: block;
+    width: 100%;
+    padding: 10px 12px;
+    background: none;
+    border: none;
+    border-radius: var(--radius-sm);
+    color: var(--text-primary);
+    font-size: 14px;
+    text-align: left;
+    cursor: pointer;
+    transition: background 0.2s ease;
+}
+
+.context-menu-item:hover {
+    background: var(--bg-hover);
+}
+
+.context-menu-item.danger {
+    color: #ef4444;
+}
+
+.context-menu-item.danger:hover {
+    background: rgba(239, 68, 68, 0.1);
+}
+
+/* Swipe 控件 */
+.swipe-controls {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-top: 6px;
+}
+
+.swipe-btn {
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-light);
+    border-radius: var(--radius-sm);
+    padding: 4px 10px;
+    font-size: 12px;
+    cursor: pointer;
+    color: var(--text-primary);
+    transition: all 0.2s ease;
+}
+
+.swipe-btn:hover:not(:disabled) {
+    background: var(--accent-purple);
+    color: white;
+    border-color: var(--accent-purple);
+}
+
+.swipe-btn:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+}
+
+.swipe-indicator {
+    font-size: 12px;
+    color: var(--text-secondary);
+    font-weight: 500;
+}
+
+.swipe-new {
+    margin-left: auto;
+    background: var(--accent-gradient);
+    color: white;
+    border: none;
+}
+
+.swipe-new:hover {
+    opacity: 0.9;
+    transform: scale(1.05);
+}
 
 /* ==================== Draw Page ==================== */
 .draw-page-content { display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100%; gap: 16px; text-align: center; padding: 20px; }
@@ -1183,4 +1269,417 @@ body {
 
 .chat-list-item.selected {
     background: rgba(139,92,246,0.1);
+}
+
+/* ==================== Edit Message Modal ==================== */
+.edit-message-modal {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 10000;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.edit-message-overlay {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.5);
+    backdrop-filter: blur(4px);
+}
+
+.edit-message-panel {
+    position: relative;
+    background: var(--bg-primary);
+    border-radius: var(--radius-lg);
+    width: 90%;
+    max-width: 600px;
+    max-height: 80vh;
+    display: flex;
+    flex-direction: column;
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+}
+
+.edit-message-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 20px;
+    border-bottom: 1px solid var(--border-color);
+}
+
+.edit-message-header h3 {
+    margin: 0;
+    font-size: var(--font-lg);
+    color: var(--text-primary);
+}
+
+.edit-message-textarea {
+    flex: 1;
+    padding: 20px;
+    border: none;
+    background: var(--bg-primary);
+    color: var(--text-primary);
+    font-size: var(--font-md);
+    font-family: inherit;
+    resize: none;
+    outline: none;
+    min-height: 200px;
+}
+
+.edit-message-actions {
+    display: flex;
+    gap: 12px;
+    padding: 20px;
+    border-top: 1px solid var(--border-color);
+    justify-content: flex-end;
+}
+
+/* ==================== Prompt Template Modal ==================== */
+.prompt-template-modal {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 10000;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.prompt-template-overlay {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.5);
+    backdrop-filter: blur(4px);
+}
+
+.prompt-template-panel {
+    position: relative;
+    background: var(--bg-primary);
+    border-radius: var(--radius-lg);
+    width: 90%;
+    max-width: 700px;
+    max-height: 80vh;
+    display: flex;
+    flex-direction: column;
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+}
+
+.prompt-template-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 20px;
+    border-bottom: 1px solid var(--border-color);
+}
+
+.prompt-template-header h3 {
+    margin: 0;
+    font-size: var(--font-lg);
+    color: var(--text-primary);
+}
+
+.prompt-template-content {
+    flex: 1;
+    overflow-y: auto;
+    padding: 20px;
+}
+
+.template-info {
+    background: var(--bg-card);
+    padding: 16px;
+    border-radius: var(--radius-md);
+    margin-bottom: 20px;
+    font-size: var(--font-sm);
+    color: var(--text-secondary);
+}
+
+.template-info code {
+    background: rgba(139, 92, 246, 0.1);
+    padding: 2px 6px;
+    border-radius: 4px;
+    font-family: 'Courier New', monospace;
+    color: var(--accent-purple);
+}
+
+.template-selector {
+    margin-bottom: 20px;
+}
+
+.template-selector label {
+    display: block;
+    margin-bottom: 8px;
+    font-weight: 500;
+    color: var(--text-primary);
+}
+
+.template-selector select {
+    width: 100%;
+    padding: 10px;
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-md);
+    background: var(--bg-primary);
+    color: var(--text-primary);
+    font-size: var(--font-md);
+    cursor: pointer;
+}
+
+.template-editor {
+    margin-bottom: 20px;
+}
+
+.template-editor label {
+    display: block;
+    margin-bottom: 8px;
+    margin-top: 16px;
+    font-weight: 500;
+    color: var(--text-primary);
+}
+
+.template-editor textarea {
+    width: 100%;
+    padding: 12px;
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-md);
+    background: var(--bg-primary);
+    color: var(--text-primary);
+    font-size: var(--font-sm);
+    font-family: 'Courier New', monospace;
+    resize: vertical;
+    min-height: 80px;
+}
+
+.template-preview {
+    margin-top: 20px;
+}
+
+.template-preview label {
+    display: block;
+    margin-bottom: 8px;
+    font-weight: 500;
+    color: var(--text-primary);
+}
+
+.template-preview pre {
+    background: var(--bg-card);
+    padding: 16px;
+    border-radius: var(--radius-md);
+    overflow-x: auto;
+    font-size: var(--font-sm);
+    color: var(--text-secondary);
+    white-space: pre-wrap;
+    word-wrap: break-word;
+}
+
+.prompt-template-actions {
+    display: flex;
+    gap: 12px;
+    padding: 20px;
+    border-top: 1px solid var(--border-color);
+    justify-content: flex-end;
+}
+
+/* ==================== Export Modal ==================== */
+.export-modal {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 10000;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.export-overlay {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.5);
+    backdrop-filter: blur(4px);
+}
+
+.export-panel {
+    position: relative;
+    background: var(--bg-primary);
+    border-radius: var(--radius-lg);
+    width: 90%;
+    max-width: 500px;
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+}
+
+.export-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 20px;
+    border-bottom: 1px solid var(--border-color);
+}
+
+.export-header h3 {
+    margin: 0;
+    font-size: var(--font-lg);
+    color: var(--text-primary);
+}
+
+.export-content {
+    padding: 20px;
+}
+
+.export-content label {
+    display: block;
+    margin-bottom: 8px;
+    font-weight: 500;
+    color: var(--text-primary);
+}
+
+.export-content select {
+    width: 100%;
+    padding: 10px;
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-md);
+    background: var(--bg-primary);
+    color: var(--text-primary);
+    font-size: var(--font-md);
+    cursor: pointer;
+    margin-bottom: 16px;
+}
+
+.export-content input[type="checkbox"] {
+    margin-right: 8px;
+}
+
+.export-actions {
+    display: flex;
+    gap: 12px;
+    padding: 20px;
+    border-top: 1px solid var(--border-color);
+    justify-content: flex-end;
+}
+
+/* ==================== Swipe Controls ==================== */
+.swipe-controls {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    margin-top: 8px;
+    padding: 4px;
+}
+
+.swipe-btn {
+    background: var(--bg-card);
+    border: 1px solid var(--border-color);
+    color: var(--text-secondary);
+    padding: 4px 8px;
+    border-radius: var(--radius-md);
+    cursor: pointer;
+    font-size: 12px;
+    transition: all 0.2s;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 28px;
+}
+
+.swipe-btn:hover:not(:disabled) {
+    background: var(--accent-purple);
+    color: white;
+    border-color: var(--accent-purple);
+    transform: translateY(-1px);
+}
+
+.swipe-btn:disabled {
+    opacity: 0.3;
+    cursor: not-allowed;
+}
+
+.swipe-indicator {
+    font-size: var(--font-xs);
+    color: var(--text-secondary);
+    padding: 0 4px;
+    min-width: 40px;
+    text-align: center;
+}
+
+.swipe-new {
+    background: var(--accent-purple);
+    color: white;
+    border-color: var(--accent-purple);
+}
+
+.swipe-new:hover {
+    background: var(--accent-purple-light);
+    transform: translateY(-1px) scale(1.05);
+}
+
+/* ==================== Common Button Styles ==================== */
+.close-btn {
+    background: none;
+    border: none;
+    font-size: 24px;
+    color: var(--text-secondary);
+    cursor: pointer;
+    padding: 0;
+    width: 32px;
+    height: 32px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: var(--radius-md);
+    transition: all 0.2s;
+}
+
+.close-btn:hover {
+    background: var(--bg-card);
+    color: var(--text-primary);
+}
+
+.btn-primary {
+    background: var(--accent-purple);
+    color: white;
+    border: none;
+    padding: 10px 20px;
+    border-radius: 999px;
+    font-size: var(--font-md);
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.btn-primary:hover {
+    background: var(--accent-purple-light);
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(139, 92, 246, 0.3);
+}
+
+.btn-secondary {
+    background: var(--bg-card);
+    color: var(--text-primary);
+    border: 1px solid var(--border-color);
+    padding: 10px 20px;
+    border-radius: 999px;
+    font-size: var(--font-md);
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.btn-secondary:hover {
+    background: var(--bg-secondary);
+    border-color: var(--accent-purple);
 }

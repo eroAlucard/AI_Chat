@@ -152,27 +152,507 @@ function renderMessages(roleId) {
         const isUser = msg.role === 'user';
         const time = new Date(msg.time);
         const timeStr = `${time.getHours().toString().padStart(2, '0')}:${time.getMinutes().toString().padStart(2, '0')}`;
-        // 如果有思考过程，渲染折叠的思考过程 + 正文
-        let bubbleContent = formatMessage(msg.content);
-        if (!isUser && msg.reasoning) {
-            bubbleContent = `<details style="margin-bottom:8px;"><summary style="color:#888;font-style:italic;cursor:pointer;font-size:0.9em;">💭 思考过程</summary><span style="color:#aaa;font-style:italic;font-size:0.9em;">${formatMessage(msg.reasoning)}</span></details>${bubbleContent}`;
+        // 获取当前显示的内容（支持 Swipe 多候选）
+        let bubbleContent = '';
+        if (!isUser && msg.swipes && msg.swipes.length > 0) {
+            const swipeIdx = msg.swipe_id || 0;
+            bubbleContent = formatMessage(msg.swipes[swipeIdx].content);
+            // 显示该候选的思考过程
+            if (msg.swipes[swipeIdx].reasoning) {
+                bubbleContent = `<details style="margin-bottom:8px;"><summary style="color:#888;font-style:italic;cursor:pointer;font-size:0.9em;">💭 思考过程</summary><span style="color:#aaa;font-style:italic;font-size:0.9em;">${formatMessage(msg.swipes[swipeIdx].reasoning)}</span></details>${bubbleContent}`;
+            }
+        } else {
+            bubbleContent = formatMessage(msg.content);
+            if (!isUser && msg.reasoning) {
+                bubbleContent = `<details style="margin-bottom:8px;"><summary style="color:#888;font-style:italic;cursor:pointer;font-size:0.9em;">💭 思考过程</summary><span style="color:#aaa;font-style:italic;font-size:0.9em;">${formatMessage(msg.reasoning)}</span></details>${bubbleContent}`;
+            }
         }
+
         // 如果消息被中断，添加警告标记和"继续生成"按钮
         if (!isUser && msg.interrupted && idx === session.messages.length - 1) {
             bubbleContent += `<br><span style="color:#f59e0b;font-size:0.85em;margin-top:8px;display:inline-block;">⚠️ 流中断</span><br><button onclick="continueGeneration('${roleId}')" style="margin-top:8px;padding:4px 12px;background:var(--accent-gradient);border:none;border-radius:6px;color:#fff;cursor:pointer;font-size:0.85em;">🔄 继续生成</button>`;
         }
+
+        // Swipe 功能：显示候选回复计数和左右箭头
+        let swipeControls = '';
+        if (!isUser && msg.swipes && msg.swipes.length > 1) {
+            const currentIdx = msg.swipe_id || 0;
+            swipeControls = `
+                <div class="swipe-controls">
+                    <button class="swipe-btn swipe-prev" data-msg-idx="${idx}" ${currentIdx === 0 ? 'disabled' : ''}>◀</button>
+                    <span class="swipe-indicator">${currentIdx + 1}/${msg.swipes.length}</span>
+                    <button class="swipe-btn swipe-next" data-msg-idx="${idx}" ${currentIdx === msg.swipes.length - 1 ? 'disabled' : ''}>▶</button>
+                    <button class="swipe-btn swipe-new" data-msg-idx="${idx}" title="生成新候选">➕</button>
+                </div>
+            `;
+        }
+
         return `
-            <div class="message ${isUser ? 'user' : 'ai'}">
+            <div class="message ${isUser ? 'user' : 'ai'}" data-msg-idx="${idx}">
                 <div class="message-avatar-placeholder">${isUser ? '👤' : role.emoji}</div>
                 <div>
                     <div class="message-bubble">${bubbleContent}</div>
                     <div class="message-time">${timeStr}</div>
+                    ${swipeControls}
                 </div>
             </div>
         `;
     }).join('');
 
+    // 绑定长按事件
+    attachMessageLongPress();
+
+    // 绑定 Swipe 滑动事件
+    attachSwipeEvents();
+
+    // 绑定 Swipe 按钮点击事件
+    attachSwipeButtonEvents();
+
     scrollToBottom();
+}
+
+// ==================== Message Long Press Menu ====================
+function attachMessageLongPress() {
+    const messages = $$('.message');
+    let longPressTimer = null;
+    let touchStartX = 0;
+    let touchStartY = 0;
+    let isLongPress = false;
+    let isSwiping = false;
+
+    messages.forEach(msgEl => {
+        const msgIdx = parseInt(msgEl.dataset.msgIdx);
+        if (isNaN(msgIdx)) return;
+
+        const session = AppState.chatSessions[AppState.currentChat];
+        if (!session) return;
+
+        const msg = session.messages[msgIdx];
+        const hasSwipes = msg && msg.role === 'assistant' && msg.swipes && msg.swipes.length > 1;
+
+        // 移动端触摸事件
+        msgEl.addEventListener('touchstart', (e) => {
+            touchStartX = e.touches[0].clientX;
+            touchStartY = e.touches[0].clientY;
+            isLongPress = false;
+            isSwiping = false;
+
+            // 只在有候选回复时启用长按
+            if (hasSwipes || msg.role === 'user' || msg.role === 'assistant') {
+                longPressTimer = setTimeout(() => {
+                    isLongPress = true;
+                    showMessageContextMenu(msgIdx, e.touches[0].clientX, e.touches[0].clientY);
+                    navigator.vibrate && navigator.vibrate(50); // 震动反馈
+                }, 500);
+            }
+        });
+
+        msgEl.addEventListener('touchmove', (e) => {
+            const moveX = e.touches[0].clientX;
+            const moveY = e.touches[0].clientY;
+            const deltaX = moveX - touchStartX;
+            const deltaY = moveY - touchStartY;
+            const distance = Math.sqrt(deltaX * deltaX + deltaY * deltaY);
+
+            // 移动超过 10px 取消长按
+            if (distance > 10) {
+                clearTimeout(longPressTimer);
+            }
+
+            // 检测左右滑动（只对有候选的 AI 消息）
+            if (hasSwipes && !isLongPress && Math.abs(deltaX) > 50 && Math.abs(deltaX) > Math.abs(deltaY) * 2) {
+                if (!isSwiping) {
+                    isSwiping = true;
+                    if (deltaX > 0) {
+                        // 向右滑动 - 上一个候选
+                        swipeToPrevious(msgIdx);
+                    } else {
+                        // 向左滑动 - 下一个候选
+                        swipeToNext(msgIdx);
+                    }
+                }
+            }
+        });
+
+        msgEl.addEventListener('touchend', () => {
+            clearTimeout(longPressTimer);
+            isLongPress = false;
+            isSwiping = false;
+        });
+
+        // 桌面端右键菜单
+        msgEl.addEventListener('contextmenu', (e) => {
+            e.preventDefault();
+            showMessageContextMenu(msgIdx, e.clientX, e.clientY);
+        });
+    });
+}
+
+function showMessageContextMenu(msgIdx, x, y) {
+    const session = AppState.chatSessions[AppState.currentChat];
+    if (!session) return;
+
+    const msg = session.messages[msgIdx];
+    if (!msg) return;
+
+    const isUser = msg.role === 'user';
+    const isLastMsg = msgIdx === session.messages.length - 1;
+    const isLastAI = !isUser && isLastMsg;
+
+    // 移除旧菜单
+    const oldMenu = $('.message-context-menu');
+    if (oldMenu) oldMenu.remove();
+
+    // 创建菜单
+    const menu = document.createElement('div');
+    menu.className = 'message-context-menu';
+    menu.style.left = x + 'px';
+    menu.style.top = y + 'px';
+
+    let menuHTML = '';
+
+    // 用户消息：编辑
+    if (isUser) {
+        menuHTML += `<button class="context-menu-item" onclick="editMessage(${msgIdx})">✏️ 编辑消息</button>`;
+    }
+
+    // AI 消息：重新生成、生成新候选
+    if (!isUser) {
+        menuHTML += `<button class="context-menu-item" onclick="regenerateMessage(${msgIdx})">🔄 重新生成</button>`;
+        menuHTML += `<button class="context-menu-item" onclick="generateNewSwipe(${msgIdx})">✨ 生成新候选</button>`;
+        // 如果是最后一条 AI 消息，显示"继续生成"
+        if (isLastAI) {
+            menuHTML += `<button class="context-menu-item" onclick="continueGeneration('${AppState.currentChat}')">➕ 继续生成</button>`;
+        }
+    }
+
+    // 通用：复制、删除此后所有、删除
+    menuHTML += `<button class="context-menu-item" onclick="copyMessage(${msgIdx})">📋 复制内容</button>`;
+    menuHTML += `<button class="context-menu-item" onclick="deleteMessagesAfter(${msgIdx})">✂️ 删除此后所有</button>`;
+    menuHTML += `<button class="context-menu-item danger" onclick="deleteMessage(${msgIdx})">🗑️ 删除消息</button>`;
+
+    menu.innerHTML = menuHTML;
+    document.body.appendChild(menu);
+
+    // 确保菜单不超出屏幕
+    const rect = menu.getBoundingClientRect();
+    if (rect.right > window.innerWidth) {
+        menu.style.left = (window.innerWidth - rect.width - 10) + 'px';
+    }
+    if (rect.bottom > window.innerHeight) {
+        menu.style.top = (window.innerHeight - rect.height - 10) + 'px';
+    }
+
+    // 点击外部关闭菜单
+    setTimeout(() => {
+        const closeMenu = (e) => {
+            if (!menu.contains(e.target)) {
+                menu.remove();
+                document.removeEventListener('click', closeMenu);
+                document.removeEventListener('touchstart', closeMenu);
+            }
+        };
+        document.addEventListener('click', closeMenu);
+        document.addEventListener('touchstart', closeMenu);
+    }, 100);
+}
+
+function copyMessage(msgIdx) {
+    const session = AppState.chatSessions[AppState.currentChat];
+    if (!session) return;
+
+    const msg = session.messages[msgIdx];
+    if (!msg) return;
+
+    // 复制纯文本内容
+    const text = msg.content;
+    navigator.clipboard.writeText(text).then(() => {
+        showToast('已复制到剪贴板');
+    }).catch(() => {
+        // 降级方案
+        const textarea = document.createElement('textarea');
+        textarea.value = text;
+        document.body.appendChild(textarea);
+        textarea.select();
+        document.execCommand('copy');
+        document.body.removeChild(textarea);
+        showToast('已复制到剪贴板');
+    });
+
+    $('.message-context-menu')?.remove();
+}
+
+function deleteMessage(msgIdx) {
+    const session = AppState.chatSessions[AppState.currentChat];
+    if (!session) return;
+
+    if (!confirm('确定删除这条消息吗？')) return;
+
+    session.messages.splice(msgIdx, 1);
+    session.lastTime = new Date().toISOString();
+    saveState();
+    renderMessages(AppState.currentChat);
+    showToast('消息已删除');
+
+    $('.message-context-menu')?.remove();
+}
+
+function deleteMessagesAfter(msgIdx) {
+    const session = AppState.chatSessions[AppState.currentChat];
+    if (!session) return;
+
+    const count = session.messages.length - msgIdx;
+    if (count <= 1) {
+        showToast('没有可删除的后续消息');
+        return;
+    }
+
+    if (!confirm(`确定删除此消息及之后的 ${count} 条消息吗？`)) return;
+
+    session.messages.splice(msgIdx);
+    session.lastTime = new Date().toISOString();
+    saveState();
+    renderMessages(AppState.currentChat);
+    showToast(`已删除 ${count} 条消息`);
+
+    $('.message-context-menu')?.remove();
+}
+
+function editMessage(msgIdx) {
+    const session = AppState.chatSessions[AppState.currentChat];
+    if (!session) return;
+
+    const msg = session.messages[msgIdx];
+    if (!msg || msg.role !== 'user') return;
+
+    $('.message-context-menu')?.remove();
+
+    // 创建编辑模态框
+    const modal = document.createElement('div');
+    modal.className = 'edit-message-modal';
+    modal.innerHTML = `
+        <div class="edit-message-overlay"></div>
+        <div class="edit-message-panel">
+            <div class="edit-message-header">
+                <h3>编辑消息</h3>
+                <button class="close-btn" onclick="closeEditMessageModal()">×</button>
+            </div>
+            <textarea class="edit-message-textarea" id="editMessageTextarea">${msg.content}</textarea>
+            <div class="edit-message-actions">
+                <button class="btn-secondary" onclick="closeEditMessageModal()">取消</button>
+                <button class="btn-primary" onclick="saveEditedMessage(${msgIdx})">保存并重新生成</button>
+            </div>
+        </div>
+    `;
+    document.body.appendChild(modal);
+
+    // 聚焦并选中全部文本
+    const textarea = $('#editMessageTextarea');
+    textarea.focus();
+    textarea.select();
+
+    // 自动调整高度
+    textarea.style.height = 'auto';
+    textarea.style.height = Math.min(textarea.scrollHeight, 300) + 'px';
+}
+
+function closeEditMessageModal() {
+    const modal = $('.edit-message-modal');
+    if (modal) modal.remove();
+}
+
+function saveEditedMessage(msgIdx) {
+    const session = AppState.chatSessions[AppState.currentChat];
+    if (!session) return;
+
+    const textarea = $('#editMessageTextarea');
+    const newContent = textarea.value.trim();
+
+    if (!newContent) {
+        showToast('消息不能为空');
+        return;
+    }
+
+    // 保存编辑后的消息
+    session.messages[msgIdx].content = newContent;
+
+    // 删除该消息之后的所有消息
+    session.messages = session.messages.slice(0, msgIdx + 1);
+
+    session.lastTime = new Date().toISOString();
+    saveState();
+
+    closeEditMessageModal();
+    renderMessages(AppState.currentChat);
+
+    // 重新生成 AI 回复
+    showToast('正在重新生成回复...');
+    sendChatRequest(AppState.currentChat);
+}
+
+function regenerateMessage(msgIdx) {
+    const session = AppState.chatSessions[AppState.currentChat];
+    if (!session) return;
+
+    $('.message-context-menu')?.remove();
+
+    // 删除该消息及之后的所有消息
+    session.messages = session.messages.slice(0, msgIdx);
+
+    session.lastTime = new Date().toISOString();
+    saveState();
+    renderMessages(AppState.currentChat);
+
+    // 重新生成
+    showToast('正在重新生成...');
+    sendChatRequest(AppState.currentChat);
+}
+
+// ==================== Swipe Feature (Multiple Responses) ====================
+function attachSwipeEvents() {
+    const messages = $$('.message.ai');
+
+    messages.forEach(msgEl => {
+        const msgIdx = parseInt(msgEl.dataset.msgIdx);
+        if (isNaN(msgIdx)) return;
+
+        const session = AppState.chatSessions[AppState.currentChat];
+        if (!session) return;
+
+        const msg = session.messages[msgIdx];
+        if (!msg || !msg.swipes || msg.swipes.length <= 1) return;
+
+        let touchStartX = 0;
+        let touchStartY = 0;
+        let isSwiping = false;
+
+        msgEl.addEventListener('touchstart', (e) => {
+            touchStartX = e.touches[0].clientX;
+            touchStartY = e.touches[0].clientY;
+            isSwiping = false;
+        });
+
+        msgEl.addEventListener('touchmove', (e) => {
+            if (!isSwiping) {
+                const moveX = e.touches[0].clientX;
+                const moveY = e.touches[0].clientY;
+                const deltaX = moveX - touchStartX;
+                const deltaY = moveY - touchStartY;
+
+                // 水平滑动距离大于垂直滑动距离，判定为 swipe
+                if (Math.abs(deltaX) > Math.abs(deltaY) && Math.abs(deltaX) > 30) {
+                    isSwiping = true;
+                }
+            }
+        });
+
+        msgEl.addEventListener('touchend', (e) => {
+            if (!isSwiping) return;
+
+            const moveX = e.changedTouches[0].clientX;
+            const deltaX = moveX - touchStartX;
+
+            if (deltaX > 50) {
+                // 向右滑动，显示上一个候选
+                swipeToPrevious(msgIdx);
+            } else if (deltaX < -50) {
+                // 向左滑动，显示下一个候选
+                swipeToNext(msgIdx);
+            }
+        });
+    });
+}
+
+function swipeToPrevious(msgIdx) {
+    const session = AppState.chatSessions[AppState.currentChat];
+    if (!session) return;
+
+    const msg = session.messages[msgIdx];
+    if (!msg || !msg.swipes || msg.swipes.length <= 1) return;
+
+    const currentIdx = msg.swipe_id || 0;
+    const newIdx = currentIdx > 0 ? currentIdx - 1 : msg.swipes.length - 1;
+
+    msg.swipe_id = newIdx;
+    msg.content = msg.swipes[newIdx].content;
+    msg.reasoning = msg.swipes[newIdx].reasoning;
+
+    saveState();
+    renderMessages(AppState.currentChat);
+    showToast(`候选 ${newIdx + 1}/${msg.swipes.length}`);
+}
+
+function swipeToNext(msgIdx) {
+    const session = AppState.chatSessions[AppState.currentChat];
+    if (!session) return;
+
+    const msg = session.messages[msgIdx];
+    if (!msg || !msg.swipes || msg.swipes.length <= 1) return;
+
+    const currentIdx = msg.swipe_id || 0;
+    const newIdx = (currentIdx + 1) % msg.swipes.length;
+
+    msg.swipe_id = newIdx;
+    msg.content = msg.swipes[newIdx].content;
+    msg.reasoning = msg.swipes[newIdx].reasoning;
+
+    saveState();
+    renderMessages(AppState.currentChat);
+    showToast(`候选 ${newIdx + 1}/${msg.swipes.length}`);
+}
+
+function addSwipeVariant(msgIdx) {
+    const session = AppState.chatSessions[AppState.currentChat];
+    if (!session) return;
+
+    const msg = session.messages[msgIdx];
+    if (!msg || msg.role !== 'assistant') return;
+
+    // 删除该消息之后的所有消息
+    session.messages = session.messages.slice(0, msgIdx);
+
+    saveState();
+    renderMessages(AppState.currentChat);
+
+    // 重新生成一个新的候选回复
+    showToast('正在生成新的候选回复...');
+
+    // 修改 sendChatRequest 以支持添加到 swipes
+    sendChatRequest(AppState.currentChat, true, msgIdx);
+}
+
+// 别名函数，保持兼容性
+function generateNewSwipe(msgIdx) {
+    addSwipeVariant(msgIdx);
+}
+
+function attachSwipeButtonEvents() {
+    // 绑定上一个候选按钮
+    $$('.swipe-prev').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            const msgIdx = parseInt(btn.dataset.msgIdx);
+            swipeToPrevious(msgIdx);
+        });
+    });
+
+    // 绑定下一个候选按钮
+    $$('.swipe-next').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            const msgIdx = parseInt(btn.dataset.msgIdx);
+            swipeToNext(msgIdx);
+        });
+    });
+
+    // 绑定生成新候选按钮
+    $$('.swipe-new').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            const msgIdx = parseInt(btn.dataset.msgIdx);
+            addSwipeVariant(msgIdx);
+        });
+    });
 }
 
 function formatMessage(content) {
@@ -306,7 +786,9 @@ async function sendMessage() {
             const msgData = {
                 role: 'assistant',
                 content: fullContent,
-                time: new Date().toISOString()
+                time: new Date().toISOString(),
+                swipes: [{ content: fullContent, reasoning: reasoningContent }],
+                swipe_id: 0
             };
             // 保存思考过程（如果有）
             if (reasoningContent) {
@@ -1261,7 +1743,8 @@ function toggleChatMenu() {
     menu.innerHTML = `
         <button class="chat-menu-item danger" id="menuDeleteChat">🗑️ 删除此对话</button>
         <button class="chat-menu-item" id="menuDeleteAll">🧹 清空聊天记录</button>
-        <button class="chat-menu-item" id="menuToggleDelete">✏️ 删除模式</button>
+        <button class="chat-menu-item" id="menuExportChat">📤 导出聊天记录</button>
+        <button class="chat-menu-item" id="menuPromptTemplate">⚙️ 提示词模板</button>
     `;
     header.appendChild(menu);
 
@@ -1270,13 +1753,10 @@ function toggleChatMenu() {
         if (!AppState.currentChat) return;
         const roleId = AppState.currentChat;
         if (confirm('确定删除此对话？删除后无法恢复。')) {
-            // 清除删除模式
-            if (deleteMode) toggleDeleteMode();
             delete AppState.chatSessions[roleId];
             AppState.currentChat = null;
             saveState();
             closeChatMenu();
-            // 清空消息容器
             $('#chatMessages').innerHTML = '';
             showChatListView();
             renderChatList();
@@ -1298,9 +1778,15 @@ function toggleChatMenu() {
         }
     });
 
-    // 切换删除模式
-    menu.querySelector('#menuToggleDelete').addEventListener('click', () => {
-        toggleDeleteMode();
+    // 导出聊天记录
+    menu.querySelector('#menuExportChat').addEventListener('click', () => {
+        exportChatHistory();
+        closeChatMenu();
+    });
+
+    // 提示词模板设置
+    menu.querySelector('#menuPromptTemplate').addEventListener('click', () => {
+        openPromptTemplateModal();
         closeChatMenu();
     });
 }
@@ -1310,60 +1796,452 @@ function closeChatMenu() {
     if (existing) existing.remove();
 }
 
-let deleteMode = false;
+// ==================== Prompt Template System ====================
+function openPromptTemplateModal() {
+    const modal = document.createElement('div');
+    modal.className = 'prompt-template-modal';
+    modal.innerHTML = `
+        <div class="prompt-template-overlay"></div>
+        <div class="prompt-template-panel">
+            <div class="prompt-template-header">
+                <h3>提示词模板设置</h3>
+                <button class="close-btn" onclick="closePromptTemplateModal()">×</button>
+            </div>
+            <div class="prompt-template-content">
+                <div class="template-info">
+                    <p>提示词模板用于控制消息的格式化方式。使用 <code>{{user}}</code> 表示用户消息，<code>{{char}}</code> 表示角色名称。</p>
+                </div>
 
-function toggleDeleteMode() {
-    deleteMode = !deleteMode;
-    const container = $('#chatMessages');
-    if (deleteMode) {
-        container.classList.add('delete-mode');
-        // 给每条消息添加删除按钮
-        container.querySelectorAll('.message').forEach((msgEl, idx) => {
-            const delBtn = document.createElement('button');
-            delBtn.className = 'msg-delete-btn';
-            delBtn.textContent = '✕';
-            delBtn.addEventListener('click', (e) => {
-                e.stopPropagation();
-                deleteMessage(idx);
-            });
-            msgEl.appendChild(delBtn);
-        });
-        showToast('删除模式：点击消息上的 ✕ 删除');
+                <div class="template-selector">
+                    <label>模板类型：</label>
+                    <select id="templateTypeSelect" onchange="onTemplateTypeChange()">
+                        <option value="default">默认格式</option>
+                        <option value="alpaca">Alpaca 格式</option>
+                        <option value="chatml">ChatML 格式</option>
+                        <option value="vicuna">Vicuna 格式</option>
+                        <option value="custom">自定义格式</option>
+                    </select>
+                </div>
+
+                <div class="template-editor" id="templateEditor">
+                    <label>用户消息模板：</label>
+                    <textarea id="userTemplate" placeholder="例如：### Instruction:\n{{user}}\n\n"></textarea>
+
+                    <label>助手消息模板：</label>
+                    <textarea id="assistantTemplate" placeholder="例如：### Response:\n{{assistant}}\n\n"></textarea>
+
+                    <label>系统消息模板：</label>
+                    <textarea id="systemTemplate" placeholder="例如：### System:\n{{system}}\n\n"></textarea>
+                </div>
+
+                <div class="template-preview">
+                    <label>预览：</label>
+                    <pre id="templatePreview"></pre>
+                </div>
+            </div>
+            <div class="prompt-template-actions">
+                <button class="btn-secondary" onclick="closePromptTemplateModal()">取消</button>
+                <button class="btn-primary" onclick="savePromptTemplate()">保存</button>
+            </div>
+        </div>
+    `;
+    document.body.appendChild(modal);
+
+    // 加载当前模板设置
+    loadCurrentTemplate();
+}
+
+function closePromptTemplateModal() {
+    const modal = $('.prompt-template-modal');
+    if (modal) modal.remove();
+}
+
+function onTemplateTypeChange() {
+    const type = $('#templateTypeSelect').value;
+    const editor = $('#templateEditor');
+    const userTemplate = $('#userTemplate');
+    const assistantTemplate = $('#assistantTemplate');
+    const systemTemplate = $('#systemTemplate');
+
+    if (type === 'custom') {
+        editor.style.display = 'block';
     } else {
-        container.classList.remove('delete-mode');
-        container.querySelectorAll('.msg-delete-btn').forEach(b => b.remove());
+        editor.style.display = 'none';
+
+        // 设置预定义模板
+        const templates = getTemplatePresets();
+        const preset = templates[type];
+        if (preset) {
+            userTemplate.value = preset.user;
+            assistantTemplate.value = preset.assistant;
+            systemTemplate.value = preset.system;
+        }
     }
+
+    updateTemplatePreview();
 }
 
-function deleteMessage(index) {
-    if (!AppState.currentChat) return;
-    const session = AppState.chatSessions[AppState.currentChat];
-    if (!session || index < 0 || index >= session.messages.length) return;
+function getTemplatePresets() {
+    return {
+        default: {
+            user: '{{user}}',
+            assistant: '{{assistant}}',
+            system: '{{system}}'
+        },
+        alpaca: {
+            user: '### Instruction:\n{{user}}\n\n',
+            assistant: '### Response:\n{{assistant}}\n\n',
+            system: '### System:\n{{system}}\n\n'
+        },
+        chatml: {
+            user: '<|im_start|>user\n{{user}}<|im_end|>\n',
+            assistant: '<|im_start|>assistant\n{{assistant}}<|im_end|>\n',
+            system: '<|im_start|>system\n{{system}}<|im_end|>\n'
+        },
+        vicuna: {
+            user: 'USER: {{user}}\n',
+            assistant: 'ASSISTANT: {{assistant}}\n',
+            system: 'SYSTEM: {{system}}\n'
+        }
+    };
+}
 
-    session.messages.splice(index, 1);
-    session.lastTime = new Date().toISOString();
+function loadCurrentTemplate() {
+    const settings = AppState.settings.promptTemplate || { type: 'default' };
+    const select = $('#templateTypeSelect');
+    select.value = settings.type || 'default';
+
+    if (settings.type === 'custom' && settings.custom) {
+        $('#userTemplate').value = settings.custom.user || '';
+        $('#assistantTemplate').value = settings.custom.assistant || '';
+        $('#systemTemplate').value = settings.custom.system || '';
+        $('#templateEditor').style.display = 'block';
+    } else {
+        onTemplateTypeChange();
+    }
+
+    updateTemplatePreview();
+}
+
+function updateTemplatePreview() {
+    const userTemplate = $('#userTemplate').value;
+    const assistantTemplate = $('#assistantTemplate').value;
+    const systemTemplate = $('#systemTemplate').value;
+
+    const preview = $('#templatePreview');
+    const exampleUser = userTemplate.replace('{{user}}', '你好！');
+    const exampleAssistant = assistantTemplate.replace('{{assistant}}', '你好！有什么我可以帮助你的吗？');
+    const exampleSystem = systemTemplate.replace('{{system}}', '你是一个有用的助手。');
+
+    preview.textContent = exampleSystem + exampleUser + exampleAssistant;
+}
+
+function savePromptTemplate() {
+    const type = $('#templateTypeSelect').value;
+
+    if (!AppState.settings.promptTemplate) {
+        AppState.settings.promptTemplate = {};
+    }
+
+    AppState.settings.promptTemplate.type = type;
+
+    if (type === 'custom') {
+        AppState.settings.promptTemplate.custom = {
+            user: $('#userTemplate').value,
+            assistant: $('#assistantTemplate').value,
+            system: $('#systemTemplate').value
+        };
+    } else {
+        const presets = getTemplatePresets();
+        AppState.settings.promptTemplate.custom = presets[type];
+    }
+
     saveState();
-    renderMessages(AppState.currentChat);
-
-    // 如果还在删除模式，重新添加删除按钮
-    if (deleteMode) {
-        const container = $('#chatMessages');
-        container.querySelectorAll('.message').forEach((msgEl, idx) => {
-            const delBtn = document.createElement('button');
-            delBtn.className = 'msg-delete-btn';
-            delBtn.textContent = '✕';
-            delBtn.addEventListener('click', (e) => {
-                e.stopPropagation();
-                deleteMessage(idx);
-            });
-            msgEl.appendChild(delBtn);
-        });
-    }
-
-    renderChatList();
+    showToast('提示词模板已保存');
+    closePromptTemplateModal();
 }
 
-// ==================== Quick Replies ====================
+function applyPromptTemplate(messages) {
+    const template = AppState.settings.promptTemplate;
+    if (!template || !template.custom) return messages;
+
+    return messages.map(msg => {
+        if (msg.role === 'user') {
+            return {
+                ...msg,
+                content: template.custom.user.replace('{{user}}', msg.content)
+            };
+        } else if (msg.role === 'assistant') {
+            return {
+                ...msg,
+                content: template.custom.assistant.replace('{{assistant}}', msg.content)
+            };
+        } else if (msg.role === 'system') {
+            return {
+                ...msg,
+                content: template.custom.system.replace('{{system}}', msg.content)
+            };
+        }
+        return msg;
+    });
+}
+
+// ==================== Export Chat History ====================
+function exportChatHistory() {
+    const session = AppState.chatSessions[AppState.currentChat];
+    if (!session || !session.messages.length) {
+        showToast('没有可导出的聊天记录');
+        return;
+    }
+
+    const role = ROLES_DATA.find(r => String(r.id) === String(AppState.currentChat));
+    if (!role) return;
+
+    // 创建导出选项模态框
+    const modal = document.createElement('div');
+    modal.className = 'export-modal';
+    modal.innerHTML = `
+        <div class="export-overlay"></div>
+        <div class="export-panel">
+            <div class="export-header">
+                <h3>导出聊天记录</h3>
+                <button class="close-btn" onclick="closeExportModal()">×</button>
+            </div>
+            <div class="export-content">
+                <label>导出格式：</label>
+                <select id="exportFormat">
+                    <option value="txt">纯文本 (.txt)</option>
+                    <option value="json">JSON (.json)</option>
+                    <option value="markdown">Markdown (.md)</option>
+                    <option value="html">HTML (.html)</option>
+                </select>
+
+                <label style="margin-top: 16px;">
+                    <input type="checkbox" id="includeReasoning" checked>
+                    包含思考过程
+                </label>
+
+                <label style="margin-top: 8px;">
+                    <input type="checkbox" id="includeTimestamp" checked>
+                    包含时间戳
+                </label>
+            </div>
+            <div class="export-actions">
+                <button class="btn-secondary" onclick="closeExportModal()">取消</button>
+                <button class="btn-primary" onclick="confirmExport()">导出</button>
+            </div>
+        </div>
+    `;
+    document.body.appendChild(modal);
+}
+
+function closeExportModal() {
+    const modal = $('.export-modal');
+    if (modal) modal.remove();
+}
+
+function confirmExport() {
+    const format = $('#exportFormat').value;
+    const includeReasoning = $('#includeReasoning').checked;
+    const includeTimestamp = $('#includeTimestamp').checked;
+
+    const session = AppState.chatSessions[AppState.currentChat];
+    const role = ROLES_DATA.find(r => String(r.id) === String(AppState.currentChat));
+
+    let content = '';
+    let filename = '';
+    let mimeType = '';
+
+    if (format === 'txt') {
+        content = exportAsTxt(session, role, includeReasoning, includeTimestamp);
+        filename = `${role.name}_聊天记录_${new Date().toISOString().slice(0, 10)}.txt`;
+        mimeType = 'text/plain';
+    } else if (format === 'json') {
+        content = exportAsJson(session, role, includeReasoning, includeTimestamp);
+        filename = `${role.name}_聊天记录_${new Date().toISOString().slice(0, 10)}.json`;
+        mimeType = 'application/json';
+    } else if (format === 'markdown') {
+        content = exportAsMarkdown(session, role, includeReasoning, includeTimestamp);
+        filename = `${role.name}_聊天记录_${new Date().toISOString().slice(0, 10)}.md`;
+        mimeType = 'text/markdown';
+    } else if (format === 'html') {
+        content = exportAsHtml(session, role, includeReasoning, includeTimestamp);
+        filename = `${role.name}_聊天记录_${new Date().toISOString().slice(0, 10)}.html`;
+        mimeType = 'text/html';
+    }
+
+    // 创建下载
+    const blob = new Blob([content], { type: mimeType });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+
+    showToast('聊天记录已导出');
+    closeExportModal();
+}
+
+function exportAsTxt(session, role, includeReasoning, includeTimestamp) {
+    let content = `${role.name} 聊天记录\n`;
+    content += `导出时间：${new Date().toLocaleString('zh-CN')}\n`;
+    content += `消息数量：${session.messages.length}\n`;
+    content += '='.repeat(50) + '\n\n';
+
+    session.messages.forEach(msg => {
+        const speaker = msg.role === 'user' ? '用户' : role.name;
+        const time = includeTimestamp ? ` [${new Date(msg.time).toLocaleString('zh-CN')}]` : '';
+
+        content += `${speaker}${time}:\n`;
+
+        if (includeReasoning && msg.reasoning) {
+            content += `💭 思考过程：\n${msg.reasoning}\n\n`;
+        }
+
+        content += `${msg.content}\n`;
+        content += '-'.repeat(50) + '\n\n';
+    });
+
+    return content;
+}
+
+function exportAsJson(session, role, includeReasoning, includeTimestamp) {
+    const data = {
+        role: role.name,
+        roleId: role.id,
+        exportTime: new Date().toISOString(),
+        messageCount: session.messages.length,
+        messages: session.messages.map(msg => {
+            const item = {
+                role: msg.role,
+                content: msg.content
+            };
+
+            if (includeTimestamp) {
+                item.time = msg.time;
+            }
+
+            if (includeReasoning && msg.reasoning) {
+                item.reasoning = msg.reasoning;
+            }
+
+            return item;
+        })
+    };
+
+    return JSON.stringify(data, null, 2);
+}
+
+function exportAsMarkdown(session, role, includeReasoning, includeTimestamp) {
+    let content = `# ${role.name} 聊天记录\n\n`;
+    content += `**导出时间**：${new Date().toLocaleString('zh-CN')}\n`;
+    content += `**消息数量**：${session.messages.length}\n\n`;
+    content += '---\n\n';
+
+    session.messages.forEach(msg => {
+        const speaker = msg.role === 'user' ? '**用户**' : `**${role.name}**`;
+        const time = includeTimestamp ? ` *${new Date(msg.time).toLocaleString('zh-CN')}*` : '';
+
+        content += `### ${speaker}${time}\n\n`;
+
+        if (includeReasoning && msg.reasoning) {
+            content += `> 💭 思考过程：\n> ${msg.reasoning.replace(/\n/g, '\n> ')}\n\n`;
+        }
+
+        content += `${msg.content}\n\n`;
+    });
+
+    return content;
+}
+
+function exportAsHtml(session, role, includeReasoning, includeTimestamp) {
+    let content = `<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>${role.name} 聊天记录</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+        .header {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+        }
+        .message {
+            background: white;
+            padding: 16px;
+            border-radius: 8px;
+            margin-bottom: 12px;
+        }
+        .message.user {
+            background: #e3f2fd;
+        }
+        .speaker {
+            font-weight: bold;
+            margin-bottom: 8px;
+        }
+        .time {
+            color: #666;
+            font-size: 0.85em;
+            margin-left: 8px;
+        }
+        .reasoning {
+            background: #f5f5f5;
+            padding: 12px;
+            border-left: 3px solid #999;
+            margin: 8px 0;
+            font-style: italic;
+            color: #666;
+        }
+        .content {
+            white-space: pre-wrap;
+            line-height: 1.6;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>${role.name} 聊天记录</h1>
+        <p>导出时间：${new Date().toLocaleString('zh-CN')}</p>
+        <p>消息数量：${session.messages.length}</p>
+    </div>
+`;
+
+    session.messages.forEach(msg => {
+        const speaker = msg.role === 'user' ? '用户' : role.name;
+        const time = includeTimestamp ? `<span class="time">${new Date(msg.time).toLocaleString('zh-CN')}</span>` : '';
+        const messageClass = msg.role === 'user' ? 'message user' : 'message';
+
+        content += `    <div class="${messageClass}">
+        <div class="speaker">${speaker}${time}</div>
+`;
+
+        if (includeReasoning && msg.reasoning) {
+            content += `        <div class="reasoning">💭 思考过程：${msg.reasoning}</div>
+`;
+        }
+
+        content += `        <div class="content">${msg.content}</div>
+    </div>
+`;
+    });
+
+    content += `</body>
+</html>`;
+
+    return content;
+}
 
 // 快捷选项映射：根据角色标签生成专属快捷选项
 const QUICK_REPLIES_MAP = {
