@@ -242,24 +242,35 @@ async function sendMessage() {
     input.style.height = 'auto';
     renderMessages(roleId);
 
-    // 显示 typing indicator
-    showTypingIndicator();
+    // 立即创建流式气泡，让用户看到等待提示
+    const role = ROLES_DATA.find(r => String(r.id) === String(roleId));
+    const container = $('#chatMessages');
+    if (container && role) {
+        const streamMsgEl = document.createElement('div');
+        streamMsgEl.className = 'message ai';
+        streamMsgEl.id = 'streamMessage';
+        streamMsgEl.innerHTML = `
+            <div class="message-avatar-placeholder" style="background:var(--accent-gradient)">${role.emoji}</div>
+            <div>
+                <div class="message-bubble" id="streamBubble"><span style="color:#aaa;font-style:italic;">💭 正在思考中…</span></div>
+                <div class="message-time" id="streamTime"></div>
+            </div>
+        `;
+        container.appendChild(streamMsgEl);
+        scrollToBottom();
+    }
 
     // 尝试调用 API
     try {
-        const role = ROLES_DATA.find(r => String(r.id) === String(roleId));
-        hideTypingIndicator();
-
         // 流式调用：实时逐字显示
         const result = await callLMApi(role, session.messages, true);
         const fullContent = result.content;
         const reasoningContent = result.reasoning;
 
         // 被中断的请求返回 '...'，不保存无意义内容
-        // 流式完成，清理 abort 状态和 typing indicator
+        // 流式完成，清理 abort 状态
         currentStreamAbort = null;
         currentStreamRoleId = null;
-        hideTypingIndicator();
 
         if (fullContent && fullContent !== '...') {
             // 流式消息元素已由 readStreamResponse 创建并实时更新
@@ -299,8 +310,13 @@ async function sendMessage() {
     } catch (error) {
         currentStreamAbort = null;
         currentStreamRoleId = null;
-        hideTypingIndicator();
         console.warn('API call failed:', error);
+
+        // 移除等待气泡，显示错误提示
+        const streamEl = $('#streamMessage');
+        if (streamEl) {
+            streamEl.remove();
+        }
 
         // 不在 session 中保存 fallback，避免覆盖可能稍后到达的远程响应
         // 在 DOM 上显示临时错误提示气泡（带重试按钮）
@@ -313,7 +329,7 @@ async function sendMessage() {
                 <div class="message-content">
                     <div id="streamBubble" style="color:#f87171;font-size:0.9em;">
                         ️ 请求失败，可能是网络中断或模型服务暂不可用。<br>
-                        <button onclick="retryLastMessage('${roleId}', ${JSON.stringify(text).replace(/'/g, "\'")})" 
+                        <button onclick="retryLastMessage('${roleId}', ${JSON.stringify(text).replace(/'/g, "\'")})"
                                 style="margin-top:8px;padding:4px 12px;background:var(--accent-gradient);border:none;border-radius:6px;color:#fff;cursor:pointer;font-size:0.85em;">
                             🔄 重试
                         </button>
@@ -642,9 +658,10 @@ async function readStreamResponse(response, role) {
     let buffer = '';
     let isReasoning = false; // 标记是否在输出思考过程
 
-    // 创建流式消息气泡（如果容器存在的话）
+    // 复用 sendMessage 中创建的流式气泡，如果不存在则创建
     const container = $('#chatMessages');
-    if (container) {
+    let streamBubble = $('#streamBubble');
+    if (!streamBubble && container) {
         const streamMsgEl = document.createElement('div');
         streamMsgEl.className = 'message ai';
         streamMsgEl.id = 'streamMessage';
@@ -656,7 +673,9 @@ async function readStreamResponse(response, role) {
             </div>
         `;
         container.appendChild(streamMsgEl);
-        console.log('[Stream] streamMessage appended, children count:', container.children.length);
+        console.log('[Stream] streamMessage created in readStreamResponse');
+    } else {
+        console.log('[Stream] reusing existing streamBubble');
     }
 
     let chunkCount = 0;
