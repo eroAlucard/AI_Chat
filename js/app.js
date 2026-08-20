@@ -794,53 +794,58 @@ function initWorldBookToggle() {
 }
 
 // 折叠事件委托标记（避免重复绑定）
-let _collapsibleDelegateBound = false;
-
 function initCollapsible() {
     const modal = document.getElementById('roleDetailModal');
     if (!modal) return;
     
-    // 事件委托：只在 modal 上绑定一次 click 事件
-    if (!_collapsibleDelegateBound) {
-        _collapsibleDelegateBound = true;
-        modal.addEventListener('click', (e) => {
-            const collapsible = e.target.closest('.collapsible');
-            if (!collapsible) return;
-            
-            // 避免点击内部交互元素时触发折叠
-            if (e.target.closest('.wb-toggle') || e.target.closest('.wb-switch') || 
-                e.target.closest('button') || e.target.closest('a') || 
-                e.target.closest('.scene-item') || e.target.closest('.wb-entry')) return;
-            
-            // 判断点击是否在底部区域（遮罩/收起提示区域）
-            const rect = collapsible.getBoundingClientRect();
-            const clickY = e.clientY - rect.top;
-            const isNearBottom = clickY > rect.height - 30;
-            
-            if (collapsible.classList.contains('collapsed') || isNearBottom) {
-                collapsible.classList.toggle('collapsed');
-            }
-        });
-    }
-    
-    // 检查每个可折叠元素的内容是否超出高度
     modal.querySelectorAll('.collapsible').forEach(el => {
-        // 先临时展开测量
-        const wasCollapsed = el.classList.contains('collapsed');
+        // 移除之前可能添加的 toggle 按钮和遮罩
+        el.querySelectorAll('.collapse-toggle, .collapse-gradient').forEach(c => c.remove());
+        
+        // 先临时展开测量内容高度
         el.classList.remove('collapsed');
         const scrollH = el.scrollHeight;
         const isDesc = el.classList.contains('role-detail-desc');
         const isRules = el.classList.contains('role-detail-rules');
         const limit = isDesc ? 72 : isRules ? 96 : 48;  // px
         
-        if (scrollH > limit + 10) {
-            el.classList.add('collapsed');
-        } else {
+        if (scrollH <= limit + 10) {
             // 内容没超出，不需要折叠
             el.classList.remove('collapsible');
+            return;
         }
+        
+        // 内容超出，启用折叠
+        el.classList.add('collapsed');
+        
+        // 添加渐变遮罩（折叠时显示）
+        const gradient = document.createElement('div');
+        gradient.className = 'collapse-gradient';
+        el.appendChild(gradient);
+        
+        // 添加展开/收起按钮
+        const toggle = document.createElement('button');
+        toggle.className = 'collapse-toggle';
+        toggle.textContent = '展开 ▾';
+        toggle.type = 'button';
+        toggle.addEventListener('click', (e) => {
+            e.stopPropagation();
+            const isCollapsed = el.classList.contains('collapsed');
+            if (isCollapsed) {
+                el.classList.remove('collapsed');
+                toggle.textContent = '收起 ▴';
+                gradient.style.display = 'none';
+            } else {
+                el.classList.add('collapsed');
+                toggle.textContent = '展开 ▾';
+                gradient.style.display = '';
+            }
+        });
+        // 插入到 collapsible 元素后面
+        el.parentNode.insertBefore(toggle, el.nextSibling);
     });
 }
+
 
 
 function toggleCollect(roleId) {

@@ -1062,39 +1062,33 @@ body {
     max-height: none;
 }
 
-/* 折叠遮罩渐变（仅在 collapsed 状态显示） */
-.collapsible.collapsed::after {
-    content: '点击展开 ▾';
+/* 折叠遮罩渐变 */
+.collapsible.collapsed .collapse-gradient {
     position: absolute;
     bottom: 0;
     left: 0;
     right: 0;
-    padding: 20px 0 4px 0;
-    text-align: center;
-    font-size: 12px;
-    color: rgba(255,255,255,0.4);
+    height: 40px;
     background: linear-gradient(transparent, #0a0a1a);
-    cursor: pointer;
-    pointer-events: auto;
-    z-index: 2;
+    pointer-events: none;
 }
 
-/* 展开后隐藏遮罩 */
-.collapsible:not(.collapsed)::after {
-    display: none;
-}
-
-/* 展开后收起提示 */
-.collapsible:not(.collapsed)::before {
-    content: '点击收起 ▴';
+/* 展开/收起按钮 */
+.collapse-toggle {
     display: block;
-    text-align: center;
+    width: 100%;
+    background: none;
+    border: none;
+    color: rgba(255,255,255,0.4);
     font-size: 12px;
-    color: rgba(255,255,255,0.3);
-    padding: 4px 0 0 0;
+    padding: 4px 0;
     cursor: pointer;
+    text-align: center;
 }
 
+.collapse-toggle:hover {
+    color: rgba(255,255,255,0.6);
+}
 /* ==================== 聊天批量删除 ==================== */
 .chat-manage-btn {
     background: none;
