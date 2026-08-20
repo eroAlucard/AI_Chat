@@ -552,6 +552,7 @@ function initRoleDetailModal() {
     const continueChatBtn = $('#continueChatBtn');
     const collectBtn = $('#collectBtn');
     initWorldBookToggle();
+    initCollapsible();
 
     [closeBtn, overlay].forEach(el => {
         el.addEventListener('click', () => modal.classList.add('hidden'));
@@ -787,6 +788,17 @@ function initWorldBookToggle() {
     toggleBtn.addEventListener('click', () => {
         panel.classList.toggle('hidden');
         arrow.textContent = panel.classList.contains('hidden') ? '▸' : '▾';
+    });
+}
+
+function initCollapsible() {
+    // 为所有可折叠元素添加点击事件
+    document.querySelectorAll('.collapsible').forEach(el => {
+        el.addEventListener('click', (e) => {
+            // 避免点击内部交互元素时触发折叠
+            if (e.target.closest('.wb-toggle') || e.target.closest('.wb-switch') || e.target.closest('button') || e.target.closest('a')) return;
+            el.classList.toggle('collapsed');
+        });
     });
 }
 

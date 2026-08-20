@@ -94,6 +94,14 @@
                 <div class="chat-list-view" id="chatListView">
                     <div class="chat-list-header">
                         <h2>消息</h2>
+                        <button class="chat-manage-btn" id="chatManageBtn">管理</button>
+                    </div>
+                    <!-- 批量操作栏 -->
+                    <div class="chat-batch-bar hidden" id="chatBatchBar">
+                        <button class="chat-batch-select-all" id="chatSelectAllBtn">全选</button>
+                        <span class="chat-batch-count" id="chatBatchCount">已选 0 项</span>
+                        <button class="chat-batch-delete" id="chatBatchDeleteBtn">删除选中</button>
+                        <button class="chat-batch-cancel" id="chatBatchCancelBtn">取消</button>
                     </div>
                     <div class="chat-list" id="chatList">
                         <!-- 聊天列表由 JS 动态生成 -->
@@ -148,8 +156,8 @@
                     <div class="role-detail-info">
                         <h2 class="role-detail-name" id="roleDetailName"></h2>
                         <div class="role-detail-tags" id="roleDetailTags"></div>
-                        <p class="role-detail-desc" id="roleDetailDesc"></p>
-                        <div class="role-detail-rules" id="roleDetailRules"></div>
+                        <p class="role-detail-desc collapsible collapsed" id="roleDetailDesc"></p>
+                        <div class="role-detail-rules collapsible collapsed" id="roleDetailRules"></div>
                         <!-- 世界书入口 -->
                         <div class="worldbook-entry hidden" id="worldbookEntry">
                             <button class="worldbook-toggle-btn" id="worldbookToggleBtn">
@@ -166,7 +174,7 @@
                             </div>
                         </div>
                         <!-- 场景选择区域 -->
-                        <div class="scene-selector" id="sceneSelector">
+                        <div class="scene-selector collapsible collapsed" id="sceneSelector">
                             <div class="scene-selector-title">选择开场场景 <span class="scene-count" id="sceneCount"></span></div>
                             <div class="scene-list" id="sceneList"></div>
                         </div>

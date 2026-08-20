@@ -1,6 +1,7 @@
 // ==================== Chat Logic ====================
 
 function initChatView() {
+    initBatchDelete();
     const backBtn = $('#chatBackBtn');
     const sendBtn = $('#sendBtn');
     const chatInput = $('#chatInput');
@@ -171,7 +172,30 @@ function renderMessages(roleId) {
 }
 
 function formatMessage(content) {
-    // 简单的文本格式化：换行符转 <br>
+    // 检测内容是否包含 HTML 标签（如角色卡返回的状态面板）
+    // 如果包含 <div>/<span>/<table> 等 HTML 标签，则渲染而非转义
+    const hasHtmlTags = /\<(div|span|table|tr|td|th|ul|ol|li|details|summary|style|img|svg|progress|meter|section|article|header|footer|nav|form|input|button|select|option|textarea|label|fieldset|legend|datalist|output|canvas|video|audio|source|picture)\b/i.test(content);
+    
+    if (hasHtmlTags) {
+        // 包含 HTML 标签：渲染而非转义
+        // 安全策略：
+        // 1. 移除危险标签（script, iframe, embed, object, link, meta, base）
+        // 2. 移除事件属性（on*）
+        // 3. 移除 javascript: 协议
+        // 4. 移除 id 属性（避免与页面元素冲突）
+        let safe = content
+            .replace(/<script\b[^>]*>[\s\S]*?<\/script>/gi, '')
+            .replace(/<script\b[^>]*\/?>/gi, '')
+            .replace(/<(iframe|embed|object|link|meta|base)\b[^>]*>/gi, '')
+            .replace(/\bon\w+\s*=\s*(?:"[^"]*"|'[^']*'|[^\s>]*)/gi, '')
+            .replace(/\bid\s*=\s*(?:"[^"]*"|'[^']*'|[^\s>]*)/gi, '')
+            .replace(/javascript:/gi, 'blocked:')
+            .replace(/data:\s*text\/html/gi, 'blocked:');
+        safe = safe.replace(/\n/g, '<br>');
+        return safe;
+    }
+    
+    // 普通文本：HTML 转义 + 换行转 <br>
     return content
         .replace(/&/g, '&amp;')
         .replace(/</g, '&lt;')
@@ -325,10 +349,13 @@ function hideTypingIndicator() {
 async function callLMApi(role, messages, useStream = true) {
     const { apiUrl, modelName, temperature, maxTokens, systemPrompt } = AppState.settings;
 
-    const baseSystem = systemPrompt || role.systemPrompt;
+    let baseSystem = systemPrompt || role.systemPrompt;
     // 统一人称规则 + 性别强调：角色必须始终保持设定性别，用对应性别的第三人称描写内心活动
-    const gender = role.gender === 'male' ? '男性' : '女性';
-    const pronoun = role.gender === 'male' ? '他' : '她';
+    const roleGender = role.gender || (role.tags && (
+        role.tags.includes('Male') || role.tags.includes('male') || role.tags.includes('男性') || role.tags.includes('男性向') ? 'male' : 'female'
+    ));
+    const gender = roleGender === 'male' ? '男性' : '女性';
+    const pronoun = roleGender === 'male' ? '他' : '她';
     const personRule = `【性别规则】你是${gender}角色（${role.name}），请始终以${gender}身份、${gender}口吻回应，保持性别特征一致。无论对话进行多少轮，你都必须保持这个性别，绝不能混淆或切换性别。描写自己的身体时必须使用${gender}的性器官和身体特征。用户是第一人称"我"。\n\n【人称规则】叙述描写时用第三人称（${pronoun}/${role.name}），不用"我"。例如不要写"我忍不住心跳加速"，而写"${pronoun}忍不住心跳加速"。对话台词中角色可以用"我"自称。\n\n`;
 
     // === 色情描写规则（所有角色通用）===
@@ -419,7 +446,75 @@ async function callLMApi(role, messages, useStream = true) {
         }
     }
 
+    // === systemMessage 超长截断 ===
+    // 估算总长度，如果超过 15000 字符（约 10000 tokens），截断世界书常驻条目
+    const MAX_SYSTEM_LENGTH = 15000;
+    let prelimSystem = personRule + eroticRule + femaleRule + maleRule + baseSystem + worldBookInjection;
+    
+    if (prelimSystem.length > MAX_SYSTEM_LENGTH) {
+        console.warn(`[callLMApi] systemMessage ${prelimSystem.length}字符 超过限制 ${MAX_SYSTEM_LENGTH}，开始截断世界书常驻条目`);
+        
+        // 分离各部分
+        const fixedPart = personRule + eroticRule + femaleRule + maleRule;  // 固定规则（不可截断）
+        const fixedLen = fixedPart.length;
+        const availableForBase = MAX_SYSTEM_LENGTH - fixedLen - worldBookInjection.length - 500;  // 留500字符余量
+        
+        // baseSystem 包含角色核心设定 + 世界书常驻条目
+        // 需要识别并截断世界书常驻部分
+        if (role.sourceData && role.sourceData.characterBook && role.sourceData.characterBook.entries) {
+            const cbEntries = role.sourceData.characterBook.entries;
+            const constantEntries = cbEntries
+                .filter(e => e.enabled !== false && e.content && e.content.trim())
+                .filter(e => e.constant === true || (!e.keys || e.keys.length === 0))
+                .sort((a, b) => (a.insertion_order || 100) - (b.insertion_order || 100));
+            
+            // 从角色原始 systemPrompt 开始，逐步添加常驻条目直到接近限制
+            // 先计算不含常驻条目的 baseSystem 长度
+            let baseWithoutCB = role.systemPrompt || '';
+            if (role.sourceData && role.sourceData.postHistoryInstructions) {
+                // postHistoryInstructions 不在 systemMessage 中，跳过
+            }
+            // 角色描述
+            const descPart = role.desc ? `【角色描述】${role.desc}
+
+` : '';
+            const coreLen = descPart.length + baseWithoutCB.length;
+            
+            let truncatedCB = '';
+            let remaining = availableForBase - coreLen;
+            let keptCount = 0;
+            let droppedCount = 0;
+            
+            for (const entry of constantEntries) {
+                const entryContent = CardParser.replaceTemplateVars(entry.content, role.name, '用户') + '
+
+';
+                if (remaining >= entryContent.length) {
+                    truncatedCB += entryContent;
+                    remaining -= entryContent.length;
+                    keptCount++;
+                } else {
+                    droppedCount++;
+                }
+            }
+            
+            if (droppedCount > 0) {
+                console.warn(`[callLMApi] 截断了 ${droppedCount} 条世界书常驻条目，保留 ${keptCount} 条`);
+            }
+            
+            // 重建 baseSystem：角色描述 + 原始 systemPrompt + 截断后的常驻条目
+            baseSystem = descPart + baseWithoutCB + '
+
+' + truncatedCB;
+        }
+    }
+
     const systemMessage = personRule + eroticRule + femaleRule + maleRule + baseSystem + worldBookInjection;
+    console.log(`[callLMApi] 角色: ${role.name}, gender: ${roleGender}, systemMessage长度: ${systemMessage.length}字符, 约${Math.round(systemMessage.length/1.5)}tokens`);
+    // 超长 systemMessage 警告（超过 16000 字符 ≈ 10000+ tokens 可能超出 context window）
+    if (systemMessage.length > 16000) {
+        console.warn(`[callLMApi] ⚠️ systemMessage 超长！${systemMessage.length}字符 ≈ ${Math.round(systemMessage.length/1.5)}tokens，可能超出模型 context window 导致无响应`);
+    }
 
     const apiMessages = [
         { role: 'system', content: systemMessage },
@@ -481,6 +576,7 @@ async function callLMApi(role, messages, useStream = true) {
     const abortSignal = currentStreamAbort.signal;
 
     let response;
+    console.log(`[API] 请求 ${fetchUrl}, body大小: ${JSON.stringify(body).length}字符, messages: ${body.messages.length}条`);
     try {
         response = await fetch(fetchUrl, {
             method: 'POST',
@@ -488,6 +584,7 @@ async function callLMApi(role, messages, useStream = true) {
             body: JSON.stringify(body),
             signal: abortSignal
         });
+        console.log(`[API] 响应状态: ${response.status} ${response.ok ? 'OK' : 'ERROR'}, content-type: ${response.headers.get('content-type')}`);
     } catch (e) {
         // 被主动取消不算错误
         if (e.name === 'AbortError') return { content: '...', reasoning: '' };
@@ -556,10 +653,15 @@ async function readStreamResponse(response, role) {
         container.appendChild(streamMsgEl);
     }
 
+    let chunkCount = 0;
     try {
         while (true) {
             const { done, value } = await reader.read();
-            if (done) break;
+            if (done) {
+                console.log(`[Stream] 流结束，共收到 ${chunkCount} 个 chunk, 内容长度: ${fullContent.length}`);
+                break;
+            }
+            chunkCount++;
 
             buffer += decoder.decode(value, { stream: true });
             const lines = buffer.split('\n');
@@ -574,6 +676,11 @@ async function readStreamResponse(response, role) {
                     const data = JSON.parse(trimmed.slice(6));
                     const choice = data.choices?.[0];
                     if (!choice) continue;
+
+                    // 记录 finish_reason（帮助排查 API 提前结束的问题）
+                    if (choice.finish_reason) {
+                        console.log(`[Stream] finish_reason: ${choice.finish_reason}`, data.usage || '');
+                    }
 
                     const delta = choice.delta;
                     if (!delta) continue;
@@ -642,6 +749,15 @@ async function readStreamResponse(response, role) {
     if (!fullContent && reasoningContent) {
         fullContent = reasoningContent;
         reasoningContent = '';
+    }
+    // 如果正文为空，可能是 API 错误或 context 不足
+    if (!fullContent || fullContent === '...') {
+        console.warn('[Stream] 流式响应结束但无内容，可能是 context 不足或 API 错误');
+        // 在 UI 上显示错误提示
+        let bubble = $('#streamBubble');
+        if (bubble) {
+            bubble.innerHTML = '<span style="color:#f87171;">⚠️ 未收到回复，可能原因：system prompt 过长超出模型 context window，请尝试减少世界书条目或缩短角色描述</span>';
+        }
     }
     return { content: fullContent || '...', reasoning: reasoningContent || '' };
 }
@@ -713,6 +829,9 @@ function getFallbackReply(role, userMessage) {
 }
 
 // ==================== Chat List ====================
+let chatBatchMode = false;
+let chatSelectedIds = new Set();
+
 function renderChatList() {
     const list = $('#chatList');
     const emptyEl = $('#chatListEmpty');
@@ -739,8 +858,10 @@ function renderChatList() {
         const timeStr = formatTime(session.lastTime);
         const msgCount = session.messages.length;
 
+        const checkboxHtml = chatBatchMode ? `<div class="chat-item-checkbox" data-role-id="${session.roleId}"></div>` : '';
         return `
-            <div class="chat-list-item" data-role-id="${session.roleId}">
+            <div class="chat-list-item ${chatBatchMode ? 'batch-mode' : ''}" data-role-id="${session.roleId}">
+                ${checkboxHtml}
                 <div class="chat-list-item-avatar-placeholder">${role.emoji}</div>
                 <div class="chat-list-item-content">
                     <div class="chat-list-item-title">${role.name}</div>
@@ -795,18 +916,136 @@ function renderChatList() {
             showChatView(roleId);
         });
         
-        // 右键菜单（桌面端）
-        item.addEventListener('contextmenu', (e) => {
-            e.preventDefault();
-            const roleId = String(item.dataset.roleId);
-            const role = ROLES_DATA.find(r => r && String(r.id) === roleId);
-            if (role && confirm(`确定删除与 ${role.name} 的聊天记录？`)) {
-                delete AppState.chatSessions[roleId];
-                saveState();
-                renderChatList();
-                updateChatBadge();
+        // 右键菜单（桌面端，非批量模式）
+        if (!chatBatchMode) {
+            item.addEventListener('contextmenu', (e) => {
+                e.preventDefault();
+                const roleId = String(item.dataset.roleId);
+                const role = ROLES_DATA.find(r => r && String(r.id) === roleId);
+                if (role && confirm(`确定删除与 ${role.name} 的聊天记录？`)) {
+                    delete AppState.chatSessions[roleId];
+                    saveState();
+                    renderChatList();
+                    updateChatBadge();
+                }
+            });
+        }
+        
+        // 批量模式：点击复选框切换选中
+        if (chatBatchMode) {
+            const checkbox = item.querySelector('.chat-item-checkbox');
+            if (checkbox) {
+                checkbox.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    const roleId = String(item.dataset.roleId);
+                    if (chatSelectedIds.has(roleId)) {
+                        chatSelectedIds.delete(roleId);
+                        checkbox.classList.remove('checked');
+                        item.classList.remove('selected');
+                    } else {
+                        chatSelectedIds.add(roleId);
+                        checkbox.classList.add('checked');
+                        item.classList.add('selected');
+                    }
+                    updateBatchCount();
+                });
             }
+            
+            // 点击整行也切换选中
+            item.addEventListener('click', (e) => {
+                if (e.target.closest('.chat-item-checkbox')) return;
+                const roleId = String(item.dataset.roleId);
+                const checkbox = item.querySelector('.chat-item-checkbox');
+                if (chatSelectedIds.has(roleId)) {
+                    chatSelectedIds.delete(roleId);
+                    if (checkbox) checkbox.classList.remove('checked');
+                    item.classList.remove('selected');
+                } else {
+                    chatSelectedIds.add(roleId);
+                    if (checkbox) checkbox.classList.add('checked');
+                    item.classList.add('selected');
+                }
+                updateBatchCount();
+            });
+        }
+    });
+}
+
+function updateBatchCount() {
+    const countEl = $('#chatBatchCount');
+    if (countEl) {
+        countEl.textContent = `已选 ${chatSelectedIds.size} 项`;
+    }
+    const deleteBtn = $('#chatBatchDeleteBtn');
+    if (deleteBtn) {
+        deleteBtn.disabled = chatSelectedIds.size === 0;
+    }
+}
+
+function enterBatchMode() {
+    chatBatchMode = true;
+    chatSelectedIds = new Set();
+    $('#chatManageBtn').textContent = '取消';
+    $('#chatBatchBar').classList.remove('hidden');
+    renderChatList();
+    updateBatchCount();
+}
+
+function exitBatchMode() {
+    chatBatchMode = false;
+    chatSelectedIds = new Set();
+    $('#chatManageBtn').textContent = '管理';
+    $('#chatBatchBar').classList.add('hidden');
+    renderChatList();
+}
+
+function initBatchDelete() {
+    // 管理按钮
+    $('#chatManageBtn').addEventListener('click', () => {
+        if (chatBatchMode) {
+            exitBatchMode();
+        } else {
+            enterBatchMode();
+        }
+    });
+    
+    // 全选按钮
+    $('#chatSelectAllBtn').addEventListener('click', () => {
+        const sessions = Object.keys(AppState.chatSessions);
+        if (chatSelectedIds.size === sessions.length) {
+            // 已全选，取消全选
+            chatSelectedIds = new Set();
+        } else {
+            // 全选
+            chatSelectedIds = new Set(sessions);
+        }
+        // 更新 UI
+        $$('.chat-item-checkbox').forEach(cb => {
+            const roleId = String(cb.dataset.roleId);
+            cb.classList.toggle('checked', chatSelectedIds.has(roleId));
+            cb.closest('.chat-list-item').classList.toggle('selected', chatSelectedIds.has(roleId));
         });
+        updateBatchCount();
+    });
+    
+    // 删除选中按钮
+    $('#chatBatchDeleteBtn').addEventListener('click', () => {
+        if (chatSelectedIds.size === 0) return;
+        if (!confirm(`确定删除选中的 ${chatSelectedIds.size} 条聊天记录？此操作不可恢复。`)) return;
+        
+        chatSelectedIds.forEach(roleId => {
+            delete AppState.chatSessions[roleId];
+        });
+        chatSelectedIds = new Set();
+        saveState();
+        exitBatchMode();
+        renderChatList();
+        updateChatBadge();
+    });
+    
+    // 取消按钮
+    $('#chatBatchCancelBtn').addEventListener('click', () => {
+        exitBatchMode();
     });
 }
 
@@ -1057,7 +1296,10 @@ function renderQuickReplies(roleId) {
     // 0. 性向专属选项优先（根据角色性别判断）
     // 女性向 = 给女性用户看的男性角色 → 显示 femaleOriented
     // 男性向 = 给男性用户看的女性角色 → 显示 maleOriented
-    const gender = role.gender || (role.tags && role.tags.includes('Male') ? 'male' : 'female');
+    const gender = role.gender || (role.tags && (
+        role.tags.includes('Male') || role.tags.includes('male') || role.tags.includes('男性') || role.tags.includes('男性向') ? 'male' : 
+        (role.tags.includes('Female') || role.tags.includes('female') || role.tags.includes('女性') || role.tags.includes('女性向') ? 'female' : 'female')
+    ));
     const isFemaleOriented = gender === 'male';  // 男性角色显示女性向快捷词
     const isMaleOriented = gender === 'female';  // 女性角色显示男性向快捷词
     

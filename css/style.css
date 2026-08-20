@@ -1038,3 +1038,179 @@ body {
 .wb-switch input:checked + .wb-slider:before {
     transform: translateX(16px);
 }
+
+/* ==================== 折叠组件 ==================== */
+.collapsible {
+    position: relative;
+    cursor: pointer;
+    transition: max-height 0.3s ease;
+}
+
+/* 描述折叠：默认3行 */
+.role-detail-desc.collapsible.collapsed {
+    max-height: 4.5em;  /* 约3行 */
+    overflow: hidden;
+}
+
+.role-detail-desc.collapsible:not(.collapsed) {
+    max-height: none;
+}
+
+/* 玩法规则折叠：默认3行 */
+.role-detail-rules.collapsible.collapsed {
+    max-height: 6em;
+    overflow: hidden;
+}
+
+.role-detail-rules.collapsible:not(.collapsed) {
+    max-height: none;
+}
+
+/* 场景选择折叠 */
+.scene-selector.collapsible.collapsed {
+    max-height: 3em;
+    overflow: hidden;
+}
+
+.scene-selector.collapsible:not(.collapsed) {
+    max-height: none;
+}
+
+/* 折叠遮罩渐变 */
+.collapsible.collapsed::after {
+    content: '点击展开 ▾';
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    padding: 20px 0 4px 0;
+    text-align: center;
+    font-size: 12px;
+    color: var(--text-muted, rgba(255,255,255,0.4));
+    background: linear-gradient(transparent, var(--bg-primary, #0a0a1a));
+    pointer-events: none;
+}
+
+/* 展开后隐藏遮罩 */
+.collapsible:not(.collapsed)::after {
+    display: none;
+}
+
+/* 展开状态提示 */
+.collapsible:not(.collapsed)::before {
+    content: '';
+    display: block;
+}
+
+/* 世界书面板不需要折叠遮罩 */
+.worldbook-panel .collapsible::after,
+.worldbook-panel .collapsible::before {
+    display: none;
+}
+
+/* ==================== 聊天批量删除 ==================== */
+.chat-manage-btn {
+    background: none;
+    border: none;
+    color: var(--accent-purple, #8b5cf6);
+    font-size: 14px;
+    cursor: pointer;
+    padding: 4px 8px;
+}
+
+.chat-manage-btn:hover {
+    opacity: 0.8;
+}
+
+.chat-batch-bar {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 12px;
+    background: rgba(255,255,255,0.05);
+    border-bottom: 1px solid var(--border-color, rgba(255,255,255,0.1));
+}
+
+.chat-batch-bar.hidden {
+    display: none;
+}
+
+.chat-batch-select-all,
+.chat-batch-cancel {
+    background: none;
+    border: 1px solid var(--border-color, rgba(255,255,255,0.2));
+    color: var(--text-secondary, rgba(255,255,255,0.7));
+    font-size: 13px;
+    padding: 4px 10px;
+    border-radius: 4px;
+    cursor: pointer;
+}
+
+.chat-batch-select-all:hover,
+.chat-batch-cancel:hover {
+    background: rgba(255,255,255,0.05);
+}
+
+.chat-batch-count {
+    flex: 1;
+    text-align: center;
+    font-size: 13px;
+    color: var(--text-muted, rgba(255,255,255,0.4));
+}
+
+.chat-batch-delete {
+    background: rgba(220,38,38,0.2);
+    border: 1px solid rgba(220,38,38,0.3);
+    color: #fca5a5;
+    font-size: 13px;
+    padding: 4px 10px;
+    border-radius: 4px;
+    cursor: pointer;
+}
+
+.chat-batch-delete:hover {
+    background: rgba(220,38,38,0.3);
+}
+
+.chat-batch-delete:disabled {
+    opacity: 0.3;
+    cursor: not-allowed;
+}
+
+/* 批量模式下的列表项 */
+.chat-list-item.batch-mode {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.chat-item-checkbox {
+    width: 20px;
+    height: 20px;
+    border: 2px solid rgba(255,255,255,0.3);
+    border-radius: 4px;
+    flex-shrink: 0;
+    cursor: pointer;
+    position: relative;
+    transition: all 0.2s;
+}
+
+.chat-item-checkbox.checked {
+    background: var(--accent-purple, #8b5cf6);
+    border-color: var(--accent-purple, #8b5cf6);
+}
+
+.chat-item-checkbox.checked::after {
+    content: '✓';
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    color: white;
+    font-size: 12px;
+    font-weight: bold;
+}
+
+.chat-list-item.selected {
+    background: rgba(139,92,246,0.1);
+}
