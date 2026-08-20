@@ -1040,16 +1040,11 @@ body {
 }
 
 /* ==================== 折叠组件 ==================== */
-.collapsible {
-    position: relative;
-    cursor: pointer;
-    transition: max-height 0.3s ease;
-}
-
 /* 描述折叠：默认3行 */
 .role-detail-desc.collapsible.collapsed {
-    max-height: 4.5em;  /* 约3行 */
+    max-height: 4.5em;
     overflow: hidden;
+    position: relative;
 }
 
 .role-detail-desc.collapsible:not(.collapsed) {
@@ -1060,23 +1055,14 @@ body {
 .role-detail-rules.collapsible.collapsed {
     max-height: 6em;
     overflow: hidden;
+    position: relative;
 }
 
 .role-detail-rules.collapsible:not(.collapsed) {
     max-height: none;
 }
 
-/* 场景选择折叠 */
-.scene-selector.collapsible.collapsed {
-    max-height: 3em;
-    overflow: hidden;
-}
-
-.scene-selector.collapsible:not(.collapsed) {
-    max-height: none;
-}
-
-/* 折叠遮罩渐变 */
+/* 折叠遮罩渐变（仅在 collapsed 状态显示） */
 .collapsible.collapsed::after {
     content: '点击展开 ▾';
     position: absolute;
@@ -1086,9 +1072,11 @@ body {
     padding: 20px 0 4px 0;
     text-align: center;
     font-size: 12px;
-    color: var(--text-muted, rgba(255,255,255,0.4));
-    background: linear-gradient(transparent, var(--bg-primary, #0a0a1a));
-    pointer-events: none;
+    color: rgba(255,255,255,0.4);
+    background: linear-gradient(transparent, #0a0a1a);
+    cursor: pointer;
+    pointer-events: auto;
+    z-index: 2;
 }
 
 /* 展开后隐藏遮罩 */
@@ -1096,16 +1084,15 @@ body {
     display: none;
 }
 
-/* 展开状态提示 */
+/* 展开后收起提示 */
 .collapsible:not(.collapsed)::before {
-    content: '';
+    content: '点击收起 ▴';
     display: block;
-}
-
-/* 世界书面板不需要折叠遮罩 */
-.worldbook-panel .collapsible::after,
-.worldbook-panel .collapsible::before {
-    display: none;
+    text-align: center;
+    font-size: 12px;
+    color: rgba(255,255,255,0.3);
+    padding: 4px 0 0 0;
+    cursor: pointer;
 }
 
 /* ==================== 聊天批量删除 ==================== */

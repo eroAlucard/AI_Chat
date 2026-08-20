@@ -552,7 +552,6 @@ function initRoleDetailModal() {
     const continueChatBtn = $('#continueChatBtn');
     const collectBtn = $('#collectBtn');
     initWorldBookToggle();
-    initCollapsible();
 
     [closeBtn, overlay].forEach(el => {
         el.addEventListener('click', () => modal.classList.add('hidden'));
@@ -641,6 +640,9 @@ function openRoleDetail(roleId) {
 
     // 渲染场景选择
     renderSceneSelector(role);
+    
+    // 内容填充完成后，初始化折叠功能（需要在内容渲染后才能测量高度）
+    initCollapsible();
 }
 
 // 从 systemPrompt 中提取玩法规则，渲染为可读的HTML
@@ -791,14 +793,52 @@ function initWorldBookToggle() {
     });
 }
 
+// 折叠事件委托标记（避免重复绑定）
+let _collapsibleDelegateBound = false;
+
 function initCollapsible() {
-    // 为所有可折叠元素添加点击事件
-    document.querySelectorAll('.collapsible').forEach(el => {
-        el.addEventListener('click', (e) => {
+    const modal = document.getElementById('roleDetailModal');
+    if (!modal) return;
+    
+    // 事件委托：只在 modal 上绑定一次 click 事件
+    if (!_collapsibleDelegateBound) {
+        _collapsibleDelegateBound = true;
+        modal.addEventListener('click', (e) => {
+            const collapsible = e.target.closest('.collapsible');
+            if (!collapsible) return;
+            
             // 避免点击内部交互元素时触发折叠
-            if (e.target.closest('.wb-toggle') || e.target.closest('.wb-switch') || e.target.closest('button') || e.target.closest('a')) return;
-            el.classList.toggle('collapsed');
+            if (e.target.closest('.wb-toggle') || e.target.closest('.wb-switch') || 
+                e.target.closest('button') || e.target.closest('a') || 
+                e.target.closest('.scene-item') || e.target.closest('.wb-entry')) return;
+            
+            // 判断点击是否在底部区域（遮罩/收起提示区域）
+            const rect = collapsible.getBoundingClientRect();
+            const clickY = e.clientY - rect.top;
+            const isNearBottom = clickY > rect.height - 30;
+            
+            if (collapsible.classList.contains('collapsed') || isNearBottom) {
+                collapsible.classList.toggle('collapsed');
+            }
         });
+    }
+    
+    // 检查每个可折叠元素的内容是否超出高度
+    modal.querySelectorAll('.collapsible').forEach(el => {
+        // 先临时展开测量
+        const wasCollapsed = el.classList.contains('collapsed');
+        el.classList.remove('collapsed');
+        const scrollH = el.scrollHeight;
+        const isDesc = el.classList.contains('role-detail-desc');
+        const isRules = el.classList.contains('role-detail-rules');
+        const limit = isDesc ? 72 : isRules ? 96 : 48;  // px
+        
+        if (scrollH > limit + 10) {
+            el.classList.add('collapsed');
+        } else {
+            // 内容没超出，不需要折叠
+            el.classList.remove('collapsible');
+        }
     });
 }
 
