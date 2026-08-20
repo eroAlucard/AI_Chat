@@ -148,7 +148,7 @@ function renderMessages(roleId) {
     const role = ROLES_DATA.find(r => String(r.id) === String(roleId));
     const container = $('#chatMessages');
 
-    container.innerHTML = session.messages.map(msg => {
+    container.innerHTML = session.messages.map((msg, idx) => {
         const isUser = msg.role === 'user';
         const time = new Date(msg.time);
         const timeStr = `${time.getHours().toString().padStart(2, '0')}:${time.getMinutes().toString().padStart(2, '0')}`;
@@ -156,6 +156,10 @@ function renderMessages(roleId) {
         let bubbleContent = formatMessage(msg.content);
         if (!isUser && msg.reasoning) {
             bubbleContent = `<details style="margin-bottom:8px;"><summary style="color:#888;font-style:italic;cursor:pointer;font-size:0.9em;">💭 思考过程</summary><span style="color:#aaa;font-style:italic;font-size:0.9em;">${formatMessage(msg.reasoning)}</span></details>${bubbleContent}`;
+        }
+        // 如果消息被中断，添加警告标记和"继续生成"按钮
+        if (!isUser && msg.interrupted && idx === session.messages.length - 1) {
+            bubbleContent += `<br><span style="color:#f59e0b;font-size:0.85em;margin-top:8px;display:inline-block;">⚠️ 流中断</span><br><button onclick="continueGeneration('${roleId}')" style="margin-top:8px;padding:4px 12px;background:var(--accent-gradient);border:none;border-radius:6px;color:#fff;cursor:pointer;font-size:0.85em;">🔄 继续生成</button>`;
         }
         return `
             <div class="message ${isUser ? 'user' : 'ai'}">
@@ -266,6 +270,7 @@ async function sendMessage() {
         const result = await callLMApi(role, session.messages, true);
         const fullContent = result.content;
         const reasoningContent = result.reasoning;
+        const interrupted = result.interrupted;
 
         // 被中断的请求返回 '...'，不保存无意义内容
         // 流式完成，清理 abort 状态
@@ -277,6 +282,15 @@ async function sendMessage() {
             // 流式完成后，将临时元素转为正式消息
             const streamEl = $('#streamMessage');
             if (streamEl) {
+                // 如果流中断，在气泡下方添加"继续生成"按钮
+                if (interrupted) {
+                    const streamBubble = streamEl.querySelector('#streamBubble');
+                    if (streamBubble) {
+                        const currentHTML = streamBubble.innerHTML;
+                        streamBubble.innerHTML = currentHTML + `<br><button onclick="continueGeneration('${roleId}')" style="margin-top:8px;padding:4px 12px;background:var(--accent-gradient);border:none;border-radius:6px;color:#fff;cursor:pointer;font-size:0.85em;">🔄 继续生成</button>`;
+                    }
+                }
+
                 // 移除临时ID，使其成为正式消息
                 streamEl.removeAttribute('id');
                 const streamBubble = streamEl.querySelector('#streamBubble');
@@ -297,6 +311,10 @@ async function sendMessage() {
             // 保存思考过程（如果有）
             if (reasoningContent) {
                 msgData.reasoning = reasoningContent;
+            }
+            // 标记为未完成（如果流中断）
+            if (interrupted) {
+                msgData.interrupted = true;
             }
             session.messages.push(msgData);
             session.lastTime = new Date().toISOString();
@@ -781,6 +799,20 @@ async function readStreamResponse(response, role) {
         }
     } catch (e) {
         console.warn('Stream read error:', e);
+        // 流中断：如果已经收到部分内容，标记为中断并返回
+        if (fullContent && fullContent.length > 0) {
+            console.log('[Stream] 流中断，但已收到部分内容，长度:', fullContent.length);
+            let bubble = $('#streamBubble');
+            if (bubble) {
+                // 保持已显示的内容，添加中断提示
+                if (reasoningContent) {
+                    bubble.innerHTML = `<details style="margin-bottom:8px;"><summary style="color:#888;font-size:0.85em;cursor:pointer;">💭 思考过程</summary><div style="color:#aaa;font-style:italic;font-size:0.9em;margin-top:4px;padding-left:8px;">${formatMessage(reasoningContent)}</div></details>${formatMessage(fullContent)}<br><span style="color:#f59e0b;font-size:0.85em;margin-top:8px;display:inline-block;">⚠️ 流中断</span>`;
+                } else {
+                    bubble.innerHTML = `${formatMessage(fullContent)}<br><span style="color:#f59e0b;font-size:0.85em;margin-top:8px;display:inline-block;">⚠️ 流中断</span>`;
+                }
+            }
+            return { content: fullContent, reasoning: reasoningContent || '', interrupted: true };
+        }
     }
 
     // 流式消息元素保留在DOM中，由 sendMessage 转为正式消息
@@ -889,9 +921,82 @@ function retryLastMessage(roleId, userText) {
             errorMsg.remove();
         }
     }
-    
+
     // 重新发送消息
     sendMessage(roleId, userText);
+}
+
+// ==================== Continue Generation ====================
+async function continueGeneration(roleId) {
+    const session = AppState.chatSessions[roleId];
+    if (!session || session.messages.length === 0) return;
+
+    // 找到最后一条 AI 消息
+    const lastMsg = session.messages[session.messages.length - 1];
+    if (lastMsg.role !== 'assistant' || !lastMsg.interrupted) return;
+
+    // 移除中断标记和按钮
+    const container = $('#chatMessages');
+    if (container) {
+        const lastAIMsg = container.querySelector('.message.ai:last-child');
+        if (lastAIMsg) {
+            const bubble = lastAIMsg.querySelector('.message-bubble');
+            if (bubble) {
+                // 移除"⚠️ 流中断"和"继续生成"按钮
+                bubble.innerHTML = bubble.innerHTML.replace(/<br><span style="color:#f59e0b[^>]*>⚠️ 流中断<\/span>/g, '').replace(/<br><button onclick="continueGeneration[^>]*>.*?<\/button>/g, '');
+                // 添加等待提示
+                bubble.innerHTML += '<br><span style="color:#aaa;font-style:italic;">💭 继续生成中…</span>';
+            }
+        }
+    }
+
+    // 调用 API 继续生成（AI 会基于上下文自然续写）
+    try {
+        const role = ROLES_DATA.find(r => String(r.id) === String(roleId));
+
+        // 创建临时的流式气泡（用于接收新内容）
+        if (container && role) {
+            const streamMsgEl = document.createElement('div');
+            streamMsgEl.className = 'message ai';
+            streamMsgEl.id = 'streamMessage';
+            streamMsgEl.innerHTML = `
+                <div class="message-avatar-placeholder" style="background:var(--accent-gradient)">${role.emoji}</div>
+                <div>
+                    <div class="message-bubble" id="streamBubble"><span style="color:#aaa;font-style:italic;">💭 正在思考中…</span></div>
+                    <div class="message-time" id="streamTime"></div>
+                </div>
+            `;
+            container.appendChild(streamMsgEl);
+            scrollToBottom();
+        }
+
+        const result = await callLMApi(role, session.messages, true);
+        const newContent = result.content;
+        const interrupted = result.interrupted;
+
+        currentStreamAbort = null;
+        currentStreamRoleId = null;
+
+        if (newContent && newContent !== '...') {
+            // 将新内容追加到原有消息
+            lastMsg.content += newContent;
+            lastMsg.interrupted = interrupted || false;
+
+            // 移除临时流式气泡
+            const streamEl = $('#streamMessage');
+            if (streamEl) {
+                streamEl.remove();
+            }
+
+            saveState();
+            renderMessages(roleId);
+        }
+    } catch (error) {
+        console.warn('Continue generation failed:', error);
+        showToast('继续生成失败，请重试');
+        // 恢复"继续生成"按钮
+        renderMessages(roleId);
+    }
 }
 
 // ==================== Chat List ====================
