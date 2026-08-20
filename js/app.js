@@ -1,9 +1,117 @@
 // ==================== Login Auth ====================
-const ACCESS_PASSWORD = 'hh1234';
+
+// 自定义角色存储 key（按用户隔离）
+function getCustomRolesKey() {
+    const user = getCurrentUser();
+    return user ? `ai_custom_roles_${user}` : 'ai_custom_roles';
+}
+
+// 预设账号列表（添加/删除用户直接改这里）
+const ACCOUNTS = {
+    'eroalucard': 'GOKO19921218',
+    'hanhan': 'hh1234',
+    'fazi': 'fz1234',
+};
+// 标签 -> 筛选分组映射
+const ROLE_TAG_FILTER_MAP = {
+    '男性向': 'audience',
+    '女性向': 'audience',
+    'Malepov': 'audience',
+    'Fempov': 'audience',
+    'anypov': 'audience',
+    'Incest': 'relation',
+    'Mother': 'relation',
+    'Mommy': 'relation',
+    'Sister': 'relation',
+    'Cousin': 'relation',
+    'Wife': 'relation',
+    'Harem': 'relation',
+    'Lesbian': 'relation',
+    'childhood friend': 'relation',
+    'girlfriend': 'relation',
+    'Mistress': 'relation',
+    'Dominant': 'personality',
+    'Submissive': 'personality',
+    'femdom': 'personality',
+    'Milf': 'personality',
+    'Tomboy': 'personality',
+    'tsundere': 'personality',
+    'Brat': 'personality',
+    'Femboy': 'personality',
+    'succubus': 'personality',
+    'Goth': 'personality',
+    'Bimbo': 'personality',
+    'Slutty': 'personality',
+    'Sadistic': 'personality',
+    'Yandere': 'personality',
+    '病娇': 'personality',
+    '傲娇': 'personality',
+    '御姐': 'personality',
+    '霸总': 'personality',
+    '腹黑': 'personality',
+    'Romance': 'theme',
+    'Humiliation': 'theme',
+    'Rape': 'theme',
+    'Non-Con': 'theme',
+    'Corruption': 'theme',
+    'Fetish': 'theme',
+    'exhibitionism': 'theme',
+    'Cheating': 'theme',
+    'Affair': 'theme',
+    'NTR': 'theme',
+    'Reverse NTR': 'theme',
+    'Netori': 'theme',
+    'Breeding Kink': 'theme',
+    'Orgasm Control': 'theme',
+    'Edging': 'theme',
+    'Chastity': 'theme',
+    '调教': 'theme',
+    '乱伦': 'theme',
+    '绿帽': 'theme',
+    '羞辱': 'theme',
+    '恶堕': 'theme',
+    '催眠': 'theme',
+    '精神控制': 'theme',
+    '强迫': 'theme',
+    '纯爱': 'theme',
+    '救赎': 'theme',
+    '权力反转': 'theme',
+    '复仇': 'theme',
+    'Female': 'gender',
+    'Male': 'gender',
+    '女性': 'gender',
+    'Human': 'type',
+    'Non-Human': 'type',
+    'Monster Girl': 'type',
+    'Elf': 'type',
+    'Demon': 'type',
+    'Angel': 'type',
+    'Vampire': 'type',
+    '魅魔': 'type',
+    '异世界': 'type',
+    '奇幻': 'type',
+    '赛博朋克': 'type',
+    'Huge Breasts': 'features',
+    'Big Breast': 'features',
+    'Huge Ass': 'features',
+    'Big Butt': 'features',
+    'Big Ass': 'features',
+    '爆乳': 'features',
+    'Cute': 'features',
+    'Petite': 'features',
+    'Tall woman': 'type',
+    'Muscular': 'features',
+};
+
+
+
+function getCurrentUser() {
+    return sessionStorage.getItem('ai_chat_user') || '';
+}
 
 function checkLogin() {
-    const authed = sessionStorage.getItem('ai_chat_authed');
-    if (authed === '1') {
+    const user = getCurrentUser();
+    if (user && ACCOUNTS[user]) {
         document.getElementById('loginOverlay').classList.add('hidden');
         return true;
     }
@@ -14,19 +122,25 @@ function initLogin() {
     if (checkLogin()) return;
 
     const form = document.getElementById('loginForm');
-    const input = document.getElementById('loginPassword');
+    const usernameInput = document.getElementById('loginUsername');
+    const passwordInput = document.getElementById('loginPassword');
     const error = document.getElementById('loginError');
 
     form.addEventListener('submit', (e) => {
         e.preventDefault();
-        const pwd = input.value.trim();
-        if (pwd === ACCESS_PASSWORD) {
-            sessionStorage.setItem('ai_chat_authed', '1');
+        const username = usernameInput.value.trim().toLowerCase();
+        const pwd = passwordInput.value;
+        if (ACCOUNTS[username] && ACCOUNTS[username] === pwd) {
+            sessionStorage.setItem('ai_chat_user', username);
             document.getElementById('loginOverlay').classList.add('hidden');
+            // 登录成功后重新加载数据（按用户隔离）
+            loadState();
+            // 重新加载自定义角色（IIFE 在脚本加载时已执行，此时才拿到用户名）
+            reloadCustomRoles();
         } else {
             error.classList.remove('hidden');
-            input.value = '';
-            input.focus();
+            passwordInput.value = '';
+            usernameInput.focus();
             setTimeout(() => error.classList.add('hidden'), 3000);
         }
     });
@@ -62,9 +176,31 @@ const AppState = {
 (function() {
     // 保留 roles-data.js 中的自制角色（id 1-10），图片路径已修正为 cards/role_00X.png
     const builtinSelfMade = (typeof ROLES_DATA !== 'undefined' && Array.isArray(ROLES_DATA)) ? [...ROLES_DATA].filter(r => r && r.id) : [];
-    const custom = (JSON.parse(localStorage.getItem('ai_custom_roles') || '[]')).filter(r => r && r.id);
+    const _customKey = getCurrentUser() ? `ai_custom_roles_${getCurrentUser()}` : 'ai_custom_roles';
+    const custom = (JSON.parse(localStorage.getItem(_customKey) || '[]')).filter(r => r && r.id);
+    const merged = [...builtinSelfMade, ...custom];
+    // 为没有 gender 字段的角色推断性别
+    merged.forEach(r => {
+        if (!r.gender && r.tags) {
+            const hasMaleTag = r.tags.some(t => t === 'Male' || t === 'male' || t === '男性' || t === '男性向');
+            const hasFemaleTag = r.tags.some(t => t === 'Female' || t === 'female' || t === '女性' || t === '女性向');
+            // 男性向 tag 意味着角色是女性（面向男性用户）
+            // 女性向 tag 意味着角色是男性（面向女性用户）
+            if (r.tags.includes('女性向')) {
+                r.gender = 'male';
+            } else if (r.tags.includes('男性向')) {
+                r.gender = 'female';
+            } else if (hasMaleTag) {
+                r.gender = 'male';
+            } else if (hasFemaleTag) {
+                r.gender = 'female';
+            } else {
+                r.gender = 'female'; // 默认女性
+            }
+        }
+    });
     Object.defineProperty(window, 'ROLES_DATA', {
-        value: [...builtinSelfMade, ...custom],
+        value: merged,
         writable: true,
         configurable: true,
         enumerable: true,
@@ -103,9 +239,14 @@ document.addEventListener('DOMContentLoaded', async () => {
 });
 
 // ==================== LocalStorage ====================
+function getStateKey() {
+    const user = getCurrentUser();
+    return user ? `ai_chat_state_${user}` : 'ai_chat_state';
+}
+
 function loadState() {
     try {
-        const saved = localStorage.getItem('ai_chat_state');
+        const saved = localStorage.getItem(getStateKey());
         if (saved) {
             const data = JSON.parse(saved);
             if (data.chatSessions) AppState.chatSessions = data.chatSessions;
@@ -117,7 +258,7 @@ function loadState() {
 
 function saveState() {
     try {
-        localStorage.setItem('ai_chat_state', JSON.stringify({
+        localStorage.setItem(getStateKey(), JSON.stringify({
             chatSessions: AppState.chatSessions,
             collections: [...AppState.collections],
             settings: AppState.settings
@@ -198,7 +339,77 @@ function initCategoryTabs() {
 }
 
 // ==================== Filter Modal ====================
+
+// 动态生成筛选标签按钮
+function renderFilterTags() {
+    const container = $('#filterBody');
+    if (!container) return;
+    
+    // 收集所有角色卡实际使用的 tags 并按分组归类
+    const tagGroups = {
+        'audience': { title: '受众', tags: {} },
+        'gender': { title: '性别', tags: {} },
+        'relation': { title: '关系', tags: {} },
+        'personality': { title: '人设', tags: {} },
+        'theme': { title: '题材', tags: {} },
+        'type': { title: '类型', tags: {} },
+        'features': { title: '特征', tags: {} },
+    };
+    
+    // 统计每个 tag 的出现次数
+    ROLES_DATA.filter(r => r && r.tags).forEach(role => {
+        role.tags.forEach(tag => {
+            const group = ROLE_TAG_FILTER_MAP[tag];
+            if (group && tagGroups[group]) {
+                tagGroups[group].tags[tag] = (tagGroups[group].tags[tag] || 0) + 1;
+            }
+        });
+    });
+    
+    // 生成 HTML
+    let html = '';
+    for (const [groupKey, groupData] of Object.entries(tagGroups)) {
+        const tags = Object.entries(groupData.tags)
+            .sort((a, b) => b[1] - a[1]); // 按出现次数降序
+        
+        if (tags.length === 0) continue;
+        
+        html += `<div class="filter-group">
+            <h4>${groupData.title}</h4>
+            <div class="filter-tags">`;
+        
+        tags.forEach(([tag, count]) => {
+            html += `<button class="filter-tag" data-group="${groupKey}" data-value="${tag}">${tag}</button>`;
+        });
+        
+        html += `</div></div>`;
+    }
+    
+    container.innerHTML = html;
+    
+    // 绑定点击事件
+    $$('.filter-tag').forEach(tag => {
+        tag.addEventListener('click', () => {
+            tag.classList.toggle('active');
+            const group = tag.dataset.group;
+            const value = tag.dataset.value;
+            if (!AppState.filters[group]) AppState.filters[group] = new Set();
+            if (tag.classList.contains('active')) {
+                AppState.filters[group].add(value);
+            } else {
+                AppState.filters[group].delete(value);
+                if (AppState.filters[group].size === 0) delete AppState.filters[group];
+            }
+            updateFilterCount();
+            renderRoleGrid();
+        });
+    });
+}
+
 function initFilterModal() {
+    // 动态生成筛选按钮
+    renderFilterTags();
+    
     const modal = $('#filterModal');
     const filterBtn = $('#filterBtn');
     const cancelBtn = $('#cancelFilterBtn');
@@ -226,22 +437,7 @@ function initFilterModal() {
         renderRoleGrid();
     });
 
-    $$('.filter-tag').forEach(tag => {
-        tag.addEventListener('click', () => {
-            tag.classList.toggle('active');
-            const group = tag.dataset.group;
-            const value = tag.dataset.value;
-            if (!AppState.filters[group]) AppState.filters[group] = new Set();
-            if (tag.classList.contains('active')) {
-                AppState.filters[group].add(value);
-            } else {
-                AppState.filters[group].delete(value);
-                if (AppState.filters[group].size === 0) delete AppState.filters[group];
-            }
-            updateFilterCount();
-            renderRoleGrid(); // 实时更新筛选结果
-        });
-    });
+    // filter-tag 事件已在 renderFilterTags 中绑定，此处不再重复
 }
 
 function updateFilterCount() {
@@ -275,7 +471,7 @@ function getFilteredRoles() {
             if (selectedValues.size === 0) continue;
             // 检查角色的 tags 中是否有标签属于当前分组且值匹配
             // ROLE_TAG_FILTER_MAP 格式: { "高冷": "personality" }，即 tag名 -> 分组名
-            const roleMatchesGroup = role.tags.some(tag => {
+            const roleMatchesGroup = (role.tags || []).some(tag => {
                 const tagGroup = ROLE_TAG_FILTER_MAP[tag];
                 // tag 的分组匹配当前筛选分组，且 tag 值在选中值中
                 return tagGroup === group && selectedValues.has(tag);
@@ -529,10 +725,11 @@ function initMinePage() {
 }
 
 function loadUserInfo() {
-    const userName = localStorage.getItem('ai_chat_username') || '用户';
-    const userId = localStorage.getItem('ai_chat_userid') || generateUserId();
-    if (!localStorage.getItem('ai_chat_userid')) {
-        localStorage.setItem('ai_chat_userid', userId);
+    const _user = getCurrentUser();
+    const userName = localStorage.getItem(`ai_chat_username_${_user}`) || _user || '用户';
+    const userId = localStorage.getItem(`ai_chat_userid_${_user}`) || generateUserId();
+    if (!localStorage.getItem(`ai_chat_userid_${_user}`)) {
+        localStorage.setItem(`ai_chat_userid_${_user}`, userId);
     }
     $('#userName').textContent = userName;
     $('#userId').textContent = `ID: ${userId}`;
@@ -749,7 +946,7 @@ function initCreateRoleModal() {
             'linear-gradient(135deg, #1a3e3e, #2d4e1b)',
         ];
 
-        const customRoles = JSON.parse(localStorage.getItem('ai_custom_roles') || '[]');
+        const customRoles = JSON.parse(localStorage.getItem(getCustomRolesKey()) || '[]');
 
         if (_editingRoleId) {
             // 编辑模式：更新已有角色
@@ -771,7 +968,7 @@ function initCreateRoleModal() {
                 ROLES_DATA[roIdx].systemPrompt = systemPrompt;
                 ROLES_DATA[roIdx].scenes = opener ? [{ preview: opener.substring(0, 60) + (opener.length > 60 ? '……' : ''), opener: opener }] : [];
             }
-            localStorage.setItem('ai_custom_roles', JSON.stringify(customRoles));
+            localStorage.setItem(getCustomRolesKey(), JSON.stringify(customRoles));
             _editingRoleId = null;
         } else {
             // 创建模式：新建角色
@@ -790,7 +987,7 @@ function initCreateRoleModal() {
                 isCustom: true
             };
             customRoles.push(customRole);
-            localStorage.setItem('ai_custom_roles', JSON.stringify(customRoles));
+            localStorage.setItem(getCustomRolesKey(), JSON.stringify(customRoles));
             ROLES_DATA.push(customRole);
         }
 
@@ -846,9 +1043,9 @@ function openCreateRoleModal(editRole) {
 function deleteCustomRole(roleId) {
     if (!confirm('确定删除这个自定义角色？删除后无法恢复。')) return;
     // 从 localStorage 移除
-    let customRoles = JSON.parse(localStorage.getItem('ai_custom_roles') || '[]');
+    let customRoles = JSON.parse(localStorage.getItem(getCustomRolesKey()) || '[]');
     customRoles = customRoles.filter(r => String(r.id) !== String(roleId));
-    localStorage.setItem('ai_custom_roles', JSON.stringify(customRoles));
+    localStorage.setItem(getCustomRolesKey(), JSON.stringify(customRoles));
     // 从 IndexedDB 删除角色图片
     if (typeof ImageStore !== 'undefined') {
         ImageStore.remove(roleId).catch(() => {});
@@ -922,8 +1119,43 @@ function renderCustomRoles() {
 }
 
 // ==================== Load Custom Roles ====================
+// 重新加载自定义角色（登录后调用，因为 IIFE 在脚本加载时还没拿到用户名）
+function reloadCustomRoles() {
+    // 从当前用户的 key 重新加载自定义角色
+    const customKey = getCustomRolesKey();
+    const custom = (JSON.parse(localStorage.getItem(customKey) || '[]')).filter(r => r && r.id);
+    // 保留内置自制角色（id 1-8）
+    const builtinSelfMade = (typeof ROLES_DATA !== 'undefined' && Array.isArray(ROLES_DATA)) 
+        ? [...ROLES_DATA].filter(r => r && r.id) : [];
+    // 重建 ROLES_DATA（替换 IIFE 的结果）
+    ROLES_DATA.length = 0;
+    const merged = [...builtinSelfMade, ...custom];
+    merged.forEach(r => ROLES_DATA.push(r));
+    // 重新推断 gender
+    merged.forEach(r => {
+        if (!r.gender && r.tags) {
+            const hasMaleTag = r.tags.some(t => t === 'Male' || t === 'male' || t === '男性' || t === '男性向');
+            const hasFemaleTag = r.tags.some(t => t === 'Female' || t === 'female' || t === '女性' || t === '女性向');
+            if (r.tags.includes('女性向')) {
+                r.gender = 'male';
+            } else if (r.tags.includes('男性向')) {
+                r.gender = 'female';
+            } else if (hasMaleTag) {
+                r.gender = 'male';
+            } else if (hasFemaleTag) {
+                r.gender = 'female';
+            } else {
+                r.gender = 'female';
+            }
+        }
+    });
+    // 重新渲染角色列表
+    if (typeof renderRoleGrid === 'function') renderRoleGrid();
+    if (typeof renderChatList === 'function') renderChatList();
+}
+
 function loadCustomRoles() {
-    const customRoles = JSON.parse(localStorage.getItem('ai_custom_roles') || '[]');
+    const customRoles = JSON.parse(localStorage.getItem(getCustomRolesKey()) || '[]');
     customRoles.forEach(role => {
         if (!ROLES_DATA.find(r => String(r.id) === String(role.id))) {
             ROLES_DATA.push(role);
@@ -1054,9 +1286,9 @@ async function confirmImportCard() {
                 return;
             }
             // 删除旧角色（同时从 IndexedDB 删除旧图片）
-            let customRoles = JSON.parse(localStorage.getItem('ai_custom_roles') || '[]');
+            let customRoles = JSON.parse(localStorage.getItem(getCustomRolesKey()) || '[]');
             customRoles = customRoles.filter(r => r.name !== role.name);
-            localStorage.setItem('ai_custom_roles', JSON.stringify(customRoles));
+            localStorage.setItem(getCustomRolesKey(), JSON.stringify(customRoles));
             if (typeof ImageStore !== 'undefined') {
                 ImageStore.remove(existing.id).catch(() => {});
             }
@@ -1081,10 +1313,10 @@ async function confirmImportCard() {
             sourceData: undefined,  // 不存 characterBook 等大字段
             image: '',  // base64 图片已存 IndexedDB，localStorage 不存
         };
-        const customRoles = JSON.parse(localStorage.getItem('ai_custom_roles') || '[]');
+        const customRoles = JSON.parse(localStorage.getItem(getCustomRolesKey()) || '[]');
         customRoles.push(slimRole);
         try {
-            localStorage.setItem('ai_custom_roles', JSON.stringify(customRoles));
+            localStorage.setItem(getCustomRolesKey(), JSON.stringify(customRoles));
         } catch (storageErr) {
             // localStorage 超限：进一步精简后重试
             console.warn('[confirmImportCard] localStorage 超限，精简数据重试...');
@@ -1105,7 +1337,7 @@ async function confirmImportCard() {
                 createdAt: r.createdAt,
             }));
             try {
-                localStorage.setItem('ai_custom_roles', JSON.stringify(ultraSlimRoles));
+                localStorage.setItem(getCustomRolesKey(), JSON.stringify(ultraSlimRoles));
             } catch (err2) {
                 throw new Error('存储空间不足，无法导入更多角色。请删除一些旧角色后重试。');
             }

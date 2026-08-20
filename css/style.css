@@ -51,7 +51,11 @@
 .login-form {
     display: flex;
     flex-direction: column;
-    gap: 16px;
+    gap: 12px;
+}
+
+#loginUsername {
+    margin-bottom: 0;
 }
 
 .login-input {

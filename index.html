@@ -12,11 +12,12 @@
         <div class="login-box">
             <div class="login-logo">✦</div>
             <h1 class="login-title">AI Chat</h1>
-            <p class="login-subtitle">请输入密码以继续</p>
+            <p class="login-subtitle">请输入账号和密码以继续</p>
             <form id="loginForm" class="login-form">
-                <input type="password" id="loginPassword" class="login-input" placeholder="输入访问密码" autocomplete="current-password" autofocus>
+                <input type="text" id="loginUsername" class="login-input" placeholder="用户名" autocomplete="username" autofocus>
+                <input type="password" id="loginPassword" class="login-input" placeholder="密码" autocomplete="current-password">
                 <button type="submit" class="login-btn">进入</button>
-                <p id="loginError" class="login-error hidden">密码错误，请重试</p>
+                <p id="loginError" class="login-error hidden">账号或密码错误</p>
             </form>
         </div>
     </div>
@@ -76,63 +77,9 @@
                                 <button class="reset-btn" id="resetFilterBtn">重置</button>
                             </div>
                         </div>
-                            <div class="filter-body">
-                            <div class="filter-group">
-                                <h4>受众</h4>
-                                <div class="filter-tags">
-                                    <button class="filter-tag" data-group="audience" data-value="男性向">男性向</button>
-                                    <button class="filter-tag" data-group="audience" data-value="女性向">女性向</button>
-                                </div>
+                            <div class="filter-body" id="filterBody">
+                                <!-- 筛选按钮由 JS 动态生成 -->
                             </div>
-                            <div class="filter-group">
-                                <h4>关系</h4>
-                                <div class="filter-tags">
-                                    <button class="filter-tag" data-group="relation" data-value="妈妈">妈妈</button>
-                                    <button class="filter-tag" data-group="relation" data-value="妹妹">妹妹</button>
-                                    <button class="filter-tag" data-group="relation" data-value="姐姐">姐姐</button>
-                                    <button class="filter-tag" data-group="relation" data-value="母子">母子</button>
-                                    <button class="filter-tag" data-group="relation" data-value="人妻">人妻</button>
-                                    <button class="filter-tag" data-group="relation" data-value="青梅竹马">青梅竹马</button>
-                                    <button class="filter-tag" data-group="relation" data-value="后宫">后宫</button>
-                                    <button class="filter-tag" data-group="relation" data-value="百合">百合</button>
-                                </div>
-                            </div>
-                            <div class="filter-group">
-                                <h4>人设</h4>
-                                <div class="filter-tags">
-                                    <button class="filter-tag" data-group="personality" data-value="熟女">熟女</button>
-                                    <button class="filter-tag" data-group="personality" data-value="御姐">御姐</button>
-                                    <button class="filter-tag" data-group="personality" data-value="处女">处女</button>
-                                    <button class="filter-tag" data-group="personality" data-value="仙子">仙子</button>
-                                    <button class="filter-tag" data-group="personality" data-value="魅魔">魅魔</button>
-                                    <button class="filter-tag" data-group="personality" data-value="女S">女S</button>
-                                    <button class="filter-tag" data-group="personality" data-value="男娘">男娘</button>
-                                    <button class="filter-tag" data-group="personality" data-value="傲娇">傲娇</button>
-                                    <button class="filter-tag" data-group="personality" data-value="高冷">高冷</button>
-                                    <button class="filter-tag" data-group="personality" data-value="反差">反差</button>
-                                    <button class="filter-tag" data-group="personality" data-value="爆乳">爆乳</button>
-                                </div>
-                            </div>
-                            <div class="filter-group">
-                                <h4>题材剧情</h4>
-                                <div class="filter-tags">
-                                    <button class="filter-tag" data-group="theme" data-value="调教">调教</button>
-                                    <button class="filter-tag" data-group="theme" data-value="乱伦">乱伦</button>
-                                    <button class="filter-tag" data-group="theme" data-value="绿帽">绿帽</button>
-                                    <button class="filter-tag" data-group="theme" data-value="NTR">NTR</button>
-                                    <button class="filter-tag" data-group="theme" data-value="NTL">NTL</button>
-                                    <button class="filter-tag" data-group="theme" data-value="逆NTR">逆NTR</button>
-                                    <button class="filter-tag" data-group="theme" data-value="羞辱">羞辱</button>
-                                    <button class="filter-tag" data-group="theme" data-value="恶堕">恶堕</button>
-                                    <button class="filter-tag" data-group="theme" data-value="催眠">催眠</button>
-                                    <button class="filter-tag" data-group="theme" data-value="精神控制">精神控制</button>
-                                    <button class="filter-tag" data-group="theme" data-value="隐奸">隐奸</button>
-                                    <button class="filter-tag" data-group="theme" data-value="强迫">强迫</button>
-                                    <button class="filter-tag" data-group="theme" data-value="纯爱">纯爱</button>
-                                    <button class="filter-tag" data-group="theme" data-value="救赎">救赎</button>
-                                </div>
-                            </div>
-                        </div>
                         <div class="filter-footer">
                             <button class="btn-cancel" id="cancelFilterBtn">取消</button>
                             <button class="btn-confirm" id="confirmFilterBtn">查看 <span id="filterResultCount">0</span> 个结果</button>

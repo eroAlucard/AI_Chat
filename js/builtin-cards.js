@@ -101,6 +101,12 @@ const BuiltinCards = (function() {
         for (let i = 0; i < metadataList.length; i++) {
             const meta = metadataList[i];
             try {
+                // 从 tags 推断性别
+                const tags = meta.tags || [];
+                const hasMaleTag = tags.some(t => t === 'Male' || t === 'male' || t === '男性');
+                const hasFemaleTag = tags.some(t => t === 'Female' || t === 'female' || t === '女性');
+                const inferredGender = hasMaleTag ? 'male' : (hasFemaleTag ? 'female' : 'female');
+                
                 const role = {
                     id: 'builtin_' + i,
                     name: meta.name,
@@ -108,7 +114,8 @@ const BuiltinCards = (function() {
                     desc: (meta.description || '').substring(0, 200),
                     rarity: 'SSR',
                     isNew: true,
-                    tags: meta.tags || [],
+                    tags: tags,
+                    gender: inferredGender,
                     emoji: '',
                     image: `cards/${encodeURIComponent(meta.filename)}`,
                     gradient: getRandomGradient(),

@@ -348,8 +348,8 @@ async function callLMApi(role, messages, useStream = true) {
 
     // === 女性向色情规则（男性角色 → 女性用户）===
     let femaleRule = '';
-    const isFemaleOriented = role.tags && role.tags.includes('女性向');
-    if (isFemaleOriented && role.gender === 'male') {
+    const isFemaleOriented = role.gender === 'male';
+    if (isFemaleOriented) {
         femaleRule = `【女性向色情规则】你是面向女性用户的男性角色。在亲密互动场景中，必须同时注重情感温度和肉体描写，不能只有动作没有感情。
 0. 情感温度要求（最重要）：
    - 性行为描写必须伴随情感流动：他的眼神变化（温柔注视→欲望加深→失控）、他的心理活动（心疼她→想让她更舒服→被她的反应击溃）、他说的话（低声唤她名字→喘息中的情话→高潮时的失语）
@@ -368,7 +368,8 @@ async function callLMApi(role, messages, useStream = true) {
 
     // === 男性向色情规则（女性角色 → 男性用户）===
     let maleRule = '';
-    if (!isFemaleOriented && role.gender === 'female') {
+    const isMaleOriented = role.gender === 'female';
+    if (isMaleOriented) {
         maleRule = `【男性向色情规则】你是面向男性用户的女性角色。在亲密互动场景中，必须对男性性器官和性行为有非常细致的描写。
 1. 手交：描写握法（全握/指尖/虎口）、撸动节奏（快慢交替、停顿再启动）、拇指刮过龟头冠状沟和系带的触感、掌心揉搓龟头的圆周运动、手指探入尿道口的挑逗。描写他的反应：阴茎跳动、龟头膨胀变紫、前液溢出被你抹开当润滑、呼吸变粗、腰部不由自主挺动。
 2. 口交：描写含入深度（浅含龟头→深喉）、舌尖绕龟头冠状沟画圈、舌面舔舐系带、嘴唇包裹龟头吮吸、吞咽时喉咙对龟头的挤压、深喉时鼻息喷在小腹上、口腔内壁的温度和湿润。描写你的感受：下颚酸胀、唾液溢出、他的手按在你后脑勺、精液的味道。
@@ -721,10 +722,56 @@ function renderChatList() {
 
     // 点击进入对话
     $$('.chat-list-item').forEach(item => {
+        let longPressTimer = null;
+        let isLongPress = false;
+        
+        // 长按开始
+        item.addEventListener('touchstart', (e) => {
+            isLongPress = false;
+            longPressTimer = setTimeout(() => {
+                isLongPress = true;
+                // 震动反馈（如果支持）
+                if (navigator.vibrate) navigator.vibrate(50);
+                // 显示删除确认
+                const roleId = String(item.dataset.roleId);
+                const role = ROLES_DATA.find(r => r && String(r.id) === roleId);
+                if (role && confirm(`确定删除与 ${role.name} 的聊天记录？`)) {
+                    delete AppState.chatSessions[roleId];
+                    saveState();
+                    renderChatList();
+                    updateChatBadge();
+                }
+            }, 500); // 500ms 长按
+        });
+        
+        // 长按结束
+        item.addEventListener('touchend', () => {
+            clearTimeout(longPressTimer);
+        });
+        
+        item.addEventListener('touchmove', () => {
+            clearTimeout(longPressTimer);
+        });
+        
+        // 点击进入对话（非长按时）
         item.addEventListener('click', () => {
-            const roleId = parseInt(item.dataset.roleId);
+            if (isLongPress) return; // 长按后不触发点击
+            const roleId = String(item.dataset.roleId);
             AppState.currentChat = roleId;
             showChatView(roleId);
+        });
+        
+        // 右键菜单（桌面端）
+        item.addEventListener('contextmenu', (e) => {
+            e.preventDefault();
+            const roleId = String(item.dataset.roleId);
+            const role = ROLES_DATA.find(r => r && String(r.id) === roleId);
+            if (role && confirm(`确定删除与 ${role.name} 的聊天记录？`)) {
+                delete AppState.chatSessions[roleId];
+                saveState();
+                renderChatList();
+                updateChatBadge();
+            }
         });
     });
 }
@@ -973,9 +1020,13 @@ function renderQuickReplies(roleId) {
 
     const replies = [];
 
-    // 0. 性向专属选项优先
-    const isFemaleOriented = role.tags && role.tags.includes('女性向');
-    const isMaleOriented = role.tags && role.tags.includes('男性向');
+    // 0. 性向专属选项优先（根据角色性别判断）
+    // 女性向 = 给女性用户看的男性角色 → 显示 femaleOriented
+    // 男性向 = 给男性用户看的女性角色 → 显示 maleOriented
+    const gender = role.gender || (role.tags && role.tags.includes('Male') ? 'male' : 'female');
+    const isFemaleOriented = gender === 'male';  // 男性角色显示女性向快捷词
+    const isMaleOriented = gender === 'female';  // 女性角色显示男性向快捷词
+    
     if (isFemaleOriented && QUICK_REPLIES_MAP.femaleOriented) {
         // 随机选3-4条女性向选项
         const femaleOptions = [...QUICK_REPLIES_MAP.femaleOriented];
