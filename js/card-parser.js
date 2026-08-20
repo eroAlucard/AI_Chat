@@ -156,10 +156,10 @@ const CardParser = (function() {
             systemPrompt += '【场景】' + replaceTemplateVars(data.scenario, charName, userName) + '\n\n';
         }
         
-        // 5. character_book 常驻 entries
+        // 5. character_book 常驻 entries（constant=true 或 keys 为空→视为常驻）
         if (data.character_book && data.character_book.entries) {
             const enabledEntries = data.character_book.entries
-                .filter(e => e.enabled !== false && e.constant === true)
+                .filter(e => e.enabled !== false && (e.constant === true || (!e.keys || e.keys.length === 0)))
                 .sort((a, b) => (a.insertion_order || 100) - (b.insertion_order || 100));
             
             for (const entry of enabledEntries) {

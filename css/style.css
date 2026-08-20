@@ -849,3 +849,192 @@ body {
 .btn-continue-chat:active {
     background: rgba(139, 92, 246, 0.1);
 }
+
+/* ==================== 世界书 ==================== */
+.worldbook-entry {
+    margin-top: 12px;
+}
+
+.worldbook-entry.hidden {
+    display: none;
+}
+
+.worldbook-toggle-btn {
+    width: 100%;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 14px;
+    background: rgba(255,255,255,0.05);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-md);
+    color: var(--text-primary);
+    font-size: 14px;
+    cursor: pointer;
+    transition: background 0.2s;
+}
+
+.worldbook-toggle-btn:hover {
+    background: rgba(255,255,255,0.08);
+}
+
+.worldbook-icon {
+    font-size: 16px;
+}
+
+.worldbook-count {
+    color: var(--text-muted);
+    font-size: 12px;
+    margin-left: auto;
+}
+
+.worldbook-arrow {
+    color: var(--text-muted);
+    font-size: 12px;
+    transition: transform 0.2s;
+}
+
+.worldbook-panel {
+    margin-top: 8px;
+    max-height: 400px;
+    overflow-y: auto;
+}
+
+.worldbook-panel.hidden {
+    display: none;
+}
+
+.worldbook-header {
+    font-size: 12px;
+    color: var(--text-muted);
+    margin-bottom: 8px;
+    padding: 0 4px;
+}
+
+.worldbook-entries {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.wb-entry {
+    padding: 10px 12px;
+    background: rgba(255,255,255,0.03);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-sm);
+    transition: opacity 0.2s;
+}
+
+.wb-entry.wb-disabled {
+    opacity: 0.4;
+}
+
+.wb-entry-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    margin-bottom: 6px;
+}
+
+.wb-entry-left {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    flex-wrap: wrap;
+    flex: 1;
+    min-width: 0;
+}
+
+.wb-tag {
+    font-size: 11px;
+    padding: 1px 6px;
+    border-radius: 3px;
+    white-space: nowrap;
+}
+
+.wb-constant {
+    background: rgba(100,200,100,0.15);
+    color: #6bc66b;
+    border: 1px solid rgba(100,200,100,0.3);
+}
+
+.wb-trigger {
+    background: rgba(100,150,255,0.15);
+    color: #6b9fff;
+    border: 1px solid rgba(100,150,255,0.3);
+}
+
+.wb-keys {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 3px;
+}
+
+.wb-key {
+    font-size: 11px;
+    padding: 1px 5px;
+    background: rgba(255,255,255,0.08);
+    border-radius: 3px;
+    color: var(--text-secondary);
+}
+
+.wb-keys-empty {
+    font-size: 11px;
+    color: var(--text-muted);
+    font-style: italic;
+}
+
+.wb-entry-content {
+    font-size: 12px;
+    color: var(--text-muted);
+    line-height: 1.5;
+    word-break: break-all;
+}
+
+/* 开关样式 */
+.wb-switch {
+    position: relative;
+    display: inline-block;
+    width: 36px;
+    height: 20px;
+    flex-shrink: 0;
+}
+
+.wb-switch input {
+    opacity: 0;
+    width: 0;
+    height: 0;
+}
+
+.wb-slider {
+    position: absolute;
+    cursor: pointer;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background-color: rgba(255,255,255,0.15);
+    transition: 0.3s;
+    border-radius: 20px;
+}
+
+.wb-slider:before {
+    position: absolute;
+    content: "";
+    height: 14px;
+    width: 14px;
+    left: 3px;
+    bottom: 3px;
+    background-color: white;
+    transition: 0.3s;
+    border-radius: 50%;
+}
+
+.wb-switch input:checked + .wb-slider {
+    background-color: var(--accent-purple, #8b5cf6);
+}
+
+.wb-switch input:checked + .wb-slider:before {
+    transform: translateX(16px);
+}

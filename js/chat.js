@@ -385,7 +385,41 @@ async function callLMApi(role, messages, useStream = true) {
 \n`;
     }
 
-    const systemMessage = personRule + eroticRule + femaleRule + maleRule + baseSystem;
+    // === 世界书关键词匹配 ===
+    let worldBookInjection = '';
+    if (role.sourceData && role.sourceData.characterBook && role.sourceData.characterBook.entries) {
+        const cbEntries = role.sourceData.characterBook.entries;
+        // 收集最近5条消息的文本（用户+角色消息都检查）
+        const recentTexts = messages.slice(-10)
+            .map(m => (m.content || '').toLowerCase())
+            .join(' ');
+        
+        // 匹配关键词触发的条目（非 constant，有 keys）
+        const triggeredEntries = cbEntries
+            .filter(e => e.enabled !== false && e.content && e.content.trim())
+            .filter(e => {
+                // 常驻条目已在 systemPrompt 中，跳过
+                if (e.constant === true) return false;
+                // keys 为空已在 systemPrompt 中，跳过
+                if (!e.keys || e.keys.length === 0) return false;
+                // 关键词匹配：任一 key 出现在最近消息中即触发
+                const keys = e.keys.map(k => (k || '').toLowerCase().trim()).filter(k => k);
+                if (keys.length === 0) return false;
+                return keys.some(key => recentTexts.includes(key));
+            })
+            .sort((a, b) => (a.insertion_order || 100) - (b.insertion_order || 100));
+        
+        for (const entry of triggeredEntries) {
+            const replaced = CardParser.replaceTemplateVars(entry.content, role.name, '用户');
+            worldBookInjection += replaced + '\n\n';
+        }
+        
+        if (worldBookInjection) {
+            console.log(`[世界书] 角色 ${role.name} 匹配到 ${triggeredEntries.length} 条世界书条目`);
+        }
+    }
+
+    const systemMessage = personRule + eroticRule + femaleRule + maleRule + baseSystem + worldBookInjection;
 
     const apiMessages = [
         { role: 'system', content: systemMessage },
@@ -971,39 +1005,39 @@ const QUICK_REPLIES_MAP = {
     },
     // 女性向专属快捷选项（让男性角色对用户执行，"你"=角色，"我"=用户）
     femaleOriented: [
-        "你用指尖画圈揉我的阴蒂",
-        "你帮我脱掉内裤慢慢抚摸下面",
-        "你用拇指按住我的阴蒂上下摩擦",
-        "你分开我的花瓣用指腹轻扫花核",
-        "你两根手指夹住我的阴蒂慢慢揉搓",
-        "你一边舔我的阴蒂一边把手指插进来",
-        "你把我的阴蒂含在嘴里吮吸",
-        "你手指沾湿后快速拨弄我的花核",
-        "你用指腹左右拨弄我的阴蒂",
-        "你一边揉我的阴蒂一边亲吻大腿内侧",
-        "你用舌尖从下往上舔我的花缝",
-        "你把手指弯起来找我的G点",
-        "你抱着我慢慢顶进来",
-        "你在我耳边说你想操我",
-        "你把我的腿架到你肩上舔我"
+        "用指尖画圈揉我的阴蒂",
+        "帮我脱掉内裤慢慢抚摸下面",
+        "用拇指按住我的阴蒂上下摩擦",
+        "分开我的花瓣用指腹轻扫花核",
+        "两根手指夹住我的阴蒂慢慢揉搓",
+        "一边舔我的阴蒂一边把手指插进来",
+        "把我的阴蒂含在嘴里吮吸",
+        "手指沾湿后快速拨弄我的花核",
+        "用指腹左右拨弄我的阴蒂",
+        "一边揉我的阴蒂一边亲吻大腿内侧",
+        "用舌尖从下往上舔我的花缝",
+        "把手指弯起来找我的G点",
+        "抱着我慢慢顶进来",
+        "在我耳边说你想操我",
+        "把我的腿架到你肩上舔我"
     ],
     // 男性向专属快捷选项（让女性角色对用户执行，"你"=角色，"我"=用户）
     maleOriented: [
-        "你用手握住我的阴茎慢慢撸动",
-        "你用舌尖绕我的龟头画圈",
-        "你把我的龟头含进嘴里吮吸",
-        "你用胸部夹住我的阴茎上下套弄",
-        "你用脚趾夹住我的阴茎撸动",
-        "你用大腿夹紧我的阴茎磨蹭",
-        "你坐上来自己动",
-        "你跪在我腿间帮我口交",
-        "你舔我的龟头同时用手撸动",
-        "你把我的阴茎塞进你的乳沟里",
-        "你专注用拇指摩擦我的龟头冠状沟",
-        "你把我带到射的边缘然后停下来",
-        "你深喉吞下我的整根",
-        "你骑在我脸上让我舔你",
-        "你转过身翘起屁股让我看"
+        "用手握住我的阴茎慢慢撸动",
+        "用舌尖绕我的龟头画圈",
+        "把我的龟头含进嘴里吮吸",
+        "用胸部夹住我的阴茎上下套弄",
+        "用脚趾夹住我的阴茎撸动",
+        "用大腿夹紧我的阴茎磨蹭",
+        "坐上来自己动",
+        "跪在我腿间帮我口交",
+        "舔我的龟头同时用手撸动",
+        "把我的阴茎塞进你的乳沟里",
+        "专注用拇指摩擦我的龟头冠状沟",
+        "把我带到射的边缘然后停下来",
+        "深喉吞下我的整根",
+        "骑在我脸上让我舔你",
+        "转过身翘起屁股让我看"
     ],
     // 通用快捷选项（所有角色都有）
     common: [

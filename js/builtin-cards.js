@@ -76,6 +76,17 @@ const BuiltinCards = (function() {
         if (meta.description) prompt += meta.description + '\n\n';
         if (meta.personality) prompt += '【性格】' + meta.personality + '\n\n';
         if (meta.scenario) prompt += '【场景】' + meta.scenario + '\n\n';
+        // 世界书常驻条目（constant=true 或 keys 为空）
+        if (meta.character_book && meta.character_book.entries) {
+            const constantEntries = meta.character_book.entries
+                .filter(e => e.enabled !== false && (e.constant === true || (!e.keys || e.keys.length === 0)))
+                .sort((a, b) => (a.insertion_order || 100) - (b.insertion_order || 100));
+            for (const entry of constantEntries) {
+                if (entry.content && entry.content.trim()) {
+                    prompt += entry.content + '\n\n';
+                }
+            }
+        }
         return prompt.trim();
     }
 
@@ -126,6 +137,10 @@ const BuiltinCards = (function() {
                     }] : [],
                     isBuiltin: true,
                     _sourceFile: meta.filename,
+                    sourceData: {
+                        characterBook: meta.character_book || null,
+                        postHistoryInstructions: meta.post_history_instructions || '',
+                    },
                 };
                 roles.push(role);
             } catch (err) {

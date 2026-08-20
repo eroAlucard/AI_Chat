@@ -551,6 +551,7 @@ function initRoleDetailModal() {
     const startChatBtn = $('#startChatBtn');
     const continueChatBtn = $('#continueChatBtn');
     const collectBtn = $('#collectBtn');
+    initWorldBookToggle();
 
     [closeBtn, overlay].forEach(el => {
         el.addEventListener('click', () => modal.classList.add('hidden'));
@@ -634,6 +635,9 @@ function openRoleDetail(roleId) {
         $('#startChatBtn').textContent = '开始对话';
     }
 
+    // 渲染世界书信息
+    renderWorldBookInfo(role);
+
     // 渲染场景选择
     renderSceneSelector(role);
 }
@@ -676,6 +680,116 @@ function parseSystemPromptRules(systemPrompt) {
     html += '</div>';
     return html;
 }
+
+// ==================== World Book UI ====================
+function renderWorldBookInfo(role) {
+    const entryEl = document.getElementById('worldbookEntry');
+    const countEl = document.getElementById('worldbookCount');
+    
+    if (!role.sourceData || !role.sourceData.characterBook || !role.sourceData.characterBook.entries) {
+        entryEl.classList.add('hidden');
+        return;
+    }
+    
+    const entries = role.sourceData.characterBook.entries.filter(e => e.content && e.content.trim());
+    if (entries.length === 0) {
+        entryEl.classList.add('hidden');
+        return;
+    }
+    
+    entryEl.classList.remove('hidden');
+    const constantCount = entries.filter(e => e.constant === true || (!e.keys || e.keys.length === 0)).length;
+    const triggerCount = entries.length - constantCount;
+    countEl.textContent = `${entries.length}条（常驻${constantCount}，触发${triggerCount}）`;
+    
+    // 渲染条目列表
+    renderWorldBookEntries(role);
+}
+
+function renderWorldBookEntries(role) {
+    const container = document.getElementById('worldbookEntries');
+    if (!role.sourceData || !role.sourceData.characterBook) {
+        container.innerHTML = '';
+        return;
+    }
+    
+    const entries = role.sourceData.characterBook.entries.filter(e => e.content && e.content.trim());
+    const charName = role.name || '角色';
+    
+    let html = '';
+    entries.forEach((entry, idx) => {
+        const isConstant = entry.constant === true || (!entry.keys || entry.keys.length === 0);
+        const isEnabled = entry.enabled !== false;
+        const keys = (entry.keys || []).filter(k => k.trim());
+        const contentPreview = (entry.content || '').substring(0, 150).replace(/\n/g, ' ');
+        const typeLabel = isConstant ? '<span class="wb-tag wb-constant">常驻</span>' : '<span class="wb-tag wb-trigger">触发</span>';
+        const enabledClass = isEnabled ? 'wb-enabled' : 'wb-disabled';
+        
+        html += `<div class="wb-entry ${enabledClass}" data-entry-idx="${idx}">
+            <div class="wb-entry-header">
+                <div class="wb-entry-left">
+                    ${typeLabel}
+                    ${keys.length > 0 ? '<span class="wb-keys">' + keys.map(k => '<span class="wb-key">' + k + '</span>').join('') + '</span>' : '<span class="wb-keys-empty">无关键词（常驻注入）</span>'}
+                </div>
+                <label class="wb-switch">
+                    <input type="checkbox" ${isEnabled ? 'checked' : ''} data-entry-idx="${idx}" class="wb-toggle">
+                    <span class="wb-slider"></span>
+                </label>
+            </div>
+            <div class="wb-entry-content">${contentPreview}${entry.content.length > 150 ? '...' : ''}</div>
+        </div>`;
+    });
+    
+    container.innerHTML = html;
+    
+    // 绑定启用/禁用开关
+    container.querySelectorAll('.wb-toggle').forEach(toggle => {
+        toggle.addEventListener('change', (e) => {
+            const idx = parseInt(e.target.dataset.entryIdx);
+            const entry = role.sourceData.characterBook.entries[idx];
+            if (entry) {
+                entry.enabled = e.target.checked;
+                // 更新条目样式
+                const entryEl = e.target.closest('.wb-entry');
+                entryEl.classList.toggle('wb-enabled', e.target.checked);
+                entryEl.classList.toggle('wb-disabled', !e.target.checked);
+                // 保存自定义角色的修改
+                if (role.source === 'imported' || !role.isBuiltin) {
+                    saveCustomRoleWorldBook(role);
+                }
+                // 更新计数
+                renderWorldBookInfo(role);
+            }
+        });
+    });
+}
+
+function saveCustomRoleWorldBook(role) {
+    // 将修改后的世界书保存到 localStorage
+    const customKey = getCustomRolesKey();
+    try {
+        const customRoles = JSON.parse(localStorage.getItem(customKey) || '[]');
+        const idx = customRoles.findIndex(r => String(r.id) === String(role.id));
+        if (idx >= 0) {
+            customRoles[idx].sourceData.characterBook = role.sourceData.characterBook;
+            localStorage.setItem(customKey, JSON.stringify(customRoles));
+        }
+    } catch (e) {
+        console.warn('[世界书] 保存失败:', e);
+    }
+}
+
+function initWorldBookToggle() {
+    const toggleBtn = document.getElementById('worldbookToggleBtn');
+    const panel = document.getElementById('worldbookPanel');
+    const arrow = toggleBtn.querySelector('.worldbook-arrow');
+    
+    toggleBtn.addEventListener('click', () => {
+        panel.classList.toggle('hidden');
+        arrow.textContent = panel.classList.contains('hidden') ? '▸' : '▾';
+    });
+}
+
 
 function toggleCollect(roleId) {
     if (AppState.collections.has(roleId)) {
@@ -1307,10 +1421,13 @@ async function confirmImportCard() {
         }
 
         // 存入 localStorage（精简数据避免超限）
-        // 移除 sourceData（characterBook 等大字段）和 base64 图片
+        // 保留 characterBook（世界书数据，用户可配置），移除其他大字段和 base64 图片
         const slimRole = {
             ...role,
-            sourceData: undefined,  // 不存 characterBook 等大字段
+            sourceData: {
+                characterBook: role.sourceData ? role.sourceData.characterBook || null : null,
+                postHistoryInstructions: role.sourceData ? role.sourceData.postHistoryInstructions || '' : '',
+            },
             image: '',  // base64 图片已存 IndexedDB，localStorage 不存
         };
         const customRoles = JSON.parse(localStorage.getItem(getCustomRolesKey()) || '[]');
