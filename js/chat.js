@@ -656,10 +656,13 @@ async function readStreamResponse(response, role) {
             </div>
         `;
         container.appendChild(streamMsgEl);
+        console.log('[Stream] streamMessage appended, children count:', container.children.length);
         // 显示等待提示气泡，让用户知道系统正在处理
         const streamBubble = $('#streamBubble');
         if (streamBubble) {
             streamBubble.innerHTML = '<span style="color:#aaa;font-style:italic;">💭 正在思考中…</span>';
+        } else {
+            console.warn('[Stream] streamBubble 元素未找到！');
         }
     }
 
@@ -719,7 +722,7 @@ async function readStreamResponse(response, role) {
                         if (bubble) {
                             // 思考过程用灰色斜体显示
                             bubble.innerHTML = `<span style="color:#888;font-style:italic;">💭 思考中…</span><br><span style="color:#aaa;font-style:italic;font-size:0.9em;">${formatMessage(reasoningContent)}</span>`;
-                            scrollToBottom();
+                            smartScrollToBottom(container);
                         }
                     }
 
@@ -741,7 +744,7 @@ async function readStreamResponse(response, role) {
                                 // 无思考过程：直接显示正文
                                 bubble.innerHTML = formatMessage(fullContent);
                             }
-                            scrollToBottom();
+                            smartScrollToBottom(container);
                         }
                     }
                 } catch (e) {
@@ -770,6 +773,17 @@ async function readStreamResponse(response, role) {
         }
     }
     return { content: fullContent || '...', reasoning: reasoningContent || '' };
+}
+
+// ==================== Smart Scroll Helper ====================
+function smartScrollToBottom(container) {
+    if (!container) return;
+    // 只有当用户已经在底部附近（距离底部 < 50px）时才自动滚动
+    const threshold = 50;
+    const isNearBottom = container.scrollHeight - container.scrollTop - container.clientHeight < threshold;
+    if (isNearBottom) {
+        container.scrollTop = container.scrollHeight;
+    }
 }
 
 // ==================== Fallback Reply ====================
