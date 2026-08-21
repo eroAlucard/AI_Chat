@@ -1,7 +1,179 @@
 // ==================== Chat Logic ====================
 
+// ==================== Draft Management ====================
+function getDraftKey() {
+    const user = getCurrentUser();
+    return user ? `ai_chat_drafts_${user}` : 'ai_chat_drafts';
+}
+
+function saveDraft(roleId, content) {
+    if (!content || !content.trim()) {
+        clearDraft(roleId);
+        return;
+    }
+    try {
+        const drafts = JSON.parse(localStorage.getItem(getDraftKey()) || '{}');
+        drafts[roleId] = content;
+        localStorage.setItem(getDraftKey(), JSON.stringify(drafts));
+    } catch (e) {
+        console.warn('Failed to save draft:', e);
+    }
+}
+
+function loadDraft(roleId) {
+    try {
+        const drafts = JSON.parse(localStorage.getItem(getDraftKey()) || '{}');
+        return drafts[roleId] || '';
+    } catch (e) {
+        console.warn('Failed to load draft:', e);
+        return '';
+    }
+}
+
+function clearDraft(roleId) {
+    try {
+        const drafts = JSON.parse(localStorage.getItem(getDraftKey()) || '{}');
+        delete drafts[roleId];
+        localStorage.setItem(getDraftKey(), JSON.stringify(drafts));
+    } catch (e) {
+        console.warn('Failed to clear draft:', e);
+    }
+}
+
+// ==================== Input History Management ====================
+const MAX_INPUT_HISTORY = 30; // 最多保存30条历史记录
+
+function getInputHistoryKey() {
+    const user = getCurrentUser();
+    return user ? `ai_chat_input_history_${user}` : 'ai_chat_input_history';
+}
+
+function saveToInputHistory(roleId, content) {
+    if (!content || !content.trim() || content.length < 2) return;
+
+    try {
+        const key = getInputHistoryKey();
+        const allHistory = JSON.parse(localStorage.getItem(key) || '{}');
+
+        // 按角色分组存储
+        if (!allHistory[roleId]) {
+            allHistory[roleId] = [];
+        }
+
+        const history = allHistory[roleId];
+
+        // 去重：如果已存在相同内容，先移除
+        const existingIndex = history.indexOf(content);
+        if (existingIndex !== -1) {
+            history.splice(existingIndex, 1);
+        }
+
+        // 添加到开头
+        history.unshift(content);
+
+        // 限制数量
+        if (history.length > MAX_INPUT_HISTORY) {
+            history.splice(MAX_INPUT_HISTORY);
+        }
+
+        allHistory[roleId] = history;
+        localStorage.setItem(key, JSON.stringify(allHistory));
+    } catch (e) {
+        console.warn('Failed to save input history:', e);
+    }
+}
+
+function loadInputHistory(roleId) {
+    try {
+        const key = getInputHistoryKey();
+        const allHistory = JSON.parse(localStorage.getItem(key) || '{}');
+        return allHistory[roleId] || [];
+    } catch (e) {
+        console.warn('Failed to load input history:', e);
+        return [];
+    }
+}
+
+function initInputHistory() {
+    const historyBtn = $('#inputHistoryBtn');
+    const historyPanel = $('#inputHistoryPanel');
+    const historyClose = $('#inputHistoryClose');
+    const historyList = $('#inputHistoryList');
+    const historyEmpty = $('#inputHistoryEmpty');
+    const chatInput = $('#chatInput');
+
+    if (!historyBtn || !historyPanel) return;
+
+    // 打开历史面板
+    historyBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const isHidden = historyPanel.classList.contains('hidden');
+
+        if (isHidden) {
+            // 渲染历史记录
+            renderInputHistory();
+            historyPanel.classList.remove('hidden');
+        } else {
+            historyPanel.classList.add('hidden');
+        }
+    });
+
+    // 关闭按钮
+    historyClose.addEventListener('click', (e) => {
+        e.stopPropagation();
+        historyPanel.classList.add('hidden');
+    });
+
+    // 点击外部关闭
+    document.addEventListener('click', (e) => {
+        if (!historyPanel.contains(e.target) && !historyBtn.contains(e.target)) {
+            historyPanel.classList.add('hidden');
+        }
+    });
+}
+
+function renderInputHistory() {
+    const roleId = AppState.currentChat;
+    if (!roleId) return;
+
+    const history = loadInputHistory(roleId);
+    const historyList = $('#inputHistoryList');
+    const historyEmpty = $('#inputHistoryEmpty');
+
+    if (history.length === 0) {
+        historyList.innerHTML = '';
+        historyEmpty.style.display = 'block';
+        return;
+    }
+
+    historyEmpty.style.display = 'none';
+    historyList.innerHTML = history.map((item, idx) => {
+        const preview = item.length > 100 ? item.substring(0, 100) + '...' : item;
+        return `<div class="input-history-item" data-idx="${idx}">${preview}</div>`;
+    }).join('');
+
+    // 绑定点击事件
+    historyList.querySelectorAll('.input-history-item').forEach(item => {
+        item.addEventListener('click', () => {
+            const idx = parseInt(item.dataset.idx);
+            const content = history[idx];
+            const chatInput = $('#chatInput');
+            chatInput.value = content;
+            chatInput.style.height = 'auto';
+            chatInput.style.height = Math.min(chatInput.scrollHeight, 120) + 'px';
+            chatInput.focus();
+
+            // 关闭面板
+            $('#inputHistoryPanel').classList.add('hidden');
+        });
+    });
+}
+
+
 function initChatView() {
     initBatchDelete();
+    initInputHistory(); // 初始化输入历史
+    initCommonPhrases(); // 初始化常用语
     const backBtn = $('#chatBackBtn');
     const sendBtn = $('#sendBtn');
     const chatInput = $('#chatInput');
@@ -21,10 +193,15 @@ function initChatView() {
         }
     });
 
-    // 自动调整输入框高度
+    // 自动调整输入框高度 + 自动保存草稿
     chatInput.addEventListener('input', () => {
         chatInput.style.height = 'auto';
         chatInput.style.height = Math.min(chatInput.scrollHeight, 120) + 'px';
+
+        // 自动保存草稿
+        if (AppState.currentChat) {
+            saveDraft(AppState.currentChat, chatInput.value);
+        }
     });
 
     // 聊天菜单按钮
@@ -124,6 +301,15 @@ function showChatView(roleId) {
 
     // 渲染快捷选项
     renderQuickReplies(roleId);
+
+    // 恢复草稿
+    const chatInput = $('#chatInput');
+    const draft = loadDraft(roleId);
+    if (draft) {
+        chatInput.value = draft;
+        chatInput.style.height = 'auto';
+        chatInput.style.height = Math.min(chatInput.scrollHeight, 120) + 'px';
+    }
 
     // 滚动到底部
     scrollToBottom();
@@ -822,6 +1008,9 @@ async function sendMessage(skipInputCheck = false) {
     if (!skipInputCheck) {
         if (!text) return;
 
+        // 保存到输入历史
+        saveToInputHistory(roleId, text);
+
         // 添加用户消息
         session.messages.push({
             role: 'user',
@@ -834,6 +1023,9 @@ async function sendMessage(skipInputCheck = false) {
         input.value = '';
         input.style.height = 'auto';
         renderMessages(roleId);
+
+        // 清除草稿
+        clearDraft(roleId);
 
         // 清除可能残留的生成标记（添加消息后再清除，确保消息历史正确）
         delete AppState._generatingSwipeFor;
@@ -2494,16 +2686,27 @@ function renderQuickReplies(roleId) {
 
     const replies = [];
 
-    // 0. 性向专属选项优先（根据角色性别判断）
+    // 0. 添加"常用语"按钮（放在最前面）
+    const phrasesBtn = document.createElement('button');
+    phrasesBtn.className = 'quick-reply-btn';
+    phrasesBtn.textContent = '📝 常用语';
+    phrasesBtn.style.background = 'rgba(139, 92, 246, 0.15)';
+    phrasesBtn.style.borderColor = 'rgba(139, 92, 246, 0.3)';
+    phrasesBtn.addEventListener('click', () => {
+        openCommonPhrasesModal();
+    });
+    container.appendChild(phrasesBtn);
+
+    // 1. 性向专属选项优先（根据角色性别判断）
     // 女性向 = 给女性用户看的男性角色 → 显示 femaleOriented
     // 男性向 = 给男性用户看的女性角色 → 显示 maleOriented
     const gender = role.gender || (role.tags && (
-        role.tags.includes('Male') || role.tags.includes('male') || role.tags.includes('男性') || role.tags.includes('男性向') ? 'male' : 
+        role.tags.includes('Male') || role.tags.includes('male') || role.tags.includes('男性') || role.tags.includes('男性向') ? 'male' :
         (role.tags.includes('Female') || role.tags.includes('female') || role.tags.includes('女性') || role.tags.includes('女性向') ? 'female' : 'female')
     ));
     const isFemaleOriented = gender === 'male';  // 男性角色显示女性向快捷词
     const isMaleOriented = gender === 'female';  // 女性角色显示男性向快捷词
-    
+
     if (isFemaleOriented && QUICK_REPLIES_MAP.femaleOriented) {
         // 随机选3-4条女性向选项
         const femaleOptions = [...QUICK_REPLIES_MAP.femaleOriented];
@@ -2517,12 +2720,12 @@ function renderQuickReplies(roleId) {
         replies.push(...shuffled.slice(0, 4));
     }
 
-    // 1. 角色专属选项
+    // 2. 角色专属选项
     if (QUICK_REPLIES_MAP.roles[role.name]) {
         replies.push(...QUICK_REPLIES_MAP.roles[role.name]);
     }
 
-    // 2. 标签专属选项（去重，最多取6条）
+    // 3. 标签专属选项（去重，最多取6条）
     const tagReplies = [];
     for (const tag of role.tags) {
         const mapped = QUICK_REPLIES_MAP.tags[tag];
@@ -2603,5 +2806,168 @@ function initQuickRepliesDrag(container) {
         isDragging = false;
         container.style.cursor = 'grab';
         container.style.userSelect = '';
+    });
+}
+
+// ==================== Common Phrases Management ====================
+function getCommonPhrasesKey() {
+    const user = getCurrentUser();
+    return user ? `ai_chat_common_phrases_${user}` : 'ai_chat_common_phrases';
+}
+
+function loadCommonPhrases() {
+    try {
+        const phrases = JSON.parse(localStorage.getItem(getCommonPhrasesKey()) || '[]');
+        return phrases;
+    } catch (e) {
+        console.warn('Failed to load common phrases:', e);
+        return [];
+    }
+}
+
+function saveCommonPhrases(phrases) {
+    try {
+        localStorage.setItem(getCommonPhrasesKey(), JSON.stringify(phrases));
+    } catch (e) {
+        console.warn('Failed to save common phrases:', e);
+    }
+}
+
+function addCommonPhrase(text) {
+    if (!text || !text.trim()) return;
+    const phrases = loadCommonPhrases();
+    // 去重
+    if (phrases.includes(text)) {
+        showToast('该常用语已存在');
+        return;
+    }
+    phrases.push(text);
+    saveCommonPhrases(phrases);
+    showToast('已添加常用语');
+}
+
+function deleteCommonPhrase(index) {
+    const phrases = loadCommonPhrases();
+    phrases.splice(index, 1);
+    saveCommonPhrases(phrases);
+    renderCommonPhrasesList();
+    showToast('已删除');
+}
+
+function openCommonPhrasesModal() {
+    const modal = $('#commonPhrasesModal');
+    modal.classList.remove('hidden');
+    renderCommonPhrasesList();
+}
+
+function closeCommonPhrasesModal() {
+    $('#commonPhrasesModal').classList.add('hidden');
+}
+
+function renderCommonPhrasesList() {
+    const phrases = loadCommonPhrases();
+    const list = $('#commonPhrasesList');
+    const empty = $('#commonPhrasesEmpty');
+
+    if (phrases.length === 0) {
+        list.innerHTML = '';
+        empty.style.display = 'block';
+        return;
+    }
+
+    empty.style.display = 'none';
+    list.innerHTML = phrases.map((phrase, idx) => `
+        <div class="common-phrase-item">
+            <div class="common-phrase-text">${phrase}</div>
+            <div class="common-phrase-actions">
+                <button class="common-phrase-btn use" data-idx="${idx}" title="使用">✓</button>
+                <button class="common-phrase-btn edit" data-idx="${idx}" title="编辑">编辑</button>
+                <button class="common-phrase-btn delete" data-idx="${idx}" title="删除">✕</button>
+            </div>
+        </div>
+    `).join('');
+
+    // 绑定使用按钮
+    list.querySelectorAll('.common-phrase-btn.use').forEach(btn => {
+        btn.addEventListener('click', () => {
+            const idx = parseInt(btn.dataset.idx);
+            const phrase = phrases[idx];
+            const chatInput = $('#chatInput');
+            chatInput.value = phrase;
+            chatInput.style.height = 'auto';
+            chatInput.style.height = Math.min(chatInput.scrollHeight, 120) + 'px';
+            chatInput.focus();
+            closeCommonPhrasesModal();
+        });
+    });
+
+    // 绑定编辑按钮
+    list.querySelectorAll('.common-phrase-btn.edit').forEach(btn => {
+        btn.addEventListener('click', () => {
+            const idx = parseInt(btn.dataset.idx);
+            const oldText = phrases[idx];
+
+            // 使用app.js中的编辑对话框
+            if (typeof openEditPhraseModal === 'function') {
+                openEditPhraseModal(idx, 'chat', oldText);
+            } else {
+                // 降级到prompt
+                const newText = prompt('编辑常用语:', oldText);
+
+                if (newText !== null && newText.trim()) {
+                    const trimmed = newText.trim();
+
+                    // 检查是否与其他常用语重复
+                    if (phrases.some((p, i) => i !== idx && p === trimmed)) {
+                        showToast('该常用语已存在');
+                        return;
+                    }
+
+                    phrases[idx] = trimmed;
+                    saveCommonPhrases(phrases);
+                    renderCommonPhrasesList();
+                    showToast('修改成功');
+                }
+            }
+        });
+    });
+
+    // 绑定删除按钮
+    list.querySelectorAll('.common-phrase-btn.delete').forEach(btn => {
+        btn.addEventListener('click', () => {
+            const idx = parseInt(btn.dataset.idx);
+            if (confirm('确定删除这条常用语？')) {
+                deleteCommonPhrase(idx);
+            }
+        });
+    });
+}
+
+function initCommonPhrases() {
+    const modal = $('#commonPhrasesModal');
+    const closeBtn = $('#closeCommonPhrases');
+    const overlay = modal.querySelector('.role-detail-overlay');
+    const addBtn = $('#addPhraseBtn');
+    const newPhraseInput = $('#newPhraseInput');
+
+    if (!modal) return;
+
+    // 关闭按钮
+    [closeBtn, overlay].forEach(el => {
+        el.addEventListener('click', () => {
+            closeCommonPhrasesModal();
+        });
+    });
+
+    // 添加按钮
+    addBtn.addEventListener('click', () => {
+        const text = newPhraseInput.value.trim();
+        if (!text) {
+            showToast('请输入常用语内容');
+            return;
+        }
+        addCommonPhrase(text);
+        newPhraseInput.value = '';
+        renderCommonPhrasesList();
     });
 }

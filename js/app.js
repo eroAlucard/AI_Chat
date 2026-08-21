@@ -164,13 +164,212 @@ const AppState = {
     }
 };
 
+// ==================== User Behavior Tracking (智能推荐系统) ====================
+const UserBehavior = {
+    // 获取用户行为数据的localStorage key
+    getStorageKey() {
+        const user = getCurrentUser();
+        return user ? `ai_user_behavior_${user}` : 'ai_user_behavior';
+    },
+
+    // 加载用户行为数据
+    load() {
+        try {
+            const data = localStorage.getItem(this.getStorageKey());
+            return data ? JSON.parse(data) : this.getDefaultData();
+        } catch (e) {
+            console.error('加载用户行为数据失败:', e);
+            return this.getDefaultData();
+        }
+    },
+
+    // 默认数据结构
+    getDefaultData() {
+        return {
+            tagHistory: {}, // { "标签名": { views: 次数, searches: 次数, filters: 次数, lastTime: 时间戳 } }
+            recentRoles: [], // 最近浏览的角色ID列表
+            searchHistory: [], // 搜索历史
+            version: 1
+        };
+    },
+
+    // 保存用户行为数据
+    save(data) {
+        try {
+            localStorage.setItem(this.getStorageKey(), JSON.stringify(data));
+        } catch (e) {
+            console.error('保存用户行为数据失败:', e);
+        }
+    },
+
+    // 记录角色卡浏览（提取该卡的所有标签）
+    trackRoleView(roleId) {
+        const role = ROLES_DATA.find(r => r.id === roleId);
+        if (!role || !role.tags) return;
+
+        const data = this.load();
+        const now = Date.now();
+
+        // 记录最近浏览
+        data.recentRoles = data.recentRoles || [];
+        data.recentRoles = data.recentRoles.filter(id => id !== roleId);
+        data.recentRoles.unshift(roleId);
+        if (data.recentRoles.length > 50) {
+            data.recentRoles = data.recentRoles.slice(0, 50);
+        }
+
+        // 记录标签浏览
+        role.tags.forEach(tag => {
+            if (!data.tagHistory[tag]) {
+                data.tagHistory[tag] = { views: 0, searches: 0, filters: 0, lastTime: now };
+            }
+            data.tagHistory[tag].views += 1;
+            data.tagHistory[tag].lastTime = now;
+        });
+
+        this.save(data);
+    },
+
+    // 记录搜索行为
+    trackSearch(query) {
+        if (!query || query.trim().length === 0) return;
+
+        const data = this.load();
+        const now = Date.now();
+
+        // 记录搜索历史
+        data.searchHistory = data.searchHistory || [];
+        data.searchHistory = data.searchHistory.filter(s => s !== query);
+        data.searchHistory.unshift(query);
+        if (data.searchHistory.length > 20) {
+            data.searchHistory = data.searchHistory.slice(0, 20);
+        }
+
+        // 尝试匹配搜索词到已知标签
+        const allTags = new Set();
+        ROLES_DATA.forEach(role => {
+            if (role.tags) {
+                role.tags.forEach(tag => allTags.add(tag));
+            }
+        });
+
+        allTags.forEach(tag => {
+            if (tag.toLowerCase().includes(query.toLowerCase()) ||
+                query.toLowerCase().includes(tag.toLowerCase())) {
+                if (!data.tagHistory[tag]) {
+                    data.tagHistory[tag] = { views: 0, searches: 0, filters: 0, lastTime: now };
+                }
+                data.tagHistory[tag].searches += 1;
+                data.tagHistory[tag].lastTime = now;
+            }
+        });
+
+        this.save(data);
+    },
+
+    // 记录筛选器使用
+    trackFilter(tag) {
+        if (!tag) return;
+
+        const data = this.load();
+        const now = Date.now();
+
+        if (!data.tagHistory[tag]) {
+            data.tagHistory[tag] = { views: 0, searches: 0, filters: 0, lastTime: now };
+        }
+        data.tagHistory[tag].filters += 1;
+        data.tagHistory[tag].lastTime = now;
+
+        this.save(data);
+    },
+
+    // 计算标签推荐得分
+    calculateScore(tagData, now) {
+        const dayInMs = 24 * 60 * 60 * 1000;
+        const timeDiff = now - tagData.lastTime;
+        const daysDiff = timeDiff / dayInMs;
+
+        // 时间衰减：30天内线性衰减，30天后固定0.3
+        let timeDecay;
+        if (daysDiff < 30) {
+            timeDecay = 1 - (daysDiff / 30) * 0.7; // 从1衰减到0.3
+        } else {
+            timeDecay = 0.3;
+        }
+
+        // 权重配置：筛选 > 搜索 > 浏览
+        const viewWeight = 1;
+        const searchWeight = 2;
+        const filterWeight = 3;
+
+        const rawScore =
+            tagData.views * viewWeight +
+            tagData.searches * searchWeight +
+            tagData.filters * filterWeight;
+
+        return rawScore * timeDecay;
+    },
+
+    // 获取推荐标签（Top N）
+    getRecommendedTags(limit = 8) {
+        const data = this.load();
+        const now = Date.now();
+
+        // 计算所有标签的得分
+        const tagScores = [];
+        for (const [tag, tagData] of Object.entries(data.tagHistory)) {
+            const score = this.calculateScore(tagData, now);
+            if (score > 0) {
+                tagScores.push({ tag, score, data: tagData });
+            }
+        }
+
+        // 按得分降序排序
+        tagScores.sort((a, b) => b.score - a.score);
+
+        // 返回Top N标签，并映射到分组
+        return tagScores.slice(0, limit).map(item => ({
+            name: item.tag,
+            group: ROLE_TAG_FILTER_MAP[item.tag] || 'features',
+            score: item.score
+        }));
+    },
+
+    // 获取热门标签（新用户冷启动）
+    getPopularTags(limit = 8) {
+        const tagCounts = {};
+
+        ROLES_DATA.forEach(role => {
+            if (role.tags) {
+                role.tags.forEach(tag => {
+                    tagCounts[tag] = (tagCounts[tag] || 0) + 1;
+                });
+            }
+        });
+
+        const sortedTags = Object.entries(tagCounts)
+            .sort((a, b) => b[1] - a[1])
+            .slice(0, limit);
+
+        return sortedTags.map(([tag]) => ({
+            name: tag,
+            group: ROLE_TAG_FILTER_MAP[tag] || 'features'
+        }));
+    },
+
+    // 清除用户行为数据
+    clear() {
+        localStorage.removeItem(this.getStorageKey());
+    }
+};
+
 // ==================== ROLES_DATA (从 localStorage 初始化) ====================
 /**
  * 全局角色数组
  * - 自定义角色：从 localStorage (ai_custom_roles) 加载
  * - 内置角色：由 BuiltinCards.autoImport() 运行时从 cards-metadata.json 动态加载
  *   不存 localStorage，避免 5MB 限制
- * 
+ *
  * 注意：必须是可写普通数组，app.js 中多处直接 push/splice/修改属性
  */
 (function() {
@@ -222,6 +421,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     initSearch();
     initCategoryTabs();
     initFilterModal();
+    initRecentViewed(); // 初始化最近浏览
     renderRoleGrid();
     // 异步从 IndexedDB 加载自定义角色图片
     if (typeof ImageStore !== 'undefined') {
@@ -293,6 +493,55 @@ function switchPage(page) {
 }
 
 // ==================== Search ====================
+const MAX_SEARCH_HISTORY = 10;
+
+function getSearchHistoryKey() {
+    const user = getCurrentUser();
+    return user ? `ai_search_history_${user}` : 'ai_search_history';
+}
+
+function saveSearchHistory(query) {
+    if (!query || !query.trim() || query.length < 2) return;
+
+    try {
+        const history = JSON.parse(localStorage.getItem(getSearchHistoryKey()) || '[]');
+
+        // 去重
+        const existingIndex = history.indexOf(query);
+        if (existingIndex !== -1) {
+            history.splice(existingIndex, 1);
+        }
+
+        // 添加到开头
+        history.unshift(query);
+
+        // 限制数量
+        if (history.length > MAX_SEARCH_HISTORY) {
+            history.splice(MAX_SEARCH_HISTORY);
+        }
+
+        localStorage.setItem(getSearchHistoryKey(), JSON.stringify(history));
+    } catch (e) {
+        console.warn('Failed to save search history:', e);
+    }
+}
+
+function loadSearchHistory() {
+    try {
+        return JSON.parse(localStorage.getItem(getSearchHistoryKey()) || '[]');
+    } catch (e) {
+        return [];
+    }
+}
+
+function clearSearchHistory() {
+    try {
+        localStorage.removeItem(getSearchHistoryKey());
+    } catch (e) {
+        console.warn('Failed to clear search history:', e);
+    }
+}
+
 function initSearch() {
     const searchBtn = $('#searchBtn');
     const searchBar = $('#searchBar');
@@ -303,6 +552,7 @@ function initSearch() {
     searchBtn.addEventListener('click', () => {
         searchBar.classList.remove('hidden');
         searchInput.focus();
+        renderSearchHistory();
     });
 
     searchCancelBtn.addEventListener('click', () => {
@@ -310,6 +560,7 @@ function initSearch() {
         searchInput.value = '';
         searchClearBtn.classList.add('hidden');
         AppState.searchQuery = '';
+        hideSearchHistory();
         renderRoleGrid();
     });
 
@@ -325,8 +576,105 @@ function initSearch() {
         const query = searchInput.value.trim();
         AppState.searchQuery = query;
         searchClearBtn.classList.toggle('hidden', !query);
+
+        if (query) {
+            hideSearchHistory();
+            // 记录搜索行为（用于智能推荐）
+            UserBehavior.trackSearch(query);
+        } else {
+            renderSearchHistory();
+        }
+
         renderRoleGrid();
     });
+
+    // 搜索框获得焦点时显示历史
+    searchInput.addEventListener('focus', () => {
+        if (!searchInput.value.trim()) {
+            renderSearchHistory();
+        }
+    });
+
+    // 搜索框失去焦点时延迟隐藏历史（避免点击历史项时过早隐藏）
+    searchInput.addEventListener('blur', () => {
+        setTimeout(() => {
+            hideSearchHistory();
+        }, 200);
+    });
+}
+
+function renderSearchHistory() {
+    const history = loadSearchHistory();
+    if (history.length === 0) {
+        hideSearchHistory();
+        return;
+    }
+
+    let container = $('#searchHistoryContainer');
+    if (!container) {
+        container = document.createElement('div');
+        container.id = 'searchHistoryContainer';
+        container.className = 'search-history-container';
+        $('#searchBar').appendChild(container);
+    }
+
+    container.innerHTML = `
+        <div class="search-history-header">
+            <span>搜索历史</span>
+            <button class="search-history-clear" id="searchHistoryClear">清空</button>
+        </div>
+        <div class="search-history-list">
+            ${history.map(item => `
+                <div class="search-history-item" data-query="${item}">
+                    <span class="search-history-icon">🔍</span>
+                    <span class="search-history-text">${item}</span>
+                </div>
+            `).join('')}
+        </div>
+    `;
+
+    container.classList.remove('hidden');
+
+    // 绑定历史项点击
+    container.querySelectorAll('.search-history-item').forEach(item => {
+        item.addEventListener('click', () => {
+            const query = item.dataset.query;
+            const searchInput = $('#searchInput');
+            searchInput.value = query;
+            AppState.searchQuery = query;
+            $('#searchClearBtn').classList.remove('hidden');
+            hideSearchHistory();
+            renderRoleGrid();
+            // 保存到历史（提升到最前）
+            saveSearchHistory(query);
+        });
+    });
+
+    // 绑定清空按钮
+    const clearBtn = $('#searchHistoryClear');
+    if (clearBtn) {
+        clearBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            if (confirm('确定清空搜索历史？')) {
+                clearSearchHistory();
+                hideSearchHistory();
+            }
+        });
+    }
+}
+
+function hideSearchHistory() {
+    const container = $('#searchHistoryContainer');
+    if (container) {
+        container.classList.add('hidden');
+    }
+}
+
+// 在搜索执行时保存历史
+function performSearch(query) {
+    if (query && query.trim()) {
+        saveSearchHistory(query.trim());
+    }
 }
 
 // ==================== Category Tabs ====================
@@ -338,6 +686,97 @@ function initCategoryTabs() {
             renderRoleGrid();
         });
     });
+
+    // 初始化快捷筛选
+    renderQuickFilters();
+}
+
+function renderQuickFilters() {
+    const container = $('#quickFilters');
+    if (!container) return;
+
+    // 使用智能推荐算法获取标签
+    let quickTags = UserBehavior.getRecommendedTags(8);
+
+    // 如果用户行为数据不足（新用户或得分太低），使用热门标签
+    if (quickTags.length < 4) {
+        quickTags = UserBehavior.getPopularTags(8);
+    }
+
+    // 渲染标签
+    container.innerHTML = quickTags.map(tag => {
+        const isActive = AppState.filters[tag.group] && AppState.filters[tag.group].has(tag.name);
+        return `<button class="quick-filter-chip ${isActive ? 'active' : ''}" data-group="${tag.group}" data-value="${tag.name}">${tag.name}</button>`;
+    }).join('');
+
+    // 绑定点击事件
+    container.querySelectorAll('.quick-filter-chip').forEach(chip => {
+        chip.addEventListener('click', () => {
+            const group = chip.dataset.group;
+            const value = chip.dataset.value;
+
+            if (!AppState.filters[group]) {
+                AppState.filters[group] = new Set();
+            }
+
+            if (chip.classList.contains('active')) {
+                // 取消选中
+                chip.classList.remove('active');
+                AppState.filters[group].delete(value);
+                if (AppState.filters[group].size === 0) {
+                    delete AppState.filters[group];
+                }
+            } else {
+                // 选中
+                chip.classList.add('active');
+                AppState.filters[group].add(value);
+
+                // 记录筛选行为
+                UserBehavior.trackFilter(value);
+            }
+
+            renderRoleGrid();
+        });
+    });
+
+    // PC端鼠标拖拽滑动支持
+    initChipsDrag(container);
+}
+
+// PC端鼠标拖拽滑动（复制快捷回复的实现）
+function initChipsDrag(container) {
+    let isDragging = false;
+    let startX = 0;
+    let scrollLeft = 0;
+
+    container.style.cursor = 'grab';
+
+    container.addEventListener('mousedown', (e) => {
+        // 如果点击的是按钮，不启动拖拽
+        if (e.target.classList.contains('quick-filter-chip')) {
+            return;
+        }
+        isDragging = true;
+        startX = e.pageX - container.offsetLeft;
+        scrollLeft = container.scrollLeft;
+        container.style.cursor = 'grabbing';
+        container.style.userSelect = 'none';
+    });
+
+    document.addEventListener('mousemove', (e) => {
+        if (!isDragging) return;
+        e.preventDefault();
+        const x = e.pageX - container.offsetLeft;
+        const walk = (x - startX) * 1.5;
+        container.scrollLeft = scrollLeft - walk;
+    });
+
+    document.addEventListener('mouseup', () => {
+        if (!isDragging) return;
+        isDragging = false;
+        container.style.cursor = 'grab';
+        container.style.userSelect = '';
+    });
 }
 
 // ==================== Filter Modal ====================
@@ -346,7 +785,7 @@ function initCategoryTabs() {
 function renderFilterTags() {
     const container = $('#filterBody');
     if (!container) return;
-    
+
     // 收集所有角色卡实际使用的 tags 并按分组归类
     const tagGroups = {
         'audience': { title: '受众', tags: {} },
@@ -357,7 +796,7 @@ function renderFilterTags() {
         'type': { title: '类型', tags: {} },
         'features': { title: '特征', tags: {} },
     };
-    
+
     // 统计每个 tag 的出现次数
     ROLES_DATA.filter(r => r && r.tags).forEach(role => {
         role.tags.forEach(tag => {
@@ -367,28 +806,28 @@ function renderFilterTags() {
             }
         });
     });
-    
+
     // 生成 HTML
     let html = '';
     for (const [groupKey, groupData] of Object.entries(tagGroups)) {
         const tags = Object.entries(groupData.tags)
             .sort((a, b) => b[1] - a[1]); // 按出现次数降序
-        
+
         if (tags.length === 0) continue;
-        
+
         html += `<div class="filter-group">
             <h4>${groupData.title}</h4>
             <div class="filter-tags">`;
-        
+
         tags.forEach(([tag, count]) => {
             html += `<button class="filter-tag" data-group="${groupKey}" data-value="${tag}">${tag}</button>`;
         });
-        
+
         html += `</div></div>`;
     }
-    
+
     container.innerHTML = html;
-    
+
     // 绑定点击事件
     $$('.filter-tag').forEach(tag => {
         tag.addEventListener('click', () => {
@@ -398,6 +837,8 @@ function renderFilterTags() {
             if (!AppState.filters[group]) AppState.filters[group] = new Set();
             if (tag.classList.contains('active')) {
                 AppState.filters[group].add(value);
+                // 记录筛选行为（用于智能推荐）
+                UserBehavior.trackFilter(value);
             } else {
                 AppState.filters[group].delete(value);
                 if (AppState.filters[group].size === 0) delete AppState.filters[group];
@@ -411,7 +852,7 @@ function renderFilterTags() {
 function initFilterModal() {
     // 动态生成筛选按钮
     renderFilterTags();
-    
+
     const modal = $('#filterModal');
     const filterBtn = $('#filterBtn');
     const cancelBtn = $('#cancelFilterBtn');
@@ -437,6 +878,8 @@ function initFilterModal() {
     confirmBtn.addEventListener('click', () => {
         modal.classList.remove('active');
         renderRoleGrid();
+        // 刷新智能chips（用户行为可能已更新）
+        renderQuickFilters();
     });
 
     // filter-tag 事件已在 renderFilterTags 中绑定，此处不再重复
@@ -525,7 +968,7 @@ function renderRoleGrid() {
 function renderRoleCard(role) {
     // 防御性检查：跳过无效角色
     if (!role || !role.id) return '';
-    
+
     const coverHtml = role.image
         ? `<img class="role-card-cover" src="${role.image}" alt="${role.name}" loading="lazy" onerror="this.style.display='none';this.nextElementSibling.style.display='flex'"><div class="role-card-cover-placeholder" style="background:${role.gradient};display:none"><span>${role.emoji}</span></div>`
         : `<div class="role-card-cover-placeholder" style="background:${role.gradient}"><span>${role.emoji}</span></div>`;
@@ -546,6 +989,112 @@ function renderRoleCard(role) {
 }
 
 // ==================== Role Detail Modal ====================
+const MAX_RECENT_VIEWED = 10;
+
+function getRecentViewedKey() {
+    const user = getCurrentUser();
+    return user ? `ai_recent_viewed_${user}` : 'ai_recent_viewed';
+}
+
+function addToRecentViewed(roleId) {
+    try {
+        const history = JSON.parse(localStorage.getItem(getRecentViewedKey()) || '[]');
+
+        // 去重
+        const existingIndex = history.indexOf(roleId);
+        if (existingIndex !== -1) {
+            history.splice(existingIndex, 1);
+        }
+
+        // 添加到开头
+        history.unshift(roleId);
+
+        // 限制数量
+        if (history.length > MAX_RECENT_VIEWED) {
+            history.splice(MAX_RECENT_VIEWED);
+        }
+
+        localStorage.setItem(getRecentViewedKey(), JSON.stringify(history));
+
+        // 刷新最近浏览显示
+        renderRecentViewed();
+    } catch (e) {
+        console.warn('Failed to add to recent viewed:', e);
+    }
+}
+
+function loadRecentViewed() {
+    try {
+        const history = JSON.parse(localStorage.getItem(getRecentViewedKey()) || '[]');
+        // 过滤掉不存在的角色
+        return history.filter(id => ROLES_DATA.find(r => String(r.id) === String(id)));
+    } catch (e) {
+        return [];
+    }
+}
+
+function clearRecentViewed() {
+    try {
+        localStorage.removeItem(getRecentViewedKey());
+        renderRecentViewed();
+    } catch (e) {
+        console.warn('Failed to clear recent viewed:', e);
+    }
+}
+
+function renderRecentViewed() {
+    const history = loadRecentViewed();
+    const section = $('#recentViewedSection');
+    const list = $('#recentViewedList');
+
+    if (!section || !list) return;
+
+    if (history.length === 0) {
+        section.classList.add('hidden');
+        return;
+    }
+
+    section.classList.remove('hidden');
+
+    list.innerHTML = history.map(roleId => {
+        const role = ROLES_DATA.find(r => String(r.id) === String(roleId));
+        if (!role) return '';
+
+        const coverHtml = role.image
+            ? `<img src="${role.image}" alt="${role.name}" loading="lazy" onerror="this.style.display='none';this.nextElementSibling.style.display='flex'">
+               <div class="recent-viewed-placeholder" style="background:${role.gradient};display:none"><span>${role.emoji}</span></div>`
+            : `<div class="recent-viewed-placeholder" style="background:${role.gradient}"><span>${role.emoji}</span></div>`;
+
+        return `
+            <div class="recent-viewed-item" data-role-id="${roleId}">
+                <div class="recent-viewed-cover">${coverHtml}</div>
+                <div class="recent-viewed-name">${role.name}</div>
+            </div>
+        `;
+    }).join('');
+
+    // 绑定点击事件
+    list.querySelectorAll('.recent-viewed-item').forEach(item => {
+        item.addEventListener('click', () => {
+            const roleId = item.dataset.roleId;
+            openRoleDetail(roleId);
+        });
+    });
+}
+
+function initRecentViewed() {
+    const clearBtn = $('#recentViewedClear');
+    if (clearBtn) {
+        clearBtn.addEventListener('click', () => {
+            if (confirm('确定清空最近浏览记录？')) {
+                clearRecentViewed();
+            }
+        });
+    }
+
+    renderRecentViewed();
+}
+
 function initRoleDetailModal() {
     const modal = $('#roleDetailModal');
     const closeBtn = $('#closeRoleDetail');
@@ -556,7 +1105,11 @@ function initRoleDetailModal() {
     initWorldBookToggle();
 
     [closeBtn, overlay].forEach(el => {
-        el.addEventListener('click', () => modal.classList.add('hidden'));
+        el.addEventListener('click', () => {
+            modal.classList.add('hidden');
+            // 刷新智能chips（浏览行为已更新）
+            renderQuickFilters();
+        });
     });
 
     // 开始新对话（重新开始）
@@ -590,6 +1143,12 @@ function initRoleDetailModal() {
 function openRoleDetail(roleId) {
     const role = ROLES_DATA.find(r => String(r.id) === String(roleId));
     if (!role) return;
+
+    // 添加到最近浏览
+    addToRecentViewed(roleId);
+
+    // 记录用户浏览行为（用于智能推荐）
+    UserBehavior.trackRoleView(roleId);
 
     const modal = $('#roleDetailModal');
     modal.classList.remove('hidden');
@@ -642,7 +1201,7 @@ function openRoleDetail(roleId) {
 
     // 渲染场景选择
     renderSceneSelector(role);
-    
+
     // 内容填充完成后，初始化折叠功能（需要在内容渲染后才能测量高度）
     initCollapsible();
 }
@@ -690,23 +1249,23 @@ function parseSystemPromptRules(systemPrompt) {
 function renderWorldBookInfo(role) {
     const entryEl = document.getElementById('worldbookEntry');
     const countEl = document.getElementById('worldbookCount');
-    
+
     if (!role.sourceData || !role.sourceData.characterBook || !role.sourceData.characterBook.entries) {
         entryEl.classList.add('hidden');
         return;
     }
-    
+
     const entries = role.sourceData.characterBook.entries.filter(e => e.content && e.content.trim());
     if (entries.length === 0) {
         entryEl.classList.add('hidden');
         return;
     }
-    
+
     entryEl.classList.remove('hidden');
     const constantCount = entries.filter(e => e.constant === true || (!e.keys || e.keys.length === 0)).length;
     const triggerCount = entries.length - constantCount;
     countEl.textContent = `${entries.length}条（常驻${constantCount}，触发${triggerCount}）`;
-    
+
     // 渲染条目列表
     renderWorldBookEntries(role);
 }
@@ -717,10 +1276,10 @@ function renderWorldBookEntries(role) {
         container.innerHTML = '';
         return;
     }
-    
+
     const entries = role.sourceData.characterBook.entries.filter(e => e.content && e.content.trim());
     const charName = role.name || '角色';
-    
+
     let html = '';
     entries.forEach((entry, idx) => {
         const isConstant = entry.constant === true || (!entry.keys || entry.keys.length === 0);
@@ -729,7 +1288,7 @@ function renderWorldBookEntries(role) {
         const contentPreview = (entry.content || '').substring(0, 150).replace(/\n/g, ' ');
         const typeLabel = isConstant ? '<span class="wb-tag wb-constant">常驻</span>' : '<span class="wb-tag wb-trigger">触发</span>';
         const enabledClass = isEnabled ? 'wb-enabled' : 'wb-disabled';
-        
+
         html += `<div class="wb-entry ${enabledClass}" data-entry-idx="${idx}">
             <div class="wb-entry-header">
                 <div class="wb-entry-left">
@@ -744,9 +1303,9 @@ function renderWorldBookEntries(role) {
             <div class="wb-entry-content">${contentPreview}${entry.content.length > 150 ? '...' : ''}</div>
         </div>`;
     });
-    
+
     container.innerHTML = html;
-    
+
     // 绑定启用/禁用开关
     container.querySelectorAll('.wb-toggle').forEach(toggle => {
         toggle.addEventListener('change', (e) => {
@@ -788,7 +1347,7 @@ function initWorldBookToggle() {
     const toggleBtn = document.getElementById('worldbookToggleBtn');
     const panel = document.getElementById('worldbookPanel');
     const arrow = toggleBtn.querySelector('.worldbook-arrow');
-    
+
     toggleBtn.addEventListener('click', () => {
         panel.classList.toggle('hidden');
         arrow.textContent = panel.classList.contains('hidden') ? '▸' : '▾';
@@ -799,7 +1358,7 @@ function initWorldBookToggle() {
 function initCollapsible() {
     const modal = document.getElementById('roleDetailModal');
     if (!modal) return;
-    
+
     // 用 requestAnimationFrame 确保 DOM 渲染完成后再测量高度
     requestAnimationFrame(() => {
         modal.querySelectorAll('.collapsible').forEach(el => {
@@ -809,27 +1368,27 @@ function initCollapsible() {
                 oldToggle.remove();
             }
             el.querySelectorAll('.collapse-gradient').forEach(c => c.remove());
-            
+
             // 先临时展开测量
             el.classList.remove('collapsed');
             const scrollH = el.scrollHeight;
             // rules 折叠阈值：13em ≈ 208px（8行）
             const limit = 208;
-            
+
             if (scrollH <= limit + 20) {
                 // 内容不超长，不需要折叠
                 el.classList.remove('collapsible');
                 return;
             }
-            
+
             // 内容超长，启用折叠
             el.classList.add('collapsed');
-            
+
             // 添加渐变遮罩
             const gradient = document.createElement('div');
             gradient.className = 'collapse-gradient';
             el.appendChild(gradient);
-            
+
             // 添加展开/收起按钮
             const toggle = document.createElement('button');
             toggle.className = 'collapse-toggle';
@@ -889,6 +1448,12 @@ function initMinePage() {
                 openCreateRoleModal();
             } else if (action === 'import-card') {
                 openImportCardModal();
+            } else if (action === 'view-behavior') {
+                openBehaviorModal();
+            } else if (action === 'quick-replies') {
+                openQuickRepliesModal();
+            } else if (action === 'data-manager') {
+                openDataManager();
             }
         });
     });
@@ -898,6 +1463,346 @@ function initMinePage() {
     renderCustomRoles();
     updateChatBadge();
     initImportCardEvents();
+}
+
+// 打开用户偏好分析弹窗
+function openBehaviorModal() {
+    const modal = $('#behaviorModal');
+    const content = $('#behaviorContent');
+
+    const data = UserBehavior.load();
+    const recommendedTags = UserBehavior.getRecommendedTags(20);
+    const now = Date.now();
+
+    let html = '<div style="margin-bottom:20px">';
+    html += `<h3 style="margin-bottom:10px">🎯 为你推荐的标签</h3>`;
+
+    if (recommendedTags.length === 0) {
+        html += `<p style="color:var(--text-secondary)">暂无数据，多浏览、搜索和筛选角色卡后会自动生成个性化推荐</p>`;
+    } else {
+        html += '<div style="display:flex;flex-wrap:wrap;gap:8px;margin-top:10px">';
+        recommendedTags.forEach(tag => {
+            const tagData = data.tagHistory[tag.name];
+            const score = UserBehavior.calculateScore(tagData, now);
+            html += `<div style="padding:6px 12px;background:var(--bg-card);border:1px solid var(--border-color);border-radius:16px;font-size:12px">
+                ${tag.name} <span style="color:var(--text-muted)">(${score.toFixed(1)})</span>
+            </div>`;
+        });
+        html += '</div>';
+    }
+    html += '</div>';
+
+    // 统计数据
+    const totalViews = Object.values(data.tagHistory).reduce((sum, t) => sum + t.views, 0);
+    const totalSearches = Object.values(data.tagHistory).reduce((sum, t) => sum + t.searches, 0);
+    const totalFilters = Object.values(data.tagHistory).reduce((sum, t) => sum + t.filters, 0);
+
+    html += '<div style="margin-bottom:20px">';
+    html += `<h3 style="margin-bottom:10px">📈 行为统计</h3>`;
+    html += `<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px">`;
+    html += `<div style="background:var(--bg-card);padding:15px;border-radius:8px;text-align:center">
+        <div style="font-size:24px;font-weight:600;color:var(--accent-purple)">${data.recentRoles.length}</div>
+        <div style="font-size:12px;color:var(--text-secondary);margin-top:4px">浏览角色数</div>
+    </div>`;
+    html += `<div style="background:var(--bg-card);padding:15px;border-radius:8px;text-align:center">
+        <div style="font-size:24px;font-weight:600;color:var(--accent-purple)">${data.searchHistory.length}</div>
+        <div style="font-size:12px;color:var(--text-secondary);margin-top:4px">搜索次数</div>
+    </div>`;
+    html += `<div style="background:var(--bg-card);padding:15px;border-radius:8px;text-align:center">
+        <div style="font-size:24px;font-weight:600;color:var(--accent-purple)">${totalFilters}</div>
+        <div style="font-size:12px;color:var(--text-secondary);margin-top:4px">筛选次数</div>
+    </div>`;
+    html += `</div></div>`;
+
+    // Top标签详情
+    html += '<div>';
+    html += `<h3 style="margin-bottom:10px">🏆 偏好标签详情</h3>`;
+    if (Object.keys(data.tagHistory).length === 0) {
+        html += `<p style="color:var(--text-secondary)">暂无标签数据</p>`;
+    } else {
+        html += '<div style="max-height:200px;overflow-y:auto">';
+        const sortedTags = Object.entries(data.tagHistory)
+            .sort((a, b) => {
+                const scoreA = UserBehavior.calculateScore(a[1], now);
+                const scoreB = UserBehavior.calculateScore(b[1], now);
+                return scoreB - scoreA;
+            })
+            .slice(0, 15);
+
+        sortedTags.forEach(([tag, tagData]) => {
+            const daysDiff = Math.floor((now - tagData.lastTime) / (24 * 60 * 60 * 1000));
+            html += `<div style="display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid var(--border-color)">
+                <span style="font-weight:500">${tag}</span>
+                <span style="color:var(--text-muted);font-size:12px">
+                    浏览${tagData.views} · 搜索${tagData.searches} · 筛选${tagData.filters} · ${daysDiff}天前
+                </span>
+            </div>`;
+        });
+        html += '</div>';
+    }
+    html += '</div>';
+
+    content.innerHTML = html;
+    modal.classList.remove('hidden');
+}
+
+// ==================== Quick Replies Management ====================
+
+// 当前正在编辑的常用语索引和来源
+let currentEditingIndex = -1;
+let currentEditingSource = ''; // 'app' 或 'chat'
+
+// 获取常用语存储key（与chat.js中的key保持一致）
+function getQuickRepliesKey() {
+    const user = getCurrentUser();
+    return user ? `ai_chat_common_phrases_${user}` : 'ai_chat_common_phrases';
+}
+
+// 加载常用语
+function loadQuickRepliesData() {
+    try {
+        const data = localStorage.getItem(getQuickRepliesKey());
+        return data ? JSON.parse(data) : [];  // 默认返回空数组
+    } catch (e) {
+        console.error('加载常用语失败:', e);
+        return [];
+    }
+}
+
+// 保存常用语
+function saveQuickRepliesData(replies) {
+    try {
+        localStorage.setItem(getQuickRepliesKey(), JSON.stringify(replies));
+        return true;
+    } catch (e) {
+        console.error('保存常用语失败:', e);
+        showToast('保存失败，可能超出存储限制');
+        return false;
+    }
+}
+
+// 打开编辑对话框
+function openEditPhraseModal(index, source, currentText) {
+    currentEditingIndex = index;
+    currentEditingSource = source;
+
+    const modal = $('#editPhraseModal');
+    const input = $('#editPhraseInput');
+    input.value = currentText;
+    modal.classList.remove('hidden');
+
+    // 聚焦并选中文本
+    setTimeout(() => {
+        input.focus();
+        input.select();
+    }, 100);
+}
+
+// 关闭编辑对话框
+function closeEditPhraseModal() {
+    const modal = $('#editPhraseModal');
+    modal.classList.add('hidden');
+    currentEditingIndex = -1;
+    currentEditingSource = '';
+}
+
+// 保存编辑后的常用语
+function saveEditedPhrase() {
+    const input = $('#editPhraseInput');
+    const newText = input.value.trim();
+
+    if (!newText) {
+        showToast('请输入常用语内容');
+        return;
+    }
+
+    const replies = loadQuickRepliesData();
+
+    // 检查是否与其他常用语重复
+    if (replies.some((r, i) => i !== currentEditingIndex && r === newText)) {
+        showToast('该常用语已存在');
+        return;
+    }
+
+    replies[currentEditingIndex] = newText;
+
+    if (saveQuickRepliesData(replies)) {
+        closeEditPhraseModal();
+
+        // 刷新对应的列表
+        if (currentEditingSource === 'app') {
+            renderQuickRepliesList();
+        } else if (currentEditingSource === 'chat' && typeof renderCommonPhrasesList === 'function') {
+            renderCommonPhrasesList();
+        }
+
+        showToast('修改成功');
+    }
+}
+
+// 打开常用语管理弹窗
+function openQuickRepliesModal() {
+    const modal = $('#quickRepliesModal');
+    renderQuickRepliesList();
+    modal.classList.remove('hidden');
+}
+
+// 渲染常用语列表
+function renderQuickRepliesList() {
+    const content = $('#quickRepliesContent');
+    const empty = $('#quickRepliesEmpty');
+    const replies = loadQuickRepliesData();
+
+    if (replies.length === 0) {
+        content.innerHTML = '';
+        empty.style.display = 'block';
+        return;
+    }
+
+    empty.style.display = 'none';
+
+    let html = '';
+    replies.forEach((reply, index) => {
+        html += `
+            <div class="common-phrase-item">
+                <div class="common-phrase-text">${escapeHtml(reply)}</div>
+                <div class="common-phrase-actions">
+                    <button class="common-phrase-btn edit" onclick="editQuickReply(${index})" title="编辑">编辑</button>
+                    <button class="common-phrase-btn delete" onclick="deleteQuickReply(${index})" title="删除">✕</button>
+                </div>
+            </div>
+        `;
+    });
+
+    content.innerHTML = html;
+}
+
+// HTML转义（防止XSS）
+function escapeHtml(text) {
+    const div = document.createElement('div');
+    div.textContent = text;
+    return div.innerHTML;
+}
+
+// 添加新常用语
+function addNewQuickReply() {
+    const input = $('#newQuickReplyInput');
+    const text = input.value.trim();
+
+    if (!text) {
+        showToast('请输入常用语内容');
+        return;
+    }
+
+    const replies = loadQuickRepliesData();
+
+    // 检查重复
+    if (replies.includes(text)) {
+        showToast('该常用语已存在');
+        return;
+    }
+
+    replies.push(text);
+
+    if (saveQuickRepliesData(replies)) {
+        input.value = '';
+        renderQuickRepliesList();
+        showToast('添加成功');
+    }
+}
+
+// 编辑常用语
+function editQuickReply(index) {
+    const replies = loadQuickRepliesData();
+    const oldText = replies[index];
+    openEditPhraseModal(index, 'app', oldText);
+}
+
+// 删除常用语
+function deleteQuickReply(index) {
+    const replies = loadQuickRepliesData();
+
+    if (confirm('确定删除这条常用语吗？')) {
+        replies.splice(index, 1);
+        if (saveQuickRepliesData(replies)) {
+            renderQuickRepliesList();
+            showToast('删除成功');
+        }
+    }
+}
+
+// 导出常用语
+function exportQuickReplies() {
+    const replies = loadQuickRepliesData();
+    const data = {
+        version: 1,
+        exportTime: new Date().toISOString(),
+        user: getCurrentUser() || 'default',
+        replies: replies
+    };
+
+    const jsonStr = JSON.stringify(data, null, 2);
+    const blob = new Blob([jsonStr], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `常用语备份_${new Date().toISOString().slice(0, 10)}.json`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+
+    showToast('导出成功');
+}
+
+// 导入常用语
+function importQuickReplies(event) {
+    const file = event.target.files[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = function(e) {
+        try {
+            const data = JSON.parse(e.target.result);
+
+            // 验证数据格式
+            if (!data.replies || !Array.isArray(data.replies)) {
+                throw new Error('无效的备份文件格式');
+            }
+
+            // 询问是否覆盖
+            const currentReplies = loadQuickRepliesData();
+            let mergeMode = 'replace';
+
+            if (currentReplies.length > 0) {
+                const choice = confirm('当前已有常用语，点击"确定"覆盖，点击"取消"合并（追加到现有列表）');
+                mergeMode = choice ? 'replace' : 'merge';
+            }
+
+            let finalReplies;
+            if (mergeMode === 'replace') {
+                finalReplies = data.replies;
+            } else {
+                // 合并并去重
+                finalReplies = [...new Set([...currentReplies, ...data.replies])];
+            }
+
+            if (saveQuickRepliesData(finalReplies)) {
+                renderQuickRepliesList();
+                showToast(`导入成功，共${data.replies.length}条常用语`);
+            }
+
+        } catch (e) {
+            console.error('导入失败:', e);
+            showToast('导入失败：' + e.message);
+        }
+
+        // 清空文件选择
+        event.target.value = '';
+    };
+
+    reader.readAsText(file);
 }
 
 function loadUserInfo() {
@@ -1301,7 +2206,7 @@ function reloadCustomRoles() {
     const customKey = getCustomRolesKey();
     const custom = (JSON.parse(localStorage.getItem(customKey) || '[]')).filter(r => r && r.id);
     // 保留内置自制角色（id 1-8）
-    const builtinSelfMade = (typeof ROLES_DATA !== 'undefined' && Array.isArray(ROLES_DATA)) 
+    const builtinSelfMade = (typeof ROLES_DATA !== 'undefined' && Array.isArray(ROLES_DATA))
         ? [...ROLES_DATA].filter(r => r && r.id) : [];
     // 重建 ROLES_DATA（替换 IIFE 的结果）
     ROLES_DATA.length = 0;
@@ -1593,3 +2498,324 @@ function initImportCardEvents() {
     });
 }
 
+
+
+// ==================== Data Manager ====================
+
+// 打开数据管理
+function openDataManager() {
+    const modal = $('#dataManagerModal');
+    modal.classList.remove('hidden');
+    calculateStorageUsage();
+}
+
+// 关闭数据管理
+function closeDataManager() {
+    const modal = $('#dataManagerModal');
+    modal.classList.add('hidden');
+}
+
+// 计算存储空间使用情况
+function calculateStorageUsage() {
+    const user = getCurrentUser();
+    const dataTypes = [
+        { key: `ai_chat_state_${user}`, name: '聊天记录', icon: '💬' },
+        { key: `ai_custom_roles_${user}`, name: '自定义角色', icon: '✨' },
+        { key: `ai_chat_common_phrases_${user}`, name: '常用语', icon: '📝' },
+        { key: `user_behavior_${user}`, name: '行为数据', icon: '📊' },
+        { key: `ai_search_history_${user}`, name: '搜索历史', icon: '🔍' },
+        { key: `ai_recent_viewed_${user}`, name: '浏览记录', icon: '👁️' },
+        { key: `ai_chat_drafts_${user}`, name: '输入草稿', icon: '📄' },
+        { key: `ai_chat_input_history_${user}`, name: '输入历史', icon: '⌨️' },
+    ];
+
+    let totalSize = 0;
+    const details = [];
+
+    dataTypes.forEach(type => {
+        const value = localStorage.getItem(type.key);
+        const size = value ? new Blob([value]).size : 0;
+        totalSize += size;
+        if (size > 0) {
+            details.push({
+                name: type.name,
+                icon: type.icon,
+                size: size
+            });
+        }
+    });
+
+    // 探测实际可用的localStorage容量
+    const maxSize = detectLocalStorageLimit();
+    const percent = Math.min((totalSize / maxSize * 100), 100).toFixed(1);
+
+    // 更新进度条
+    $('#storageUsedBar').style.width = percent + '%';
+    $('#storageUsedText').textContent = `已使用 ${formatBytes(totalSize)} / ${formatBytes(maxSize)}`;
+    $('#storagePercent').textContent = percent + '%';
+
+    // 显示实际探测到的容量提示
+    if (maxSize >= 10 * 1024 * 1024) {
+        $('#storagePercent').title = '当前浏览器支持约10MB存储';
+    } else {
+        $('#storagePercent').title = '当前浏览器支持约5MB存储';
+    }
+
+    // 更新详细列表
+    const detailsContainer = $('#storageDetails');
+    if (details.length === 0) {
+        detailsContainer.innerHTML = '<div style="text-align:center;color:var(--text-secondary);padding:12px">暂无数据</div>';
+    } else {
+        detailsContainer.innerHTML = details
+            .sort((a, b) => b.size - a.size)
+            .map(d => `
+                <div class="storage-item">
+                    <span class="storage-item-name">${d.icon} ${d.name}</span>
+                    <span class="storage-item-size">${formatBytes(d.size)}</span>
+                </div>
+            `).join('');
+    }
+}
+
+// 格式化字节大小
+function formatBytes(bytes) {
+    if (bytes === 0) return '0 B';
+    const k = 1024;
+    const sizes = ['B', 'KB', 'MB'];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    return (bytes / Math.pow(k, i)).toFixed(i > 0 ? 1 : 0) + ' ' + sizes[i];
+}
+
+// 探测localStorage实际可用容量
+let _cachedStorageLimit = null;
+function detectLocalStorageLimit() {
+    // 使用缓存结果，避免重复探测
+    if (_cachedStorageLimit !== null) {
+        return _cachedStorageLimit;
+    }
+
+    try {
+        // 快速探测：尝试写入1MB数据
+        const testKey = '__storage_test__';
+        const oneMB = 1024 * 1024;
+        const testData = 'x'.repeat(oneMB);
+
+        // 尝试写入10次（10MB）
+        let maxSize = 5 * oneMB; // 默认5MB
+        for (let i = 1; i <= 10; i++) {
+            try {
+                localStorage.setItem(testKey, testData.repeat(i));
+                maxSize = i * oneMB;
+            } catch (e) {
+                // 写入失败，说明超出限制
+                break;
+            }
+        }
+
+        // 清理测试数据
+        localStorage.removeItem(testKey);
+
+        // 缓存结果
+        _cachedStorageLimit = maxSize;
+        return maxSize;
+
+    } catch (e) {
+        // 探测失败，返回保守值5MB
+        _cachedStorageLimit = 5 * 1024 * 1024;
+        return _cachedStorageLimit;
+    }
+}
+
+// 导出所有数据
+async function exportAllData() {
+    try {
+        const user = getCurrentUser();
+        const exportData = {
+            version: 2,
+            exportTime: new Date().toISOString(),
+            user: user,
+            data: {}
+        };
+
+        // 收集所有数据
+        const keys = [
+            `ai_chat_state_${user}`,
+            `ai_custom_roles_${user}`,
+            `ai_chat_common_phrases_${user}`,
+            `user_behavior_${user}`,
+            `ai_search_history_${user}`,
+            `ai_recent_viewed_${user}`,
+            `ai_chat_drafts_${user}`,
+            `ai_chat_input_history_${user}`,
+            `ai_chat_username_${user}`,
+            `ai_chat_userid_${user}`
+        ];
+
+        keys.forEach(key => {
+            const value = localStorage.getItem(key);
+            if (value) {
+                exportData.data[key] = value;
+            }
+        });
+
+        // IndexedDB 图片数据
+        if (typeof ImageStore !== 'undefined') {
+            try {
+                const images = await ImageStore.getAll();
+                if (images && images.length > 0) {
+                    exportData.images = images;
+                }
+            } catch (e) {
+                console.warn('导出图片数据失败:', e);
+            }
+        }
+
+        // 下载文件
+        const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: 'application/json' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `ai_chat_backup_${user}_${Date.now()}.json`;
+        a.click();
+        URL.revokeObjectURL(url);
+
+        alert('✅ 备份导出成功！\n\n文件包含：\n• 所有聊天记录\n• 自定义角色\n• 常用语\n• 行为数据\n• 其他设置');
+    } catch (e) {
+        console.error('导出失败:', e);
+        alert('❌ 导出失败：' + e.message);
+    }
+}
+
+// 导入所有数据
+function importAllData() {
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = '.json';
+    input.onchange = async (e) => {
+        const file = e.target.files[0];
+        if (!file) return;
+
+        try {
+            const text = await file.text();
+            const importData = JSON.parse(text);
+
+            // 验证格式
+            if (!importData.version || !importData.data) {
+                throw new Error('备份文件格式不正确');
+            }
+
+            // 确认导入
+            const confirmMsg = `确定要导入备份数据吗？\n\n备份信息：\n• 用户：${importData.user || '未知'}\n• 时间：${importData.exportTime ? new Date(importData.exportTime).toLocaleString() : '未知'}\n\n⚠️ 导入会覆盖当前数据！`;
+
+            if (!confirm(confirmMsg)) return;
+
+            // 导入 localStorage 数据
+            Object.keys(importData.data).forEach(key => {
+                localStorage.setItem(key, importData.data[key]);
+            });
+
+            // 导入 IndexedDB 图片
+            if (importData.images && typeof ImageStore !== 'undefined') {
+                try {
+                    for (const img of importData.images) {
+                        await ImageStore.save(img.id, img.data);
+                    }
+                } catch (e) {
+                    console.warn('导入图片数据失败:', e);
+                }
+            }
+
+            alert('✅ 数据导入成功！\n\n页面即将刷新以加载新数据...');
+            setTimeout(() => location.reload(), 1000);
+
+        } catch (e) {
+            console.error('导入失败:', e);
+            alert('❌ 导入失败：' + e.message);
+        }
+    };
+    input.click();
+}
+
+// 清除搜索历史
+function cleanSearchHistory() {
+    if (!confirm('确定要清除所有搜索历史吗？')) return;
+
+    try {
+        localStorage.removeItem(getSearchHistoryKey());
+        alert('✅ 搜索历史已清除');
+        calculateStorageUsage();
+    } catch (e) {
+        alert('❌ 清除失败：' + e.message);
+    }
+}
+
+// 清除浏览记录
+function cleanRecentViewed() {
+    if (!confirm('确定要清除所有浏览记录吗？')) return;
+
+    try {
+        localStorage.removeItem(getRecentViewedKey());
+        alert('✅ 浏览记录已清除');
+        calculateStorageUsage();
+    } catch (e) {
+        alert('❌ 清除失败：' + e.message);
+    }
+}
+
+// 清除输入草稿
+function cleanDrafts() {
+    if (!confirm('确定要清除所有输入草稿吗？')) return;
+
+    try {
+        localStorage.removeItem(getDraftKey());
+        alert('✅ 输入草稿已清除');
+        calculateStorageUsage();
+    } catch (e) {
+        alert('❌ 清除失败：' + e.message);
+    }
+}
+
+// 清除行为数据
+function cleanBehaviorData() {
+    if (!confirm('确定要清除所有行为数据吗？\n\n这将重置智能推荐功能。')) return;
+
+    try {
+        UserBehavior.clear();
+        alert('✅ 行为数据已清除');
+        calculateStorageUsage();
+        renderQuickFilters(); // 刷新chips
+    } catch (e) {
+        alert('❌ 清除失败：' + e.message);
+    }
+}
+
+// 清空所有数据
+function clearAllData() {
+    const confirmMsg = '⚠️ 警告：此操作将清空所有数据！\n\n包括：\n• 所有聊天记录\n• 自定义角色\n• 常用语\n• 行为数据\n• 所有设置\n\n此操作无法恢复，确定要继续吗？';
+
+    if (!confirm(confirmMsg)) return;
+
+    // 二次确认
+    const finalConfirm = prompt('请输入"确认清空"来继续：');
+    if (finalConfirm !== '确认清空') {
+        alert('❌ 已取消操作');
+        return;
+    }
+
+    try {
+        const user = getCurrentUser();
+        const keys = Object.keys(localStorage).filter(k => k.includes(user));
+        keys.forEach(k => localStorage.removeItem(k));
+
+        // 清除 IndexedDB
+        if (typeof ImageStore !== 'undefined') {
+            ImageStore.clear().catch(() => {});
+        }
+
+        alert('✅ 所有数据已清空\n\n页面即将刷新...');
+        setTimeout(() => location.reload(), 1000);
+
+    } catch (e) {
+        alert('❌ 清除失败：' + e.message);
+    }
+}
