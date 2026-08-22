@@ -173,6 +173,233 @@
                         </div>
                     </div>
                 </div>
+
+                <!-- 聊天设置侧边栏 -->
+                <div class="chat-settings-sidebar hidden" id="chatSettingsSidebar">
+                    <div class="chat-settings-overlay" id="chatSettingsOverlay"></div>
+                    <div class="chat-settings-panel">
+                        <div class="chat-settings-header">
+                            <div class="chat-settings-role">
+                                <img class="chat-settings-avatar" id="chatSettingsAvatar" src="" alt="">
+                                <span class="chat-settings-name" id="chatSettingsName"></span>
+                            </div>
+                            <button class="chat-settings-search-btn" id="chatSettingsSearchBtn">🔍</button>
+                        </div>
+
+                        <div class="chat-settings-body">
+                            <!-- 聊天设定 -->
+                            <div class="chat-settings-section">
+                                <div class="chat-settings-section-title">聊天设定</div>
+
+                                <div class="chat-settings-item" id="settingScenario">
+                                    <span class="setting-item-label">情景设定</span>
+                                    <span class="setting-item-arrow">→</span>
+                                </div>
+
+                                <div class="chat-settings-item" id="settingUserIdentity">
+                                    <span class="setting-item-label">用户身份</span>
+                                    <span class="setting-item-value" id="userIdentityValue">未设置</span>
+                                    <span class="setting-item-arrow">→</span>
+                                </div>
+
+                                <div class="chat-settings-item" id="settingChatTheme">
+                                    <span class="setting-item-label">聊天主题</span>
+                                    <span class="setting-item-arrow">→</span>
+                                </div>
+                            </div>
+
+                            <!-- 高级选项 -->
+                            <div class="chat-settings-section">
+                                <div class="chat-settings-section-title">
+                                    <span>高级选项</span>
+                                    <button class="section-toggle" id="advancedToggle">收起</button>
+                                </div>
+
+                                <div class="chat-settings-advanced" id="advancedSettings">
+                                    <div class="chat-settings-item" id="settingPromptTemplate">
+                                        <span class="setting-item-label">提示词模板</span>
+                                        <span class="setting-item-value">默认</span>
+                                        <span class="setting-item-arrow">→</span>
+                                    </div>
+
+                                    <div class="chat-settings-item" id="settingWorldbook">
+                                        <span class="setting-item-label">世界书</span>
+                                        <span class="setting-item-value" id="worldbookValue">未设置</span>
+                                        <span class="setting-item-arrow">→</span>
+                                    </div>
+
+                                    <div class="chat-settings-item" id="settingExport">
+                                        <span class="setting-item-label">导出聊天</span>
+                                        <span class="setting-item-arrow">→</span>
+                                    </div>
+
+                                    <div class="chat-settings-item" id="settingClearChat">
+                                        <span class="setting-item-label">清空记录</span>
+                                        <span class="setting-item-arrow">→</span>
+                                    </div>
+
+                                    <div class="chat-settings-item danger" id="settingDeleteChat">
+                                        <span class="setting-item-label">删除对话</span>
+                                        <span class="setting-item-arrow">→</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 情景设定面板 -->
+                <div class="chat-detail-panel hidden" id="scenarioPanel">
+                    <div class="chat-detail-header">
+                        <button class="back-btn" id="scenarioBackBtn">←</button>
+                        <h3>情景设定</h3>
+                    </div>
+                    <div class="chat-detail-body">
+                        <div class="setting-item">
+                            <label class="setting-label">当前情景</label>
+                            <textarea class="setting-textarea" id="scenarioInput" rows="6" placeholder="描述当前对话的场景、背景、氛围..."></textarea>
+                        </div>
+                        <div class="chat-detail-actions">
+                            <button class="btn-save" id="saveScenarioBtn">保存</button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 用户身份设定面板 -->
+                <div class="chat-detail-panel hidden" id="userIdentityPanel">
+                    <div class="chat-detail-header">
+                        <button class="back-btn" id="userIdentityBackBtn">←</button>
+                        <h3>用户身份</h3>
+                    </div>
+                    <div class="chat-detail-body">
+                        <div class="setting-item">
+                            <label class="setting-label">用户名称 <span class="hint-text">（角色卡中的 {{user}} 将被替换为此名称）</span></label>
+                            <input type="text" class="setting-input" id="userNameInput" placeholder="例如：小明、张三等">
+                        </div>
+                        <div class="setting-item">
+                            <label class="setting-label">用户身份描述 <span class="hint-text">（可选）</span></label>
+                            <textarea class="setting-textarea" id="userDescInput" rows="4" placeholder="描述你的外貌、性格、背景等..."></textarea>
+                        </div>
+                        <div class="chat-detail-actions">
+                            <button class="btn-save" id="saveUserIdentityBtn">保存</button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 面板背景遮罩 -->
+                <div class="panel-backdrop" id="panelBackdrop"></div>
+
+                <!-- 聊天主题设定面板 -->
+                <div class="chat-detail-panel hidden" id="chatThemePanel">
+                    <div class="chat-detail-header">
+                        <button class="back-btn" id="chatThemeBackBtn">←</button>
+                        <h3>聊天主题</h3>
+                    </div>
+                    <div class="chat-detail-body">
+                        <div class="setting-item">
+                            <label class="setting-label">背景类型</label>
+                            <select class="setting-select" id="bgTypeSelect">
+                                <option value="color">纯色背景</option>
+                                <option value="image">图片背景</option>
+                                <option value="role">角色卡图片</option>
+                            </select>
+                        </div>
+                        <div class="setting-item" id="bgColorSetting">
+                            <label class="setting-label">背景颜色</label>
+                            <input type="color" class="setting-color-input" id="bgColorInput" value="#1a1a2e">
+                        </div>
+                        <div class="setting-item hidden" id="bgImageSetting">
+                            <label class="setting-label">自定义图片</label>
+                            <button class="btn-upload" id="uploadBgBtn">选择图片</button>
+                            <input type="file" id="bgImageInput" accept="image/*" style="display:none">
+                        </div>
+                        <div class="setting-item">
+                            <label class="setting-label">气泡透明度 <span class="setting-value" id="bubbleOpacityValue">95%</span></label>
+                            <input type="range" class="setting-range" id="bubbleOpacityInput" min="50" max="100" value="95">
+                        </div>
+                        <div class="setting-item">
+                            <label class="setting-label">字体大小 <span class="setting-value" id="fontSizeValue">14px</span></label>
+                            <input type="range" class="setting-range" id="fontSizeInput" min="12" max="20" value="14">
+                        </div>
+                        <div class="chat-detail-actions">
+                            <button class="btn-cancel" id="resetChatThemeBtn">重置</button>
+                            <button class="btn-save" id="saveChatThemeBtn">保存</button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 世界书管理面板 -->
+                <div class="worldbook-manager-panel hidden" id="worldbookManagerPanel">
+                    <div class="worldbook-manager-header">
+                        <button class="back-btn" id="worldbookManagerBackBtn">←</button>
+                        <h3>世界书</h3>
+                    </div>
+                    <div class="worldbook-manager-body">
+                        <div class="worldbook-manager-title">
+                            <label class="setting-label">名称</label>
+                            <input type="text" class="setting-input" id="worldbookNameInput" placeholder="世界书名称">
+                        </div>
+                        <div class="worldbook-manager-controls">
+                            <div class="worldbook-search-box">
+                                <input type="text" class="worldbook-search-input" id="worldbookSearchInput" placeholder="搜索条目...">
+                                <span class="worldbook-search-icon">🔍</span>
+                            </div>
+                            <button class="btn-add-entry" id="addWorldbookEntryBtn">+ 添加条目</button>
+                        </div>
+                        <div class="worldbook-entries-list" id="worldbookEntriesList">
+                            <!-- 条目列表由 JS 动态生成 -->
+                        </div>
+                        <div class="worldbook-empty" id="worldbookEmpty">
+                            <div class="empty-icon">📖</div>
+                            <p>暂无世界书条目</p>
+                            <p class="empty-hint">点击"添加条目"创建第一个条目</p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 世界书条目编辑面板 -->
+                <div class="worldbook-entry-editor hidden" id="worldbookEntryEditor">
+                    <div class="worldbook-editor-header">
+                        <button class="back-btn" id="worldbookEditorBackBtn">←</button>
+                        <h3 id="worldbookEditorTitle">编辑条目</h3>
+                    </div>
+                    <div class="worldbook-editor-body">
+                        <div class="setting-item">
+                            <label class="setting-label">名称 <span class="required">*</span></label>
+                            <input type="text" class="setting-input" id="entryNameInput" placeholder="为条目命名">
+                        </div>
+                        <div class="setting-item">
+                            <label class="setting-label">关键词 <span class="hint-text">（多个关键词用逗号分隔，留空则常驻注入）</span></label>
+                            <input type="text" class="setting-input" id="entryKeysInput" placeholder="例如：城市,首都,王国">
+                        </div>
+                        <div class="setting-item">
+                            <label class="setting-label">内容 <span class="required">*</span></label>
+                            <textarea class="setting-textarea" id="entryContentInput" rows="8" placeholder="输入条目内容..."></textarea>
+                        </div>
+                        <div class="setting-item">
+                            <label class="setting-label">激活策略</label>
+                            <select class="setting-select" id="entryConstantSelect">
+                                <option value="false">关键词触发</option>
+                                <option value="true">常驻注入</option>
+                            </select>
+                        </div>
+                        <div class="setting-item">
+                            <label class="setting-label">优先级 <span class="hint-text">（数值越小越优先）</span></label>
+                            <input type="number" class="setting-input" id="entryOrderInput" value="100" min="0" max="999">
+                        </div>
+                        <div class="setting-item">
+                            <label class="setting-label">启用此条目</label>
+                            <label class="switch">
+                                <input type="checkbox" id="entryEnabledSwitch" checked>
+                                <span class="slider"></span>
+                            </label>
+                        </div>
+                        <div class="worldbook-editor-actions">
+                            <button class="btn-cancel" id="cancelEntryBtn">取消</button>
+                            <button class="btn-save" id="saveEntryBtn">保存</button>
+                        </div>
+                    </div>
+                </div>
             </section>
 
             <!-- 角色详情页 -->

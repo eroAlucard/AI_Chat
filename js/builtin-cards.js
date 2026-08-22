@@ -118,6 +118,26 @@ const BuiltinCards = (function() {
                 const hasFemaleTag = tags.some(t => t === 'Female' || t === 'female' || t === '女性' || t === '女性向');
                 const inferredGender = hasMaleTag ? 'male' : (hasFemaleTag ? 'female' : 'female');
                 
+                // 构建开场白数组（包含 first_mes 和 alternate_greetings）
+                const scenes = [];
+                if (meta.first_mes) {
+                    scenes.push({
+                        opener: meta.first_mes,
+                        preview: meta.first_mes.substring(0, 60) + (meta.first_mes.length > 60 ? '……' : '')
+                    });
+                }
+                // 添加备选开场白
+                if (meta.alternate_greetings && Array.isArray(meta.alternate_greetings)) {
+                    for (const greeting of meta.alternate_greetings) {
+                        if (greeting && greeting.trim()) {
+                            scenes.push({
+                                opener: greeting,
+                                preview: greeting.substring(0, 60) + (greeting.length > 60 ? '……' : '')
+                            });
+                        }
+                    }
+                }
+
                 const role = {
                     id: 'builtin_' + i,
                     name: meta.name,
@@ -131,15 +151,13 @@ const BuiltinCards = (function() {
                     image: `cards/${encodeURIComponent(meta.filename)}`,
                     gradient: getRandomGradient(),
                     systemPrompt: buildSystemPrompt(meta),
-                    scenes: meta.first_mes ? [{
-                        opener: meta.first_mes,
-                        preview: meta.first_mes.substring(0, 60) + (meta.first_mes.length > 60 ? '……' : '')
-                    }] : [],
+                    scenes: scenes,
                     isBuiltin: true,
                     _sourceFile: meta.filename,
                     sourceData: {
                         characterBook: meta.character_book || null,
                         postHistoryInstructions: meta.post_history_instructions || '',
+                        alternateGreetings: meta.alternate_greetings || [],
                     },
                 };
                 roles.push(role);

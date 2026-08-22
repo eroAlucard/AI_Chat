@@ -2242,6 +2242,21 @@ function loadCustomRoles() {
             ROLES_DATA.push(role);
         }
     });
+
+    // 加载世界书覆盖数据
+    const worldbookKey = getCurrentUser() ? `ai_worldbook_overrides_${getCurrentUser()}` : 'ai_worldbook_overrides';
+    try {
+        const worldbookOverrides = JSON.parse(localStorage.getItem(worldbookKey) || '{}');
+        ROLES_DATA.forEach(role => {
+            if (worldbookOverrides[role.id]) {
+                if (!role.sourceData) role.sourceData = {};
+                role.sourceData.characterBook = worldbookOverrides[role.id];
+            }
+        });
+    } catch (e) {
+        console.warn('Failed to load worldbook overrides:', e);
+    }
+
     // 异步从 IndexedDB 加载自定义角色图片
     if (typeof ImageStore !== 'undefined') {
         setTimeout(() => {

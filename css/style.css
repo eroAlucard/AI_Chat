@@ -474,9 +474,9 @@ body {
 .message-avatar-placeholder { width: 32px; height: 32px; border-radius: var(--radius-full); display: flex; align-items: center; justify-content: center; font-size: 16px; flex-shrink: 0; }
 .message.ai .message-avatar-placeholder { background: var(--accent-gradient); }
 .message.user .message-avatar-placeholder { background: var(--bg-card); border: 1px solid var(--border-light); }
-.message-bubble { padding: 10px 14px; padding-bottom: 28px; border-radius: var(--radius-lg); font-size: var(--font-md); line-height: 1.6; word-break: break-word; position: relative; }
-.message.ai .message-bubble { background: var(--bg-card); color: var(--text-primary); border-bottom-left-radius: 4px; }
-.message.user .message-bubble { background: var(--accent-gradient); color: white; border-bottom-right-radius: 4px; }
+.message-bubble { padding: 10px 14px; padding-bottom: 28px; border-radius: var(--radius-lg); font-size: inherit; line-height: 1.6; word-break: break-word; position: relative; }
+.message.ai .message-bubble { background: var(--bubble-ai-bg, var(--bg-card)); color: var(--text-primary); border-bottom-left-radius: 4px; }
+.message.user .message-bubble { background: var(--bubble-user-bg, var(--accent-gradient)); color: white; border-bottom-right-radius: 4px; }
 .message-time { font-size: var(--font-xs); color: var(--text-muted); margin-top: 4px; text-align: right; }
 .message.ai .message-time { text-align: left; }
 
@@ -851,9 +851,18 @@ body {
 
 /* ==================== Settings Panel ==================== */
 .settings-panel {
-    position: fixed; top: 0; left: 50%; transform: translateX(-50%);
-    width: 100%; max-width: 480px; height: 100%;
-    background: var(--bg-primary); z-index: 400; overflow-y: auto;
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: 100%;
+    max-width: 480px;
+    max-height: 85vh;
+    background: var(--bg-primary);
+    z-index: 400;
+    overflow-y: auto;
+    border-radius: var(--radius-lg);
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
 }
 .settings-panel.hidden { display: none; }
 .settings-header { display: flex; align-items: center; gap: 12px; padding: 14px 16px; background: var(--bg-secondary); border-bottom: 1px solid var(--border-color); position: sticky; top: 0; z-index: 1; }
@@ -861,6 +870,7 @@ body {
 .settings-body { padding: 20px 16px; display: flex; flex-direction: column; gap: 20px; }
 .setting-item { display: flex; flex-direction: column; gap: 8px; }
 .setting-label { font-size: var(--font-sm); color: var(--text-secondary); font-weight: 500; }
+.setting-label .hint-text { font-size: 12px; color: var(--text-muted); font-weight: 400; }
 .setting-input, .setting-textarea {
     padding: 10px 14px; background: var(--bg-input); border: 1px solid var(--border-color);
     border-radius: var(--radius-md); color: var(--text-primary); font-size: var(--font-md);
@@ -1775,9 +1785,9 @@ body {
     position: relative;
     background: var(--bg-primary);
     border-radius: var(--radius-lg);
-    width: 90%;
-    max-width: 700px;
-    max-height: 80vh;
+    width: 100%;
+    max-width: 480px;
+    max-height: 85vh;
     display: flex;
     flex-direction: column;
     box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
@@ -2189,3 +2199,756 @@ body {
 .clean-btn.danger:hover {
     background: rgba(239, 68, 68, 0.1);
 }
+
+/* ==================== 世界书管理器 ==================== */
+.worldbook-manager-panel {
+    position: fixed;
+    top: 0;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 100%;
+    max-width: 480px;
+    height: 100%;
+    bottom: 60px;
+    background: var(--bg-primary);
+    z-index: 900;
+    display: flex;
+    flex-direction: column;
+}
+
+.worldbook-manager-panel.hidden {
+    display: none;
+}
+
+.worldbook-manager-header {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 14px 16px;
+    background: var(--bg-secondary);
+    border-bottom: 1px solid var(--border-color);
+}
+
+.worldbook-manager-header h3 {
+    flex: 1;
+    font-size: 18px;
+    font-weight: 600;
+    color: var(--text-primary);
+    margin: 0;
+}
+
+.worldbook-manager-body {
+    flex: 1;
+    overflow-y: auto;
+    padding: 16px;
+}
+
+.worldbook-manager-title {
+    margin-bottom: 16px;
+}
+
+.worldbook-manager-controls {
+    display: flex;
+    gap: 12px;
+    margin-bottom: 16px;
+}
+
+.worldbook-search-box {
+    flex: 1;
+    position: relative;
+}
+
+.worldbook-search-input {
+    width: 100%;
+    padding: 10px 36px 10px 12px;
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-md);
+    color: var(--text-primary);
+    font-size: 14px;
+}
+
+.worldbook-search-icon {
+    position: absolute;
+    right: 12px;
+    top: 50%;
+    transform: translateY(-50%);
+    color: var(--text-muted);
+    pointer-events: none;
+}
+
+.btn-add-entry {
+    padding: 10px 16px;
+    background: var(--accent-purple);
+    color: white;
+    border: none;
+    border-radius: var(--radius-md);
+    font-size: 14px;
+    font-weight: 500;
+    cursor: pointer;
+    white-space: nowrap;
+}
+
+.btn-add-entry:hover {
+    background: var(--accent-purple-hover);
+}
+
+.worldbook-entries-list {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.worldbook-empty {
+    text-align: center;
+    padding: 60px 20px;
+    color: var(--text-muted);
+}
+
+.worldbook-empty .empty-icon {
+    font-size: 48px;
+    margin-bottom: 12px;
+    opacity: 0.5;
+}
+
+.worldbook-empty p {
+    margin: 8px 0;
+    font-size: 14px;
+}
+
+.worldbook-empty .empty-hint {
+    font-size: 12px;
+    opacity: 0.7;
+}
+
+.wb-manager-entry {
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-lg);
+    padding: 14px;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.wb-manager-entry:hover {
+    border-color: var(--accent-purple);
+    background: rgba(139, 92, 246, 0.05);
+}
+
+.wb-manager-entry.disabled {
+    opacity: 0.5;
+}
+
+.wb-manager-entry-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 8px;
+}
+
+.wb-manager-entry-left {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex: 1;
+    min-width: 0;
+}
+
+.wb-manager-entry-name {
+    font-weight: 500;
+    color: var(--text-primary);
+    font-size: 14px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.wb-manager-tag {
+    display: inline-block;
+    padding: 2px 8px;
+    border-radius: var(--radius-sm);
+    font-size: 11px;
+    font-weight: 500;
+}
+
+.wb-manager-tag.constant {
+    background: rgba(59, 130, 246, 0.15);
+    color: #60a5fa;
+}
+
+.wb-manager-tag.trigger {
+    background: rgba(168, 85, 247, 0.15);
+    color: #c084fc;
+}
+
+.wb-manager-entry-actions {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.wb-action-btn {
+    background: transparent;
+    border: none;
+    padding: 4px;
+    cursor: pointer;
+    font-size: 16px;
+    opacity: 0.7;
+    transition: opacity 0.2s;
+}
+
+.wb-action-btn:hover {
+    opacity: 1;
+}
+
+.wb-toggle {
+    position: relative;
+    display: inline-block;
+    width: 40px;
+    height: 22px;
+}
+
+.wb-toggle-switch {
+    opacity: 0;
+    width: 0;
+    height: 0;
+}
+
+.wb-toggle-slider {
+    position: absolute;
+    cursor: pointer;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background-color: rgba(255, 255, 255, 0.1);
+    border-radius: 22px;
+    transition: 0.2s;
+}
+
+.wb-toggle-slider:before {
+    position: absolute;
+    content: "";
+    height: 16px;
+    width: 16px;
+    left: 3px;
+    bottom: 3px;
+    background-color: white;
+    border-radius: 50%;
+    transition: 0.2s;
+}
+
+.wb-toggle-switch:checked + .wb-toggle-slider {
+    background-color: var(--accent-purple);
+}
+
+.wb-toggle-switch:checked + .wb-toggle-slider:before {
+    transform: translateX(18px);
+}
+
+.wb-manager-keys {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin-bottom: 8px;
+}
+
+.wb-key-tag {
+    display: inline-block;
+    padding: 3px 8px;
+    background: rgba(139, 92, 246, 0.15);
+    color: var(--accent-purple);
+    border-radius: var(--radius-sm);
+    font-size: 12px;
+}
+
+.wb-manager-content {
+    color: var(--text-secondary);
+    font-size: 13px;
+    line-height: 1.5;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+}
+
+/* ==================== 世界书条目编辑器 ==================== */
+.worldbook-entry-editor {
+    position: fixed;
+    top: 0;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 100%;
+    max-width: 480px;
+    height: 100%;
+    bottom: 60px;
+    background: var(--bg-primary);
+    z-index: 950;
+    display: flex;
+    flex-direction: column;
+}
+
+.worldbook-entry-editor.hidden {
+    display: none;
+}
+
+.worldbook-editor-header {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 14px 16px;
+    background: var(--bg-secondary);
+    border-bottom: 1px solid var(--border-color);
+}
+
+.worldbook-editor-header h3 {
+    flex: 1;
+    font-size: 18px;
+    font-weight: 600;
+    color: var(--text-primary);
+    margin: 0;
+}
+
+.worldbook-editor-body {
+    flex: 1;
+    overflow-y: auto;
+    padding: 16px;
+}
+
+.setting-item {
+    margin-bottom: 20px;
+}
+
+.setting-label {
+    display: block;
+    color: var(--text-primary);
+    font-size: 14px;
+    font-weight: 500;
+    margin-bottom: 8px;
+}
+
+.required {
+    color: #ef4444;
+}
+
+.hint-text {
+    color: var(--text-muted);
+    font-size: 12px;
+    font-weight: 400;
+}
+
+.setting-input,
+.setting-textarea,
+.setting-select {
+    width: 100%;
+    padding: 10px 12px;
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-md);
+    color: var(--text-primary);
+    font-size: 14px;
+    font-family: inherit;
+}
+
+.setting-textarea {
+    resize: vertical;
+    min-height: 100px;
+}
+
+.setting-select {
+    cursor: pointer;
+}
+
+.switch {
+    position: relative;
+    display: inline-block;
+    width: 50px;
+    height: 28px;
+}
+
+.switch input {
+    opacity: 0;
+    width: 0;
+    height: 0;
+}
+
+.slider {
+    position: absolute;
+    cursor: pointer;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background-color: rgba(255, 255, 255, 0.1);
+    border-radius: 28px;
+    transition: 0.2s;
+}
+
+.slider:before {
+    position: absolute;
+    content: "";
+    height: 20px;
+    width: 20px;
+    left: 4px;
+    bottom: 4px;
+    background-color: white;
+    border-radius: 50%;
+    transition: 0.2s;
+}
+
+input:checked + .slider {
+    background-color: var(--accent-purple);
+}
+
+input:checked + .slider:before {
+    transform: translateX(22px);
+}
+
+.worldbook-editor-actions {
+    display: flex;
+    gap: 12px;
+    margin-top: 24px;
+    padding-top: 16px;
+    border-top: 1px solid var(--border-color);
+}
+
+.btn-cancel,
+.btn-save {
+    flex: 1;
+    padding: 12px 24px;
+    border: none;
+    border-radius: var(--radius-md);
+    font-size: 14px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.btn-cancel {
+    background: var(--bg-secondary);
+    color: var(--text-primary);
+    border: 1px solid var(--border-color);
+}
+
+.btn-cancel:hover {
+    background: rgba(255, 255, 255, 0.05);
+}
+
+.btn-save {
+    background: var(--accent-purple);
+    color: white;
+}
+
+.btn-save:hover {
+    background: var(--accent-purple-hover);
+}
+
+/* ==================== 聊天设置侧边栏 ==================== */
+.chat-settings-sidebar {
+    position: fixed;
+    top: 0;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 100%;
+    max-width: 480px;
+    height: 100%;
+    z-index: 1000;
+    pointer-events: none;
+}
+
+.chat-settings-sidebar.hidden {
+    display: none;
+}
+
+.chat-settings-sidebar.active {
+    pointer-events: all;
+}
+
+.chat-settings-overlay {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.5);
+    opacity: 0;
+    transition: opacity 0.3s;
+}
+
+.chat-settings-sidebar.active .chat-settings-overlay {
+    opacity: 1;
+}
+
+.chat-settings-panel {
+    position: absolute;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    width: 80%;
+    max-width: 320px;
+    background: var(--bg-primary);
+    transform: translateX(100%);
+    transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    display: flex;
+    flex-direction: column;
+    box-shadow: -4px 0 12px rgba(0, 0, 0, 0.3);
+}
+
+.chat-settings-sidebar.active .chat-settings-panel {
+    transform: translateX(0);
+}
+
+.chat-settings-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 16px;
+    background: var(--bg-secondary);
+    border-bottom: 1px solid var(--border-color);
+}
+
+.chat-settings-role {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    flex: 1;
+    min-width: 0;
+}
+
+.chat-settings-avatar {
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    object-fit: cover;
+}
+
+.chat-settings-name {
+    font-size: 16px;
+    font-weight: 600;
+    color: var(--text-primary);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.chat-settings-search-btn {
+    background: transparent;
+    border: none;
+    font-size: 20px;
+    padding: 8px;
+    cursor: pointer;
+    opacity: 0.7;
+    transition: opacity 0.2s;
+}
+
+.chat-settings-search-btn:hover {
+    opacity: 1;
+}
+
+.chat-settings-body {
+    flex: 1;
+    overflow-y: auto;
+    padding: 8px 0;
+}
+
+.chat-settings-section {
+    padding: 8px 0;
+}
+
+.chat-settings-section + .chat-settings-section {
+    border-top: 1px solid var(--border-color);
+}
+
+.chat-settings-section-title {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 12px 16px 8px;
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.section-toggle {
+    background: transparent;
+    border: none;
+    color: var(--accent-purple);
+    font-size: 12px;
+    padding: 4px 8px;
+    cursor: pointer;
+    border-radius: var(--radius-sm);
+    transition: background 0.2s;
+}
+
+.section-toggle:hover {
+    background: rgba(139, 92, 246, 0.1);
+}
+
+.chat-settings-advanced {
+    transition: max-height 0.3s, opacity 0.3s;
+    overflow: hidden;
+}
+
+.chat-settings-advanced.collapsed {
+    max-height: 0;
+    opacity: 0;
+}
+
+.chat-settings-item {
+    display: flex;
+    align-items: center;
+    padding: 14px 16px;
+    cursor: pointer;
+    transition: background 0.2s;
+}
+
+.chat-settings-item:hover {
+    background: rgba(255, 255, 255, 0.03);
+}
+
+.chat-settings-item.danger {
+    color: #ef4444;
+}
+
+.chat-settings-item.danger:hover {
+    background: rgba(239, 68, 68, 0.1);
+}
+
+.setting-item-label {
+    flex: 1;
+    font-size: 14px;
+    color: var(--text-primary);
+}
+
+.chat-settings-item.danger .setting-item-label {
+    color: #ef4444;
+}
+
+.setting-item-value {
+    font-size: 13px;
+    color: var(--text-muted);
+    margin-right: 8px;
+    max-width: 120px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.setting-item-arrow {
+    color: var(--text-muted);
+    font-size: 14px;
+}
+
+/* ==================== 聊天详情面板 ==================== */
+.chat-detail-panel {
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: 100%;
+    max-width: 480px;
+    max-height: 85vh;
+    background: rgba(26, 26, 46, 0.98);
+    backdrop-filter: blur(10px);
+    z-index: 1100;
+    display: flex;
+    flex-direction: column;
+    border-radius: var(--radius-lg);
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+    overflow: hidden;
+}
+
+.chat-detail-panel.hidden {
+    display: none;
+}
+
+.chat-detail-header {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 14px 16px;
+    background: var(--bg-secondary);
+    border-bottom: 1px solid var(--border-color);
+}
+
+.chat-detail-header h3 {
+    flex: 1;
+    font-size: 18px;
+    font-weight: 600;
+    color: var(--text-primary);
+    margin: 0;
+}
+
+.chat-detail-body {
+    flex: 1;
+    overflow-y: auto;
+    padding: 16px;
+}
+
+.chat-detail-actions {
+    display: flex;
+    gap: 12px;
+    margin-top: 24px;
+    padding-top: 16px;
+    border-top: 1px solid var(--border-color);
+}
+
+.setting-color-input {
+    width: 100%;
+    height: 50px;
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-md);
+    background: var(--bg-secondary);
+    cursor: pointer;
+}
+
+.btn-upload {
+    width: 100%;
+    padding: 10px 16px;
+    background: var(--bg-secondary);
+    color: var(--text-primary);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-md);
+    font-size: 14px;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.btn-upload:hover {
+    background: rgba(255, 255, 255, 0.05);
+    border-color: var(--accent-purple);
+}
+
+/* 聊天消息背景 */
+.chat-messages {
+    position: relative;
+    font-size: 14px; /* 默认字体大小 */
+}
+
+/* 背景图片 */
+.chat-messages.has-bg-image {
+    background-size: cover !important;
+    background-position: center !important;
+    background-repeat: no-repeat !important;
+}
+
+/* 面板背景遮罩 */
+.panel-backdrop {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.5);
+    backdrop-filter: blur(8px);
+    z-index: 1099;
+    display: none;
+}
+
+.panel-backdrop.active {
+    display: block;
+}
+

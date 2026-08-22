@@ -174,6 +174,12 @@ function initChatView() {
     initBatchDelete();
     initInputHistory(); // 初始化输入历史
     initCommonPhrases(); // 初始化常用语
+    initWorldbookManager(); // 初始化世界书管理器
+    initWorldbookEntryEditor(); // 初始化世界书条目编辑器
+    initChatSettingsSidebar(); // 初始化聊天设置侧边栏
+    initScenarioPanel(); // 初始化情景设定
+    initUserIdentityPanel(); // 初始化用户身份
+    initChatThemePanel(); // 初始化聊天主题
     const backBtn = $('#chatBackBtn');
     const sendBtn = $('#sendBtn');
     const chatInput = $('#chatInput');
@@ -207,12 +213,7 @@ function initChatView() {
     // 聊天菜单按钮
     menuBtn.addEventListener('click', (e) => {
         e.stopPropagation();
-        toggleChatMenu();
-    });
-
-    // 点击其他地方关闭菜单
-    document.addEventListener('click', () => {
-        closeChatMenu();
+        openChatSettingsSidebar();
     });
 }
 
@@ -280,6 +281,9 @@ function showChatView(roleId) {
     // 渲染消息
     renderMessages(roleId);
 
+    // 应用聊天主题
+    applyChatTheme();
+
     // 优化：如果同一角色的后台流式请求还在跑，显示"正在生成回复…"提示
     // 必须在 renderMessages 之后调用，否则会被 innerHTML 清空
     if (currentStreamAbort && currentStreamRoleId === roleId) {
@@ -316,6 +320,12 @@ function showChatView(roleId) {
 }
 
 function getWelcomeMessage(role) {
+    // 优先使用角色卡中的开场白（first_mes）
+    if (role.scenes && role.scenes.length > 0 && role.scenes[0].opener) {
+        return role.scenes[0].opener;
+    }
+
+    // 降级方案：硬编码的默认欢迎消息
     const welcomes = {
         "凌朔": "……你来了？有什么事就说吧。",
         "苏娅": "嗨～今天过得怎么样？有什么想聊的吗？😊",
@@ -1229,14 +1239,24 @@ function hideTypingIndicator() {
 async function callLMApi(role, messages, useStream = true) {
     const { apiUrl, modelName, temperature, maxTokens, systemPrompt } = AppState.settings;
 
+    // 获取会话中的用户名设置
+    const session = AppState.chatSessions[AppState.currentChat];
+    const userName = (session && session.userName) || '用户';
+
     let baseSystem = systemPrompt || role.systemPrompt;
+
+    // 替换系统提示词中的模板变量
+    if (typeof CardParser !== 'undefined' && CardParser.replaceTemplateVars) {
+        baseSystem = CardParser.replaceTemplateVars(baseSystem, role.name, userName);
+    }
+
     // 统一人称规则 + 性别强调：角色必须始终保持设定性别，用对应性别的第三人称描写内心活动
     const roleGender = role.gender || (role.tags && (
         role.tags.includes('Male') || role.tags.includes('male') || role.tags.includes('男性') || role.tags.includes('男性向') ? 'male' : 'female'
     ));
     const gender = roleGender === 'male' ? '男性' : '女性';
     const pronoun = roleGender === 'male' ? '他' : '她';
-    const personRule = `【性别规则】你是${gender}角色（${role.name}），请始终以${gender}身份、${gender}口吻回应，保持性别特征一致。无论对话进行多少轮，你都必须保持这个性别，绝不能混淆或切换性别。描写自己的身体时必须使用${gender}的性器官和身体特征。用户是第一人称"我"。\n\n【人称规则】叙述描写时用第三人称（${pronoun}/${role.name}），不用"我"。例如不要写"我忍不住心跳加速"，而写"${pronoun}忍不住心跳加速"。对话台词中角色可以用"我"自称。\n\n`;
+    const personRule = `【性别规则】你是${gender}角色（${role.name}），请始终以${gender}身份、${gender}口吻回应，保持性别特征一致。无论对话进行多少轮，你都必须保持这个性别，绝不能混淆或切换性别。描写自己的身体时必须使用${gender}的性器官和身体特征。${userName}是第一人称"我"。\n\n【人称规则】叙述描写时用第三人称（${pronoun}/${role.name}），不用"我"。例如不要写"我忍不住心跳加速"，而写"${pronoun}忍不住心跳加速"。对话台词中角色可以用"我"自称。\n\n`;
 
     // === 色情描写规则（所有角色通用）===
     let eroticRule = `【色情描写规则】
@@ -1317,7 +1337,7 @@ async function callLMApi(role, messages, useStream = true) {
             .sort((a, b) => (a.insertion_order || 100) - (b.insertion_order || 100));
         
         for (const entry of triggeredEntries) {
-            const replaced = CardParser.replaceTemplateVars(entry.content, role.name, '用户');
+            const replaced = CardParser.replaceTemplateVars(entry.content, role.name, userName);
             worldBookInjection += replaced + '\n\n';
         }
         
@@ -2072,44 +2092,102 @@ function updateChatBadge() {
     }
 }
 
-// ==================== Chat Menu & Message Actions ====================
-function toggleChatMenu() {
-    const existing = document.querySelector('.chat-menu-dropdown');
-    if (existing) {
-        existing.remove();
+// ==================== Chat Settings Sidebar ====================
+function openChatSettingsSidebar() {
+    if (!AppState.currentChat) return;
+
+    const role = ROLES_DATA.find(r => String(r.id) === String(AppState.currentChat));
+    if (!role) return;
+
+    const sidebar = $('#chatSettingsSidebar');
+    sidebar.classList.remove('hidden');
+    setTimeout(() => sidebar.classList.add('active'), 10);
+
+    // 填充角色信息
+    $('#chatSettingsAvatar').src = role.image || '';
+    $('#chatSettingsName').textContent = role.name || '';
+
+    // 更新用户身份显示
+    updateUserIdentityDisplay();
+
+    // 更新世界书显示
+    updateWorldbookDisplay();
+}
+
+function closeChatSettingsSidebar() {
+    const sidebar = $('#chatSettingsSidebar');
+    sidebar.classList.remove('active');
+    setTimeout(() => sidebar.classList.add('hidden'), 300);
+}
+
+function updateUserIdentityDisplay() {
+    const session = AppState.chatSessions[AppState.currentChat];
+    const userName = (session && session.userName) || '';
+    $('#userIdentityValue').textContent = userName || '未设置';
+}
+
+function updateWorldbookDisplay() {
+    const role = ROLES_DATA.find(r => String(r.id) === String(AppState.currentChat));
+    if (!role || !role.sourceData || !role.sourceData.characterBook) {
+        $('#worldbookValue').textContent = '未设置';
         return;
     }
-    const chatView = $('#chatView');
-    const header = chatView.querySelector('.chat-header');
-    header.style.position = 'relative';
-    const menu = document.createElement('div');
-    menu.className = 'chat-menu-dropdown';
-    menu.innerHTML = `
-        <button class="chat-menu-item danger" id="menuDeleteChat">🗑️ 删除此对话</button>
-        <button class="chat-menu-item" id="menuDeleteAll">🧹 清空聊天记录</button>
-        <button class="chat-menu-item" id="menuExportChat">📤 导出聊天记录</button>
-        <button class="chat-menu-item" id="menuPromptTemplate">⚙️ 提示词模板</button>
-    `;
-    header.appendChild(menu);
 
-    // 删除此对话（整个会话）
-    menu.querySelector('#menuDeleteChat').addEventListener('click', () => {
-        if (!AppState.currentChat) return;
-        const roleId = AppState.currentChat;
-        if (confirm('确定删除此对话？删除后无法恢复。')) {
-            delete AppState.chatSessions[roleId];
-            AppState.currentChat = null;
-            saveState();
-            closeChatMenu();
-            $('#chatMessages').innerHTML = '';
-            showChatListView();
-            renderChatList();
-            updateChatBadge();
-        }
+    const entries = role.sourceData.characterBook.entries || [];
+    const enabledCount = entries.filter(e => e.enabled !== false).length;
+    $('#worldbookValue').textContent = `${enabledCount}/${entries.length} 条`;
+}
+
+// 初始化聊天设置侧边栏事件
+function initChatSettingsSidebar() {
+    const overlay = $('#chatSettingsOverlay');
+    const advancedToggle = $('#advancedToggle');
+    const advancedSettings = $('#advancedSettings');
+
+    // 点击遮罩层关闭
+    overlay.addEventListener('click', closeChatSettingsSidebar);
+
+    // 高级选项折叠
+    advancedToggle.addEventListener('click', () => {
+        advancedSettings.classList.toggle('collapsed');
+        advancedToggle.textContent = advancedSettings.classList.contains('collapsed') ? '展开' : '收起';
     });
 
-    // 清空聊天记录
-    menu.querySelector('#menuDeleteAll').addEventListener('click', () => {
+    // 情景设定
+    $('#settingScenario').addEventListener('click', () => {
+        openScenarioPanel();
+    });
+
+    // 用户身份
+    $('#settingUserIdentity').addEventListener('click', () => {
+        openUserIdentityPanel();
+    });
+
+    // 聊天主题
+    $('#settingChatTheme').addEventListener('click', () => {
+        openChatThemePanel();
+    });
+
+    // 提示词模板
+    $('#settingPromptTemplate').addEventListener('click', () => {
+        closeChatSettingsSidebar();
+        openPromptTemplateModal();
+    });
+
+    // 世界书
+    $('#settingWorldbook').addEventListener('click', () => {
+        closeChatSettingsSidebar();
+        openWorldbookManager();
+    });
+
+    // 导出聊天
+    $('#settingExport').addEventListener('click', () => {
+        closeChatSettingsSidebar();
+        exportChatHistory();
+    });
+
+    // 清空记录
+    $('#settingClearChat').addEventListener('click', () => {
         if (!AppState.currentChat) return;
         const session = AppState.chatSessions[AppState.currentChat];
         if (session && confirm('确定清空所有聊天记录？')) {
@@ -2118,21 +2196,37 @@ function toggleChatMenu() {
             saveState();
             renderMessages(AppState.currentChat);
             renderChatList();
-            closeChatMenu();
+            closeChatSettingsSidebar();
+            showToast('聊天记录已清空');
         }
     });
 
-    // 导出聊天记录
-    menu.querySelector('#menuExportChat').addEventListener('click', () => {
-        exportChatHistory();
-        closeChatMenu();
+    // 删除对话
+    $('#settingDeleteChat').addEventListener('click', () => {
+        if (!AppState.currentChat) return;
+        const roleId = AppState.currentChat;
+        if (confirm('确定删除此对话？删除后无法恢复。')) {
+            delete AppState.chatSessions[roleId];
+            AppState.currentChat = null;
+            saveState();
+            closeChatSettingsSidebar();
+            $('#chatMessages').innerHTML = '';
+            showChatListView();
+            renderChatList();
+            updateChatBadge();
+            showToast('对话已删除');
+        }
     });
+}
 
-    // 提示词模板设置
-    menu.querySelector('#menuPromptTemplate').addEventListener('click', () => {
-        openPromptTemplateModal();
-        closeChatMenu();
-    });
+// ==================== 旧的菜单函数（保留以防万一）====================
+function toggleChatMenu() {
+    const existing = document.querySelector('.chat-menu-dropdown');
+    if (existing) {
+        existing.remove();
+        return;
+    }
+    openChatSettingsSidebar();
 }
 
 function closeChatMenu() {
@@ -2969,5 +3063,655 @@ function initCommonPhrases() {
         addCommonPhrase(text);
         newPhraseInput.value = '';
         renderCommonPhrasesList();
+    });
+}
+
+// ==================== Worldbook Manager ====================
+let currentEditingEntryIndex = null;
+
+function openWorldbookManager() {
+    if (!AppState.currentChat) return;
+
+    const role = ROLES_DATA.find(r => String(r.id) === String(AppState.currentChat));
+    if (!role) return;
+
+    // 确保角色有世界书数据结构
+    if (!role.sourceData) role.sourceData = {};
+    if (!role.sourceData.characterBook) {
+        role.sourceData.characterBook = {
+            name: `${role.name}的世界书`,
+            entries: []
+        };
+    }
+
+    const managerPanel = $('#worldbookManagerPanel');
+    const chatView = $('#chatView');
+
+    // 填充世界书名称
+    $('#worldbookNameInput').value = role.sourceData.characterBook.name || `${role.name}的世界书`;
+
+    // 渲染条目列表
+    renderWorldbookEntriesList(role);
+
+    chatView.classList.add('hidden');
+    managerPanel.classList.remove('hidden');
+}
+
+function closeWorldbookManager() {
+    const managerPanel = $('#worldbookManagerPanel');
+    const chatView = $('#chatView');
+
+    managerPanel.classList.add('hidden');
+    chatView.classList.remove('hidden');
+
+    // 清空搜索框
+    $('#worldbookSearchInput').value = '';
+}
+
+function renderWorldbookEntriesList(role) {
+    const container = $('#worldbookEntriesList');
+    const emptyEl = $('#worldbookEmpty');
+    const searchInput = $('#worldbookSearchInput');
+
+    if (!role.sourceData || !role.sourceData.characterBook || !role.sourceData.characterBook.entries) {
+        container.innerHTML = '';
+        emptyEl.classList.remove('hidden');
+        return;
+    }
+
+    const entries = role.sourceData.characterBook.entries;
+    const searchTerm = searchInput.value.toLowerCase();
+
+    // 过滤搜索
+    const filteredEntries = entries.filter(entry => {
+        if (!searchTerm) return true;
+        const name = (entry.name || '').toLowerCase();
+        const content = (entry.content || '').toLowerCase();
+        const keys = (entry.keys || []).join(',').toLowerCase();
+        return name.includes(searchTerm) || content.includes(searchTerm) || keys.includes(searchTerm);
+    });
+
+    if (filteredEntries.length === 0) {
+        container.innerHTML = '';
+        emptyEl.classList.remove('hidden');
+        return;
+    }
+
+    emptyEl.classList.add('hidden');
+
+    let html = '';
+    filteredEntries.forEach((entry, idx) => {
+        const originalIdx = entries.indexOf(entry);
+        const isEnabled = entry.enabled !== false;
+        const isConstant = entry.constant === true || (!entry.keys || entry.keys.length === 0);
+        const keys = (entry.keys || []).filter(k => k.trim());
+        const contentPreview = (entry.content || '').substring(0, 100).replace(/\n/g, ' ');
+        const name = entry.name || `条目 ${originalIdx + 1}`;
+
+        html += `
+            <div class="wb-manager-entry ${isEnabled ? '' : 'disabled'}" data-idx="${originalIdx}">
+                <div class="wb-manager-entry-header">
+                    <div class="wb-manager-entry-left">
+                        <span class="wb-manager-entry-name">${name}</span>
+                        <span class="wb-manager-tag ${isConstant ? 'constant' : 'trigger'}">${isConstant ? '常驻' : '触发'}</span>
+                    </div>
+                    <div class="wb-manager-entry-actions">
+                        <button class="wb-action-btn edit" data-idx="${originalIdx}" title="编辑">✏️</button>
+                        <button class="wb-action-btn copy" data-idx="${originalIdx}" title="复制">📋</button>
+                        <button class="wb-action-btn delete" data-idx="${originalIdx}" title="删除">🗑️</button>
+                        <label class="wb-toggle">
+                            <input type="checkbox" class="wb-toggle-switch" data-idx="${originalIdx}" ${isEnabled ? 'checked' : ''}>
+                            <span class="wb-toggle-slider"></span>
+                        </label>
+                    </div>
+                </div>
+                ${keys.length > 0 ? `<div class="wb-manager-keys">${keys.map(k => `<span class="wb-key-tag">${k}</span>`).join('')}</div>` : ''}
+                <div class="wb-manager-content">${contentPreview}</div>
+            </div>
+        `;
+    });
+
+    container.innerHTML = html;
+
+    // 绑定事件
+    attachWorldbookEntryEvents();
+}
+
+function attachWorldbookEntryEvents() {
+    // 编辑按钮
+    $$('.wb-action-btn.edit').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            const idx = parseInt(btn.dataset.idx);
+            openWorldbookEntryEditor(idx);
+        });
+    });
+
+    // 复制按钮
+    $$('.wb-action-btn.copy').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            const idx = parseInt(btn.dataset.idx);
+            copyWorldbookEntry(idx);
+        });
+    });
+
+    // 删除按钮
+    $$('.wb-action-btn.delete').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            const idx = parseInt(btn.dataset.idx);
+            deleteWorldbookEntry(idx);
+        });
+    });
+
+    // 启用/禁用开关
+    $$('.wb-toggle-switch').forEach(toggle => {
+        toggle.addEventListener('change', (e) => {
+            const idx = parseInt(toggle.dataset.idx);
+            toggleWorldbookEntry(idx, toggle.checked);
+        });
+    });
+
+    // 点击条目打开编辑
+    $$('.wb-manager-entry').forEach(entry => {
+        entry.addEventListener('click', (e) => {
+            // 如果点击的是按钮或开关，不触发
+            if (e.target.closest('.wb-manager-entry-actions')) return;
+            const idx = parseInt(entry.dataset.idx);
+            openWorldbookEntryEditor(idx);
+        });
+    });
+}
+
+function openWorldbookEntryEditor(entryIdx = null) {
+    currentEditingEntryIndex = entryIdx;
+
+    const role = ROLES_DATA.find(r => String(r.id) === String(AppState.currentChat));
+    if (!role) return;
+
+    const editorPanel = $('#worldbookEntryEditor');
+    const managerPanel = $('#worldbookManagerPanel');
+    const title = $('#worldbookEditorTitle');
+
+    // 清空表单
+    $('#entryNameInput').value = '';
+    $('#entryKeysInput').value = '';
+    $('#entryContentInput').value = '';
+    $('#entryConstantSelect').value = 'false';
+    $('#entryOrderInput').value = '100';
+    $('#entryEnabledSwitch').checked = true;
+
+    if (entryIdx !== null) {
+        // 编辑模式
+        title.textContent = '编辑条目';
+        const entry = role.sourceData.characterBook.entries[entryIdx];
+        if (entry) {
+            $('#entryNameInput').value = entry.name || '';
+            $('#entryKeysInput').value = (entry.keys || []).join(', ');
+            $('#entryContentInput').value = entry.content || '';
+            $('#entryConstantSelect').value = entry.constant === true ? 'true' : 'false';
+            $('#entryOrderInput').value = entry.insertion_order || entry.priority || 100;
+            $('#entryEnabledSwitch').checked = entry.enabled !== false;
+        }
+    } else {
+        // 新建模式
+        title.textContent = '新建条目';
+    }
+
+    managerPanel.classList.add('hidden');
+    editorPanel.classList.remove('hidden');
+}
+
+function closeWorldbookEntryEditor() {
+    const editorPanel = $('#worldbookEntryEditor');
+    const managerPanel = $('#worldbookManagerPanel');
+
+    editorPanel.classList.add('hidden');
+    managerPanel.classList.remove('hidden');
+
+    currentEditingEntryIndex = null;
+}
+
+function saveWorldbookEntry() {
+    const role = ROLES_DATA.find(r => String(r.id) === String(AppState.currentChat));
+    if (!role) return;
+
+    const name = $('#entryNameInput').value.trim();
+    const keysStr = $('#entryKeysInput').value.trim();
+    const content = $('#entryContentInput').value.trim();
+    const constant = $('#entryConstantSelect').value === 'true';
+    const insertionOrder = parseInt($('#entryOrderInput').value) || 100;
+    const enabled = $('#entryEnabledSwitch').checked;
+
+    if (!name) {
+        showToast('请输入条目名称');
+        return;
+    }
+
+    if (!content) {
+        showToast('请输入条目内容');
+        return;
+    }
+
+    const keys = keysStr ? keysStr.split(',').map(k => k.trim()).filter(k => k) : [];
+
+    const entry = {
+        name: name,
+        keys: keys,
+        content: content,
+        constant: constant,
+        insertion_order: insertionOrder,
+        enabled: enabled
+    };
+
+    if (currentEditingEntryIndex !== null) {
+        // 更新现有条目
+        role.sourceData.characterBook.entries[currentEditingEntryIndex] = entry;
+    } else {
+        // 添加新条目
+        if (!role.sourceData.characterBook.entries) {
+            role.sourceData.characterBook.entries = [];
+        }
+        role.sourceData.characterBook.entries.push(entry);
+    }
+
+    // 保存到 localStorage
+    saveRolesData();
+
+    showToast(currentEditingEntryIndex !== null ? '条目已更新' : '条目已添加');
+    closeWorldbookEntryEditor();
+    renderWorldbookEntriesList(role);
+}
+
+function copyWorldbookEntry(idx) {
+    const role = ROLES_DATA.find(r => String(r.id) === String(AppState.currentChat));
+    if (!role) return;
+
+    const entry = role.sourceData.characterBook.entries[idx];
+    if (!entry) return;
+
+    const newEntry = JSON.parse(JSON.stringify(entry));
+    newEntry.name = `${newEntry.name} (副本)`;
+
+    role.sourceData.characterBook.entries.push(newEntry);
+    saveRolesData();
+
+    showToast('条目已复制');
+    renderWorldbookEntriesList(role);
+}
+
+function deleteWorldbookEntry(idx) {
+    const role = ROLES_DATA.find(r => String(r.id) === String(AppState.currentChat));
+    if (!role) return;
+
+    if (!confirm('确定删除这个条目吗？')) return;
+
+    role.sourceData.characterBook.entries.splice(idx, 1);
+    saveRolesData();
+
+    showToast('条目已删除');
+    renderWorldbookEntriesList(role);
+}
+
+function toggleWorldbookEntry(idx, enabled) {
+    const role = ROLES_DATA.find(r => String(r.id) === String(AppState.currentChat));
+    if (!role) return;
+
+    const entry = role.sourceData.characterBook.entries[idx];
+    if (!entry) return;
+
+    entry.enabled = enabled;
+    saveRolesData();
+
+    showToast(enabled ? '条目已启用' : '条目已禁用');
+}
+
+function saveRolesData() {
+    // 保存角色数据到 localStorage
+    // 只保存自定义角色和带有 sourceData 的内置角色的修改
+    const customRolesKey = getCurrentUser() ? `ai_custom_roles_${getCurrentUser()}` : 'ai_custom_roles';
+    const customRoles = ROLES_DATA.filter(r => r.isCustom);
+
+    try {
+        localStorage.setItem(customRolesKey, JSON.stringify(customRoles));
+
+        // 对于内置角色的世界书修改，我们需要单独保存
+        const worldbookOverrides = {};
+        ROLES_DATA.forEach(role => {
+            if (!role.isCustom && role.sourceData && role.sourceData.characterBook) {
+                worldbookOverrides[role.id] = role.sourceData.characterBook;
+            }
+        });
+
+        const worldbookKey = getCurrentUser() ? `ai_worldbook_overrides_${getCurrentUser()}` : 'ai_worldbook_overrides';
+        localStorage.setItem(worldbookKey, JSON.stringify(worldbookOverrides));
+    } catch (e) {
+        console.error('Failed to save roles data:', e);
+        showToast('保存失败：存储空间不足');
+    }
+}
+
+// 初始化世界书管理器事件
+function initWorldbookManager() {
+    const backBtn = $('#worldbookManagerBackBtn');
+    const addBtn = $('#addWorldbookEntryBtn');
+    const searchInput = $('#worldbookSearchInput');
+    const nameInput = $('#worldbookNameInput');
+
+    backBtn.addEventListener('click', () => {
+        // 保存世界书名称
+        const role = ROLES_DATA.find(r => String(r.id) === String(AppState.currentChat));
+        if (role && role.sourceData && role.sourceData.characterBook) {
+            role.sourceData.characterBook.name = nameInput.value.trim();
+            saveRolesData();
+        }
+        closeWorldbookManager();
+    });
+
+    addBtn.addEventListener('click', () => {
+        openWorldbookEntryEditor(null);
+    });
+
+    searchInput.addEventListener('input', () => {
+        const role = ROLES_DATA.find(r => String(r.id) === String(AppState.currentChat));
+        if (role) renderWorldbookEntriesList(role);
+    });
+}
+
+// 初始化世界书条目编辑器事件
+function initWorldbookEntryEditor() {
+    const backBtn = $('#worldbookEditorBackBtn');
+    const saveBtn = $('#saveEntryBtn');
+    const cancelBtn = $('#cancelEntryBtn');
+
+    backBtn.addEventListener('click', closeWorldbookEntryEditor);
+    cancelBtn.addEventListener('click', closeWorldbookEntryEditor);
+    saveBtn.addEventListener('click', saveWorldbookEntry);
+}
+
+// ==================== Scenario Panel ====================
+function openScenarioPanel() {
+    const panel = $('#scenarioPanel');
+    const sidebar = $('#chatSettingsSidebar');
+    const backdrop = $('#panelBackdrop');
+
+    // 加载当前情景
+    const session = AppState.chatSessions[AppState.currentChat];
+    $('#scenarioInput').value = (session && session.scenario) || '';
+
+    backdrop.classList.add('active');
+    sidebar.classList.add('hidden');
+    panel.classList.remove('hidden');
+}
+
+function closeScenarioPanel() {
+    const panel = $('#scenarioPanel');
+    const sidebar = $('#chatSettingsSidebar');
+    const backdrop = $('#panelBackdrop');
+
+    backdrop.classList.remove('active');
+    panel.classList.add('hidden');
+    sidebar.classList.remove('hidden');
+}
+
+function initScenarioPanel() {
+    const backBtn = $('#scenarioBackBtn');
+    const saveBtn = $('#saveScenarioBtn');
+    const backdrop = $('#panelBackdrop');
+
+    backBtn.addEventListener('click', closeScenarioPanel);
+    backdrop.addEventListener('click', () => {
+        const panel = $('#scenarioPanel');
+        if (!panel.classList.contains('hidden')) {
+            closeScenarioPanel();
+        }
+    });
+
+    saveBtn.addEventListener('click', () => {
+        if (!AppState.currentChat) return;
+
+        const session = AppState.chatSessions[AppState.currentChat];
+        if (!session) return;
+
+        session.scenario = $('#scenarioInput').value.trim();
+        saveState();
+
+        showToast('情景设定已保存');
+        closeScenarioPanel();
+    });
+}
+
+// ==================== User Identity Panel ====================
+function openUserIdentityPanel() {
+    const panel = $('#userIdentityPanel');
+    const sidebar = $('#chatSettingsSidebar');
+    const backdrop = $('#panelBackdrop');
+
+    // 加载当前用户身份
+    const session = AppState.chatSessions[AppState.currentChat];
+    $('#userNameInput').value = (session && session.userName) || '';
+    $('#userDescInput').value = (session && session.userDesc) || '';
+
+    backdrop.classList.add('active');
+    sidebar.classList.add('hidden');
+    panel.classList.remove('hidden');
+}
+
+function closeUserIdentityPanel() {
+    const panel = $('#userIdentityPanel');
+    const sidebar = $('#chatSettingsSidebar');
+    const backdrop = $('#panelBackdrop');
+
+    backdrop.classList.remove('active');
+    panel.classList.add('hidden');
+    sidebar.classList.remove('hidden');
+}
+
+function initUserIdentityPanel() {
+    const backBtn = $('#userIdentityBackBtn');
+    const saveBtn = $('#saveUserIdentityBtn');
+    const backdrop = $('#panelBackdrop');
+
+    backBtn.addEventListener('click', closeUserIdentityPanel);
+    backdrop.addEventListener('click', () => {
+        const panel = $('#userIdentityPanel');
+        if (!panel.classList.contains('hidden')) {
+            closeUserIdentityPanel();
+        }
+    });
+
+    saveBtn.addEventListener('click', () => {
+        if (!AppState.currentChat) return;
+
+        const session = AppState.chatSessions[AppState.currentChat];
+        if (!session) return;
+
+        session.userName = $('#userNameInput').value.trim();
+        session.userDesc = $('#userDescInput').value.trim();
+        saveState();
+
+        updateUserIdentityDisplay();
+        showToast('用户身份已保存');
+        closeUserIdentityPanel();
+    });
+}
+
+// ==================== Chat Theme Panel ====================
+function openChatThemePanel() {
+    const panel = $('#chatThemePanel');
+    const sidebar = $('#chatSettingsSidebar');
+
+    // 加载当前主题设置
+    const session = AppState.chatSessions[AppState.currentChat];
+    const theme = (session && session.chatTheme) || {
+        bgType: 'color',
+        bgColor: '#1a1a2e',
+        bubbleOpacity: 95,
+        fontSize: 14
+    };
+
+    $('#bgTypeSelect').value = theme.bgType || 'color';
+    $('#bgColorInput').value = theme.bgColor || '#1a1a2e';
+    $('#bubbleOpacityInput').value = theme.bubbleOpacity || 95;
+    $('#fontSizeInput').value = theme.fontSize || 14;
+
+    updateThemePreview();
+    handleBgTypeChange();
+
+    const backdrop = $('#panelBackdrop');
+    backdrop.classList.add('active');
+    sidebar.classList.add('hidden');
+    panel.classList.remove('hidden');
+}
+
+function closeChatThemePanel() {
+    const panel = $('#chatThemePanel');
+    const sidebar = $('#chatSettingsSidebar');
+    const backdrop = $('#panelBackdrop');
+
+    backdrop.classList.remove('active');
+    panel.classList.add('hidden');
+    sidebar.classList.remove('hidden');
+}
+
+function handleBgTypeChange() {
+    const bgType = $('#bgTypeSelect').value;
+    const colorSetting = $('#bgColorSetting');
+    const imageSetting = $('#bgImageSetting');
+
+    if (bgType === 'color') {
+        colorSetting.classList.remove('hidden');
+        imageSetting.classList.add('hidden');
+    } else if (bgType === 'image') {
+        colorSetting.classList.add('hidden');
+        imageSetting.classList.remove('hidden');
+    } else if (bgType === 'role') {
+        colorSetting.classList.add('hidden');
+        imageSetting.classList.add('hidden');
+    }
+}
+
+function updateThemePreview() {
+    $('#bubbleOpacityValue').textContent = $('#bubbleOpacityInput').value + '%';
+    $('#fontSizeValue').textContent = $('#fontSizeInput').value + 'px';
+}
+
+function applyChatTheme() {
+    if (!AppState.currentChat) return;
+
+    const session = AppState.chatSessions[AppState.currentChat];
+    const theme = (session && session.chatTheme) || {};
+    const chatMessages = $('#chatMessages');
+
+    // 重置样式
+    chatMessages.style.backgroundImage = '';
+    chatMessages.style.backgroundColor = '';
+    chatMessages.style.fontSize = '';
+    chatMessages.style.removeProperty('--bubble-ai-bg');
+    chatMessages.style.removeProperty('--bubble-user-bg');
+
+    if (theme.bgType === 'color') {
+        chatMessages.style.backgroundColor = theme.bgColor || '#1a1a2e';
+        chatMessages.classList.remove('has-bg-image');
+    } else if (theme.bgType === 'image' && theme.bgImage) {
+        chatMessages.style.backgroundImage = `url(${theme.bgImage})`;
+        chatMessages.classList.add('has-bg-image');
+    } else if (theme.bgType === 'role') {
+        const role = ROLES_DATA.find(r => String(r.id) === String(AppState.currentChat));
+        if (role && role.image) {
+            chatMessages.style.backgroundImage = `url(${role.image})`;
+            chatMessages.classList.add('has-bg-image');
+        }
+    }
+
+    if (theme.fontSize) {
+        chatMessages.style.fontSize = theme.fontSize + 'px';
+    }
+
+    // 应用气泡透明度
+    if (theme.bubbleOpacity !== undefined) {
+        const opacity = theme.bubbleOpacity / 100;
+        chatMessages.style.setProperty('--bubble-ai-bg', `rgba(42, 42, 62, ${opacity})`);
+        chatMessages.style.setProperty('--bubble-user-bg', `linear-gradient(135deg, rgba(139, 92, 246, ${opacity}), rgba(59, 130, 246, ${opacity}))`);
+    }
+}
+
+function initChatThemePanel() {
+    const backBtn = $('#chatThemeBackBtn');
+    const saveBtn = $('#saveChatThemeBtn');
+    const resetBtn = $('#resetChatThemeBtn');
+    const bgTypeSelect = $('#bgTypeSelect');
+    const bubbleOpacityInput = $('#bubbleOpacityInput');
+    const fontSizeInput = $('#fontSizeInput');
+    const uploadBgBtn = $('#uploadBgBtn');
+    const bgImageInput = $('#bgImageInput');
+    const backdrop = $('#panelBackdrop');
+
+    backBtn.addEventListener('click', closeChatThemePanel);
+
+    // 点击背景遮罩关闭面板
+    backdrop.addEventListener('click', () => {
+        const panel = $('#chatThemePanel');
+        if (!panel.classList.contains('hidden')) {
+            closeChatThemePanel();
+        }
+    });
+
+    bgTypeSelect.addEventListener('change', handleBgTypeChange);
+
+    bubbleOpacityInput.addEventListener('input', updateThemePreview);
+    fontSizeInput.addEventListener('input', updateThemePreview);
+
+    uploadBgBtn.addEventListener('click', () => {
+        bgImageInput.click();
+    });
+
+    bgImageInput.addEventListener('change', (e) => {
+        const file = e.target.files[0];
+        if (!file) return;
+
+        const reader = new FileReader();
+        reader.onload = (evt) => {
+            // 临时保存图片数据
+            bgImageInput.dataset.imageData = evt.target.result;
+            showToast('图片已选择，点击保存后生效');
+        };
+        reader.readAsDataURL(file);
+    });
+
+    saveBtn.addEventListener('click', () => {
+        if (!AppState.currentChat) return;
+
+        const session = AppState.chatSessions[AppState.currentChat];
+        if (!session) return;
+
+        session.chatTheme = {
+            bgType: $('#bgTypeSelect').value,
+            bgColor: $('#bgColorInput').value,
+            bubbleOpacity: parseInt($('#bubbleOpacityInput').value),
+            fontSize: parseInt($('#fontSizeInput').value),
+            bgImage: bgImageInput.dataset.imageData || (session.chatTheme && session.chatTheme.bgImage)
+        };
+
+        saveState();
+        applyChatTheme();
+
+        showToast('主题已保存');
+        closeChatThemePanel();
+    });
+
+    resetBtn.addEventListener('click', () => {
+        if (!AppState.currentChat) return;
+
+        const session = AppState.chatSessions[AppState.currentChat];
+        if (session) {
+            session.chatTheme = null;
+            saveState();
+            applyChatTheme();
+        }
+
+        showToast('主题已重置');
+        closeChatThemePanel();
     });
 }
