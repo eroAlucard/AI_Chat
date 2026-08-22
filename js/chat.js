@@ -180,6 +180,9 @@ function initChatView() {
     initScenarioPanel(); // 初始化情景设定
     initUserIdentityPanel(); // 初始化用户身份
     initChatThemePanel(); // 初始化聊天主题
+    initPromptTemplatePanel(); // 初始化提示词模板
+    initExportChatPanel(); // 初始化导出聊天
+    initPanelBackdrop(); // 初始化背景遮罩
     initSwipeBackGestures(); // 初始化手势返回
     const backBtn = $('#chatBackBtn');
     const sendBtn = $('#sendBtn');
@@ -261,6 +264,17 @@ function showChatView(roleId) {
 
     $('#chatListView').style.display = 'none';
     $('#chatView').classList.remove('hidden');
+
+    // 隐藏搜索框（从首页搜索进入聊天时）
+    const searchBar = $('#searchBar');
+    if (searchBar && !searchBar.classList.contains('hidden')) {
+        searchBar.classList.add('hidden');
+        const searchInput = $('#searchInput');
+        const searchClearBtn = $('#searchClearBtn');
+        if (searchInput) searchInput.value = '';
+        if (searchClearBtn) searchClearBtn.classList.add('hidden');
+        if (typeof AppState !== 'undefined') AppState.searchQuery = '';
+    }
 
     // 设置角色信息
     $('#chatRoleName').textContent = role.name;
@@ -2208,6 +2222,11 @@ function initChatSettingsSidebar() {
         openPromptTemplateModal();
     });
 
+    // 提示词模板
+    $('#settingPromptTemplate').addEventListener('click', () => {
+        openPromptTemplatePanel();
+    });
+
     // 世界书
     $('#settingWorldbook').addEventListener('click', () => {
         closeChatSettingsSidebar();
@@ -2216,8 +2235,7 @@ function initChatSettingsSidebar() {
 
     // 导出聊天
     $('#settingExport').addEventListener('click', () => {
-        closeChatSettingsSidebar();
-        exportChatHistory();
+        openExportChatPanel();
     });
 
     // 清空记录
@@ -2230,7 +2248,6 @@ function initChatSettingsSidebar() {
             saveState();
             renderMessages(AppState.currentChat);
             renderChatList();
-            closeChatSettingsSidebar();
             showToast('聊天记录已清空');
         }
     });
@@ -2269,76 +2286,72 @@ function closeChatMenu() {
 }
 
 // ==================== Prompt Template System ====================
-function openPromptTemplateModal() {
-    const modal = document.createElement('div');
-    modal.className = 'prompt-template-modal';
-    modal.innerHTML = `
-        <div class="prompt-template-overlay"></div>
-        <div class="prompt-template-panel">
-            <div class="prompt-template-header">
-                <h3>提示词模板设置</h3>
-                <button class="close-btn" onclick="closePromptTemplateModal()">×</button>
-            </div>
-            <div class="prompt-template-content">
-                <div class="template-info">
-                    <p>提示词模板用于控制消息的格式化方式。使用 <code>{{user}}</code> 表示用户消息，<code>{{char}}</code> 表示角色名称。</p>
-                </div>
+function openPromptTemplatePanel() {
+    const panel = $('#promptTemplatePanel');
+    const backdrop = $('#panelBackdrop');
+    const sidebar = $('#chatSettingsSidebar');
 
-                <div class="template-selector">
-                    <label>模板类型：</label>
-                    <select id="templateTypeSelect" onchange="onTemplateTypeChange()">
-                        <option value="default">默认格式</option>
-                        <option value="alpaca">Alpaca 格式</option>
-                        <option value="chatml">ChatML 格式</option>
-                        <option value="vicuna">Vicuna 格式</option>
-                        <option value="custom">自定义格式</option>
-                    </select>
-                </div>
-
-                <div class="template-editor" id="templateEditor">
-                    <label>用户消息模板：</label>
-                    <textarea id="userTemplate" placeholder="例如：### Instruction:\n{{user}}\n\n"></textarea>
-
-                    <label>助手消息模板：</label>
-                    <textarea id="assistantTemplate" placeholder="例如：### Response:\n{{assistant}}\n\n"></textarea>
-
-                    <label>系统消息模板：</label>
-                    <textarea id="systemTemplate" placeholder="例如：### System:\n{{system}}\n\n"></textarea>
-                </div>
-
-                <div class="template-preview">
-                    <label>预览：</label>
-                    <pre id="templatePreview"></pre>
-                </div>
-            </div>
-            <div class="prompt-template-actions">
-                <button class="btn-secondary" onclick="closePromptTemplateModal()">取消</button>
-                <button class="btn-primary" onclick="savePromptTemplate()">保存</button>
-            </div>
-        </div>
-    `;
-    document.body.appendChild(modal);
+    // 隐藏 sidebar 的 overlay，用 backdrop 替代
+    sidebar.classList.add('detail-open');
+    backdrop.classList.add('active');
+    panel.classList.remove('hidden');
 
     // 加载当前模板设置
     loadCurrentTemplate();
 }
 
-function closePromptTemplateModal() {
-    const modal = $('.prompt-template-modal');
-    if (modal) modal.remove();
+function closePromptTemplatePanel() {
+    const panel = $('#promptTemplatePanel');
+    const backdrop = $('#panelBackdrop');
+    const sidebar = $('#chatSettingsSidebar');
+
+    backdrop.classList.remove('active');
+    panel.classList.add('hidden');
+    sidebar.classList.remove('detail-open');
+
+    // 确保设置面板保持打开状态
+    if (!sidebar.classList.contains('active')) {
+        openChatSettingsSidebar();
+    }
+}
+
+function initPromptTemplatePanel() {
+    const backBtn = $('#promptTemplateBackBtn');
+    const saveBtn = $('#savePromptTemplateBtn');
+    const typeSelect = $('#templateTypeSelect');
+
+    if (backBtn) {
+        backBtn.addEventListener('click', closePromptTemplatePanel);
+    }
+
+    if (saveBtn) {
+        saveBtn.addEventListener('click', savePromptTemplate);
+    }
+
+    if (typeSelect) {
+        typeSelect.addEventListener('change', onTemplateTypeChange);
+    }
+
+    // 监听模板输入变化，实时更新预览
+    ['userTemplate', 'assistantTemplate', 'systemTemplate'].forEach(id => {
+        const el = $(`#${id}`);
+        if (el) {
+            el.addEventListener('input', updateTemplatePreview);
+        }
+    });
 }
 
 function onTemplateTypeChange() {
     const type = $('#templateTypeSelect').value;
-    const editor = $('#templateEditor');
+    const editorSection = $('#templateEditorSection');
     const userTemplate = $('#userTemplate');
     const assistantTemplate = $('#assistantTemplate');
     const systemTemplate = $('#systemTemplate');
 
     if (type === 'custom') {
-        editor.style.display = 'block';
+        editorSection.style.display = 'block';
     } else {
-        editor.style.display = 'none';
+        editorSection.style.display = 'none';
 
         // 设置预定义模板
         const templates = getTemplatePresets();
@@ -2381,13 +2394,15 @@ function getTemplatePresets() {
 function loadCurrentTemplate() {
     const settings = AppState.settings.promptTemplate || { type: 'default' };
     const select = $('#templateTypeSelect');
+    if (!select) return;
+
     select.value = settings.type || 'default';
 
     if (settings.type === 'custom' && settings.custom) {
         $('#userTemplate').value = settings.custom.user || '';
         $('#assistantTemplate').value = settings.custom.assistant || '';
         $('#systemTemplate').value = settings.custom.system || '';
-        $('#templateEditor').style.display = 'block';
+        $('#templateEditorSection').style.display = 'block';
     } else {
         onTemplateTypeChange();
     }
@@ -2430,7 +2445,7 @@ function savePromptTemplate() {
 
     saveState();
     showToast('提示词模板已保存');
-    closePromptTemplateModal();
+    closePromptTemplatePanel();
 }
 
 function applyPromptTemplate(messages) {
@@ -2459,7 +2474,7 @@ function applyPromptTemplate(messages) {
 }
 
 // ==================== Export Chat History ====================
-function exportChatHistory() {
+function openExportChatPanel() {
     const session = AppState.chatSessions[AppState.currentChat];
     if (!session || !session.messages.length) {
         showToast('没有可导出的聊天记录');
@@ -2469,47 +2484,42 @@ function exportChatHistory() {
     const role = ROLES_DATA.find(r => String(r.id) === String(AppState.currentChat));
     if (!role) return;
 
-    // 创建导出选项模态框
-    const modal = document.createElement('div');
-    modal.className = 'export-modal';
-    modal.innerHTML = `
-        <div class="export-overlay" onclick="closeExportModal()"></div>
-        <div class="export-panel">
-            <div class="export-header">
-                <h3>导出聊天记录</h3>
-                <button class="close-btn" onclick="closeExportModal()">×</button>
-            </div>
-            <div class="export-content">
-                <label>导出格式：</label>
-                <select id="exportFormat">
-                    <option value="txt">纯文本 (.txt)</option>
-                    <option value="json">JSON (.json)</option>
-                    <option value="markdown">Markdown (.md)</option>
-                    <option value="html">HTML (.html)</option>
-                </select>
+    const panel = $('#exportChatPanel');
+    const backdrop = $('#panelBackdrop');
+    const sidebar = $('#chatSettingsSidebar');
 
-                <label style="margin-top: 16px;">
-                    <input type="checkbox" id="includeReasoning" checked>
-                    包含思考过程
-                </label>
-
-                <label style="margin-top: 8px;">
-                    <input type="checkbox" id="includeTimestamp" checked>
-                    包含时间戳
-                </label>
-            </div>
-            <div class="export-actions">
-                <button class="btn-secondary" onclick="closeExportModal()">取消</button>
-                <button class="btn-primary" onclick="confirmExport()">导出</button>
-            </div>
-        </div>
-    `;
-    document.body.appendChild(modal);
+    // 隐藏 sidebar 的 overlay，用 backdrop 替代
+    sidebar.classList.add('detail-open');
+    backdrop.classList.add('active');
+    panel.classList.remove('hidden');
 }
 
-function closeExportModal() {
-    const modal = $('.export-modal');
-    if (modal) modal.remove();
+function closeExportChatPanel() {
+    const panel = $('#exportChatPanel');
+    const backdrop = $('#panelBackdrop');
+    const sidebar = $('#chatSettingsSidebar');
+
+    backdrop.classList.remove('active');
+    panel.classList.add('hidden');
+    sidebar.classList.remove('detail-open');
+
+    // 确保设置面板保持打开状态
+    if (!sidebar.classList.contains('active')) {
+        openChatSettingsSidebar();
+    }
+}
+
+function initExportChatPanel() {
+    const backBtn = $('#exportChatBackBtn');
+    const confirmBtn = $('#confirmExportBtn');
+
+    if (backBtn) {
+        backBtn.addEventListener('click', closeExportChatPanel);
+    }
+
+    if (confirmBtn) {
+        confirmBtn.addEventListener('click', confirmExport);
+    }
 }
 
 function confirmExport() {
@@ -2554,7 +2564,7 @@ function confirmExport() {
     URL.revokeObjectURL(url);
 
     showToast('聊天记录已导出');
-    closeExportModal();
+    closeExportChatPanel();
 }
 
 function exportAsTxt(session, role, includeReasoning, includeTimestamp) {
@@ -3145,6 +3155,9 @@ function closeWorldbookManager() {
 
     // 清空搜索框
     $('#worldbookSearchInput').value = '';
+
+    // 返回设置面板
+    openChatSettingsSidebar();
 }
 
 function renderWorldbookEntriesList(role) {
@@ -3469,43 +3482,69 @@ function initWorldbookEntryEditor() {
     saveBtn.addEventListener('click', saveWorldbookEntry);
 }
 
+// ==================== Panel Backdrop ====================
+function initPanelBackdrop() {
+    const backdrop = $('#panelBackdrop');
+    if (!backdrop) return;
+
+    backdrop.addEventListener('click', () => {
+        // 检查哪个面板是打开的，并关闭它
+        const scenarioPanel = $('#scenarioPanel');
+        const userIdentityPanel = $('#userIdentityPanel');
+        const chatThemePanel = $('#chatThemePanel');
+        const promptTemplatePanel = $('#promptTemplatePanel');
+        const exportChatPanel = $('#exportChatPanel');
+
+        if (scenarioPanel && !scenarioPanel.classList.contains('hidden')) {
+            closeScenarioPanel();
+        } else if (userIdentityPanel && !userIdentityPanel.classList.contains('hidden')) {
+            closeUserIdentityPanel();
+        } else if (chatThemePanel && !chatThemePanel.classList.contains('hidden')) {
+            closeChatThemePanel();
+        } else if (promptTemplatePanel && !promptTemplatePanel.classList.contains('hidden')) {
+            closePromptTemplatePanel();
+        } else if (exportChatPanel && !exportChatPanel.classList.contains('hidden')) {
+            closeExportChatPanel();
+        }
+    });
+}
+
 // ==================== Scenario Panel ====================
 function openScenarioPanel() {
     const panel = $('#scenarioPanel');
-    const sidebar = $('#chatSettingsSidebar');
     const backdrop = $('#panelBackdrop');
+    const sidebar = $('#chatSettingsSidebar');
 
     // 加载当前情景
     const session = AppState.chatSessions[AppState.currentChat];
     $('#scenarioInput').value = (session && session.scenario) || '';
 
+    // 隐藏 sidebar 的 overlay，用 backdrop 替代
+    sidebar.classList.add('detail-open');
     backdrop.classList.add('active');
-    sidebar.classList.add('hidden');
     panel.classList.remove('hidden');
 }
 
 function closeScenarioPanel() {
     const panel = $('#scenarioPanel');
-    const sidebar = $('#chatSettingsSidebar');
     const backdrop = $('#panelBackdrop');
+    const sidebar = $('#chatSettingsSidebar');
 
     backdrop.classList.remove('active');
     panel.classList.add('hidden');
-    sidebar.classList.remove('hidden');
+    sidebar.classList.remove('detail-open');
+
+    // 确保设置面板保持打开状态
+    if (!sidebar.classList.contains('active')) {
+        openChatSettingsSidebar();
+    }
 }
 
 function initScenarioPanel() {
     const backBtn = $('#scenarioBackBtn');
     const saveBtn = $('#saveScenarioBtn');
-    const backdrop = $('#panelBackdrop');
 
     backBtn.addEventListener('click', closeScenarioPanel);
-    backdrop.addEventListener('click', () => {
-        const panel = $('#scenarioPanel');
-        if (!panel.classList.contains('hidden')) {
-            closeScenarioPanel();
-        }
-    });
 
     saveBtn.addEventListener('click', () => {
         if (!AppState.currentChat) return;
@@ -3524,41 +3563,40 @@ function initScenarioPanel() {
 // ==================== User Identity Panel ====================
 function openUserIdentityPanel() {
     const panel = $('#userIdentityPanel');
-    const sidebar = $('#chatSettingsSidebar');
     const backdrop = $('#panelBackdrop');
+    const sidebar = $('#chatSettingsSidebar');
 
     // 加载当前用户身份
     const session = AppState.chatSessions[AppState.currentChat];
     $('#userNameInput').value = (session && session.userName) || '';
     $('#userDescInput').value = (session && session.userDesc) || '';
 
+    // 隐藏 sidebar 的 overlay，用 backdrop 替代
+    sidebar.classList.add('detail-open');
     backdrop.classList.add('active');
-    sidebar.classList.add('hidden');
     panel.classList.remove('hidden');
 }
 
 function closeUserIdentityPanel() {
     const panel = $('#userIdentityPanel');
-    const sidebar = $('#chatSettingsSidebar');
     const backdrop = $('#panelBackdrop');
+    const sidebar = $('#chatSettingsSidebar');
 
     backdrop.classList.remove('active');
     panel.classList.add('hidden');
-    sidebar.classList.remove('hidden');
+    sidebar.classList.remove('detail-open');
+
+    // 确保设置面板保持打开状态
+    if (!sidebar.classList.contains('active')) {
+        openChatSettingsSidebar();
+    }
 }
 
 function initUserIdentityPanel() {
     const backBtn = $('#userIdentityBackBtn');
     const saveBtn = $('#saveUserIdentityBtn');
-    const backdrop = $('#panelBackdrop');
 
     backBtn.addEventListener('click', closeUserIdentityPanel);
-    backdrop.addEventListener('click', () => {
-        const panel = $('#userIdentityPanel');
-        if (!panel.classList.contains('hidden')) {
-            closeUserIdentityPanel();
-        }
-    });
 
     saveBtn.addEventListener('click', () => {
         if (!AppState.currentChat) return;
@@ -3579,6 +3617,7 @@ function initUserIdentityPanel() {
 // ==================== Chat Theme Panel ====================
 function openChatThemePanel() {
     const panel = $('#chatThemePanel');
+    const backdrop = $('#panelBackdrop');
     const sidebar = $('#chatSettingsSidebar');
 
     // 加载当前主题设置
@@ -3598,20 +3637,25 @@ function openChatThemePanel() {
     updateThemePreview();
     handleBgTypeChange();
 
-    const backdrop = $('#panelBackdrop');
+    // 隐藏 sidebar 的 overlay，用 backdrop 替代
+    sidebar.classList.add('detail-open');
     backdrop.classList.add('active');
-    sidebar.classList.add('hidden');
     panel.classList.remove('hidden');
 }
 
 function closeChatThemePanel() {
     const panel = $('#chatThemePanel');
-    const sidebar = $('#chatSettingsSidebar');
     const backdrop = $('#panelBackdrop');
+    const sidebar = $('#chatSettingsSidebar');
 
     backdrop.classList.remove('active');
     panel.classList.add('hidden');
-    sidebar.classList.remove('hidden');
+    sidebar.classList.remove('detail-open');
+
+    // 确保设置面板保持打开状态
+    if (!sidebar.classList.contains('active')) {
+        openChatSettingsSidebar();
+    }
 }
 
 function handleBgTypeChange() {
@@ -3690,17 +3734,8 @@ function initChatThemePanel() {
     const fontSizeInput = $('#fontSizeInput');
     const uploadBgBtn = $('#uploadBgBtn');
     const bgImageInput = $('#bgImageInput');
-    const backdrop = $('#panelBackdrop');
 
     backBtn.addEventListener('click', closeChatThemePanel);
-
-    // 点击背景遮罩关闭面板
-    backdrop.addEventListener('click', () => {
-        const panel = $('#chatThemePanel');
-        if (!panel.classList.contains('hidden')) {
-            closeChatThemePanel();
-        }
-    });
 
     bgTypeSelect.addEventListener('change', handleBgTypeChange);
 
@@ -3934,6 +3969,18 @@ function initSwipeBackGestures() {
     const chatThemePanel = $('#chatThemePanel');
     if (chatThemePanel) {
         new SwipeBackGesture(chatThemePanel, closeChatThemePanel);
+    }
+
+    // 提示词模板面板
+    const promptTemplatePanel = $('#promptTemplatePanel');
+    if (promptTemplatePanel) {
+        new SwipeBackGesture(promptTemplatePanel, closePromptTemplatePanel);
+    }
+
+    // 导出聊天面板
+    const exportChatPanel = $('#exportChatPanel');
+    if (exportChatPanel) {
+        new SwipeBackGesture(exportChatPanel, closeExportChatPanel);
     }
 
     // 聊天设置面板

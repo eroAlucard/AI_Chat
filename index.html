@@ -199,7 +199,6 @@
                                 <img class="chat-settings-avatar" id="chatSettingsAvatar" src="" alt="">
                                 <span class="chat-settings-name" id="chatSettingsName"></span>
                             </div>
-                            <button class="chat-settings-search-btn" id="chatSettingsSearchBtn">🔍</button>
                         </div>
 
                         <div class="chat-settings-body">
@@ -340,6 +339,80 @@
                         <div class="chat-detail-actions">
                             <button class="btn-cancel" id="resetChatThemeBtn">重置</button>
                             <button class="btn-save" id="saveChatThemeBtn">保存</button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 提示词模板面板 -->
+                <div class="chat-detail-panel hidden" id="promptTemplatePanel">
+                    <div class="chat-detail-header">
+                        <button class="back-btn" id="promptTemplateBackBtn">←</button>
+                        <h3>提示词模板设置</h3>
+                    </div>
+                    <div class="chat-detail-body">
+                        <div class="setting-item">
+                            <p class="hint-text">提示词模板用于控制消息的格式化方式。使用 <code>{{user}}</code> 表示用户消息，<code>{{char}}</code> 表示角色名称。</p>
+                        </div>
+                        <div class="setting-item">
+                            <label class="setting-label">模板类型</label>
+                            <select class="setting-select" id="templateTypeSelect">
+                                <option value="default">默认格式</option>
+                                <option value="alpaca">Alpaca 格式</option>
+                                <option value="chatml">ChatML 格式</option>
+                                <option value="vicuna">Vicuna 格式</option>
+                                <option value="custom">自定义格式</option>
+                            </select>
+                        </div>
+                        <div class="setting-item" id="templateEditorSection">
+                            <label class="setting-label">用户消息模板</label>
+                            <textarea class="setting-textarea" id="userTemplate" rows="3" placeholder="例如：### Instruction:\n{{user}}\n\n"></textarea>
+
+                            <label class="setting-label" style="margin-top:16px">助手消息模板</label>
+                            <textarea class="setting-textarea" id="assistantTemplate" rows="3" placeholder="例如：### Response:\n{{assistant}}\n\n"></textarea>
+
+                            <label class="setting-label" style="margin-top:16px">系统消息模板</label>
+                            <textarea class="setting-textarea" id="systemTemplate" rows="3" placeholder="例如：### System:\n{{system}}\n\n"></textarea>
+                        </div>
+                        <div class="setting-item">
+                            <label class="setting-label">预览</label>
+                            <pre class="template-preview-text" id="templatePreview"></pre>
+                        </div>
+                        <div class="chat-detail-actions">
+                            <button class="btn-save" id="savePromptTemplateBtn">保存</button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 导出聊天面板 -->
+                <div class="chat-detail-panel hidden" id="exportChatPanel">
+                    <div class="chat-detail-header">
+                        <button class="back-btn" id="exportChatBackBtn">←</button>
+                        <h3>导出聊天记录</h3>
+                    </div>
+                    <div class="chat-detail-body">
+                        <div class="setting-item">
+                            <label class="setting-label">导出格式</label>
+                            <select class="setting-select" id="exportFormat">
+                                <option value="txt">纯文本 (.txt)</option>
+                                <option value="json">JSON (.json)</option>
+                                <option value="markdown">Markdown (.md)</option>
+                                <option value="html">HTML (.html)</option>
+                            </select>
+                        </div>
+                        <div class="setting-item">
+                            <label class="setting-checkbox">
+                                <input type="checkbox" id="includeReasoning" checked>
+                                <span>包含思考过程</span>
+                            </label>
+                        </div>
+                        <div class="setting-item">
+                            <label class="setting-checkbox">
+                                <input type="checkbox" id="includeTimestamp" checked>
+                                <span>包含时间戳</span>
+                            </label>
+                        </div>
+                        <div class="chat-detail-actions">
+                            <button class="btn-save" id="confirmExportBtn">导出</button>
                         </div>
                     </div>
                 </div>

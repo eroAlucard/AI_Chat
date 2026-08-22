@@ -2501,9 +2501,6 @@ function showUrlImportError(msg) {
 async function handleImportFile(file) {
     const fileName = file.name.toLowerCase();
 
-    // 可视化调试：显示文件信息
-    showToast(`开始处理文件: ${file.name} (${file.type})`);
-
     if (!fileName.endsWith('.png') && !fileName.endsWith('.json')) {
         showFileImportError('请选择 PNG 或 JSON 格式的角色卡文件');
         return;
@@ -2514,48 +2511,25 @@ async function handleImportFile(file) {
     const preview = $('#importFilePreview');
     const error = $('#importFileError');
 
-    // 可视化调试：检查元素是否存在
-    if (!dropArea) {
-        showToast('❌ 找不到dropArea元素', 3000);
-        return;
-    }
-    if (!preview) {
-        showToast('❌ 找不到preview元素', 3000);
-        return;
-    }
+    if (!dropArea || !preview) return;
 
     if (dropArea) dropArea.classList.add('hidden');
     if (preview) preview.classList.add('hidden');
     if (error) error.classList.add('hidden');
 
-    showToast('正在解析角色卡...', 2000);
-
     try {
         const previewData = await CardParser.previewCard(file);
-
-        // 可视化调试：显示解析结果
-        showToast(`✓ 解析成功: ${previewData.name}`, 2000);
-
         _pendingImportRole = { file: file, preview: previewData };
         _pendingImportSource = 'file';
 
         // 填充预览信息
         if (preview) {
             fillPreviewInfo(preview, previewData);
-            showToast('正在显示预览...', 1000);
             preview.classList.remove('hidden');
-
-            // 检查preview是否真的显示了
-            setTimeout(() => {
-                const isHidden = preview.classList.contains('hidden');
-                const display = window.getComputedStyle(preview).display;
-                showToast(`预览状态: hidden=${isHidden}, display=${display}`, 3000);
-            }, 100);
         }
 
     } catch (err) {
         console.error('导入人物卡失败:', err);
-        showToast(`❌ 解析失败: ${err.message}`, 3000);
         showFileImportError('解析失败：' + (err.message || '未知错误'));
         if (dropArea) dropArea.classList.remove('hidden');
     }
@@ -2563,8 +2537,6 @@ async function handleImportFile(file) {
 
 // 填充预览信息的通用函数
 function fillPreviewInfo(previewEl, preview) {
-    showToast('开始填充预览信息...', 1000);
-
     const avatarEl = previewEl.querySelector('.import-preview-avatar');
     const nameEl = previewEl.querySelector('.import-preview-name');
     const specEl = previewEl.querySelector('.import-preview-spec');
@@ -2572,10 +2544,8 @@ function fillPreviewInfo(previewEl, preview) {
     const descEl = previewEl.querySelector('.import-preview-desc');
     const infoEl = previewEl.querySelector('.import-preview-info');
 
-    // 检查所有子元素是否存在
     if (!nameEl || !specEl || !descEl || !infoEl) {
-        showToast('❌ 预览子元素缺失', 3000);
-        console.error('缺失的元素:', { nameEl, specEl, descEl, infoEl });
+        console.error('预览元素缺失');
         return;
     }
 
@@ -2612,8 +2582,6 @@ function fillPreviewInfo(previewEl, preview) {
             avatarEl.style.background = 'linear-gradient(135deg,#1a1a3e,#2d1b4e)';
         }
     }
-
-    showToast('✓ 预览信息填充完成', 1000);
 }
 
 // 确认导入角色（共同逻辑）
