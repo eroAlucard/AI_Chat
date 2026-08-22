@@ -205,7 +205,30 @@ body {
 }
 
 /* ==================== Page Content ==================== */
-.page-content { flex: 1; overflow: hidden; position: relative; }
+.page-content {
+    flex: 1;
+    overflow: hidden;
+    position: relative;
+}
+
+/* 顶部滚动渐变蒙版 - 优化卡片滚动裁切效果 */
+.page-content::before {
+    content: '';
+    position: fixed;
+    top: env(safe-area-inset-top, 0px);
+    left: 0;
+    right: 0;
+    height: 100px;
+    background: linear-gradient(to bottom,
+        rgba(15, 15, 26, 1) 0%,
+        rgba(15, 15, 26, 0.95) 20%,
+        rgba(15, 15, 26, 0.7) 50%,
+        rgba(15, 15, 26, 0) 100%
+    );
+    pointer-events: none;
+    z-index: 10;
+}
+
 .page {
     display: none;
     height: 100%;

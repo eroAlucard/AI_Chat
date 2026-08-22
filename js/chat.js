@@ -2887,10 +2887,14 @@ function renderQuickReplies(roleId) {
         btn.addEventListener('click', () => {
             // 拖拽滑动时不触发点击
             if (_qrDragMoved) return;
-            // 填入输入框并聚焦
+
+            // 填入输入框
             const input = $('#chatInput');
             input.value = text;
-            input.focus();
+
+            // 手机端：不聚焦，避免弹出键盘
+            // PC端：可以聚焦（但这里统一不聚焦，因为会自动发送）
+
             // 自动发送
             sendMessage();
         });
@@ -3023,7 +3027,8 @@ function renderCommonPhrasesList() {
             chatInput.value = phrase;
             chatInput.style.height = 'auto';
             chatInput.style.height = Math.min(chatInput.scrollHeight, 120) + 'px';
-            chatInput.focus();
+            // 手机端：不聚焦，避免弹出键盘（用户可以手动点击输入框）
+            // chatInput.focus();
             closeCommonPhrasesModal();
         });
     });
