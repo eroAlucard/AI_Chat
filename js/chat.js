@@ -180,6 +180,7 @@ function initChatView() {
     initScenarioPanel(); // 初始化情景设定
     initUserIdentityPanel(); // 初始化用户身份
     initChatThemePanel(); // 初始化聊天主题
+    initSwipeBackGestures(); // 初始化手势返回
     const backBtn = $('#chatBackBtn');
     const sendBtn = $('#sendBtn');
     const chatInput = $('#chatInput');
@@ -3757,4 +3758,192 @@ function initChatThemePanel() {
         showToast('主题已重置');
         closeChatThemePanel();
     });
+}
+
+// ==================== Swipe Back Gesture ====================
+class SwipeBackGesture {
+    constructor(element, onSwipeBack) {
+        this.element = element;
+        this.onSwipeBack = onSwipeBack;
+        this.startX = 0;
+        this.startY = 0;
+        this.currentX = 0;
+        this.isSwiping = false;
+        this.threshold = 100; // 滑动阈值（像素）
+        this.edgeThreshold = 50; // 边缘检测阈值（从左边缘多少像素内开始有效）
+        this.originalTransform = ''; // 保存原始transform
+
+        this.handleTouchStart = this.handleTouchStart.bind(this);
+        this.handleTouchMove = this.handleTouchMove.bind(this);
+        this.handleTouchEnd = this.handleTouchEnd.bind(this);
+
+        this.enable();
+    }
+
+    enable() {
+        this.element.addEventListener('touchstart', this.handleTouchStart, { passive: false });
+        this.element.addEventListener('touchmove', this.handleTouchMove, { passive: false });
+        this.element.addEventListener('touchend', this.handleTouchEnd);
+    }
+
+    disable() {
+        this.element.removeEventListener('touchstart', this.handleTouchStart);
+        this.element.removeEventListener('touchmove', this.handleTouchMove);
+        this.element.removeEventListener('touchend', this.handleTouchEnd);
+    }
+
+    handleTouchStart(e) {
+        // 检查是否在容器内有滚动内容
+        const target = e.target;
+        const scrollableParent = this.findScrollableParent(target);
+
+        // 如果在可滚动区域内且不是从左边缘开始，不触发手势
+        if (scrollableParent && scrollableParent !== this.element) {
+            const scrollLeft = scrollableParent.scrollLeft;
+            if (scrollLeft > 0) {
+                return; // 内容已经滚动，不触发返回手势
+            }
+        }
+
+        this.startX = e.touches[0].clientX;
+        this.startY = e.touches[0].clientY;
+
+        // 只有从左边缘开始的滑动才有效
+        if (this.startX <= this.edgeThreshold) {
+            this.isSwiping = true;
+            // 保存原始transform
+            const computedStyle = window.getComputedStyle(this.element);
+            this.originalTransform = computedStyle.transform !== 'none' ? computedStyle.transform : '';
+            this.element.style.transition = 'none';
+        }
+    }
+
+    handleTouchMove(e) {
+        if (!this.isSwiping) return;
+
+        this.currentX = e.touches[0].clientX;
+        const currentY = e.touches[0].clientY;
+        const deltaX = this.currentX - this.startX;
+        const deltaY = currentY - this.startY;
+
+        // 判断是横向滑动还是纵向滑动
+        if (Math.abs(deltaY) > Math.abs(deltaX)) {
+            // 纵向滑动，取消手势
+            this.isSwiping = false;
+            this.resetTransform();
+            return;
+        }
+
+        // 只处理向右滑动
+        if (deltaX > 0) {
+            e.preventDefault();
+            // 添加视觉反馈：随着滑动距离移动面板
+            const translateX = Math.min(deltaX, window.innerWidth);
+            // 组合原始transform和滑动offset
+            const newTransform = this.originalTransform
+                ? `${this.originalTransform} translateX(${translateX}px)`
+                : `translateX(${translateX}px)`;
+            this.element.style.transform = newTransform;
+            this.element.style.opacity = 1 - (translateX / window.innerWidth) * 0.3;
+        }
+    }
+
+    handleTouchEnd(e) {
+        if (!this.isSwiping) return;
+
+        const deltaX = this.currentX - this.startX;
+
+        this.element.style.transition = 'transform 0.3s ease, opacity 0.3s ease';
+
+        if (deltaX > this.threshold) {
+            // 滑动距离超过阈值，触发返回
+            const finalTransform = this.originalTransform
+                ? `${this.originalTransform} translateX(${window.innerWidth}px)`
+                : `translateX(${window.innerWidth}px)`;
+            this.element.style.transform = finalTransform;
+            this.element.style.opacity = 0;
+
+            setTimeout(() => {
+                this.resetTransform();
+                if (this.onSwipeBack) {
+                    this.onSwipeBack();
+                }
+            }, 300);
+        } else {
+            // 未达到阈值，回弹
+            this.resetTransform();
+        }
+
+        this.isSwiping = false;
+        this.startX = 0;
+        this.currentX = 0;
+    }
+
+    resetTransform() {
+        this.element.style.transition = '';
+        this.element.style.transform = '';
+        this.element.style.opacity = '';
+    }
+
+    findScrollableParent(element) {
+        let parent = element;
+        while (parent && parent !== this.element) {
+            const overflowX = window.getComputedStyle(parent).overflowX;
+            if (overflowX === 'auto' || overflowX === 'scroll') {
+                return parent;
+            }
+            parent = parent.parentElement;
+        }
+        return null;
+    }
+}
+
+// 初始化所有面板的手势返回
+function initSwipeBackGestures() {
+    // 世界书管理面板
+    const worldbookManagerPanel = $('#worldbookManagerPanel');
+    if (worldbookManagerPanel) {
+        new SwipeBackGesture(worldbookManagerPanel, () => {
+            const backBtn = $('#worldbookManagerBackBtn');
+            if (backBtn) backBtn.click();
+        });
+    }
+
+    // 世界书条目编辑面板
+    const worldbookEntryEditor = $('#worldbookEntryEditor');
+    if (worldbookEntryEditor) {
+        new SwipeBackGesture(worldbookEntryEditor, () => {
+            const backBtn = $('#worldbookEditorBackBtn');
+            if (backBtn) backBtn.click();
+        });
+    }
+
+    // 情景设定面板
+    const scenarioPanel = $('#scenarioPanel');
+    if (scenarioPanel) {
+        new SwipeBackGesture(scenarioPanel, closeScenarioPanel);
+    }
+
+    // 用户身份面板
+    const userIdentityPanel = $('#userIdentityPanel');
+    if (userIdentityPanel) {
+        new SwipeBackGesture(userIdentityPanel, closeUserIdentityPanel);
+    }
+
+    // 聊天主题面板
+    const chatThemePanel = $('#chatThemePanel');
+    if (chatThemePanel) {
+        new SwipeBackGesture(chatThemePanel, closeChatThemePanel);
+    }
+
+    // 聊天设置面板
+    const chatSettingsPanel = $('#chatSettingsSidebar .chat-settings-panel');
+    if (chatSettingsPanel) {
+        new SwipeBackGesture(chatSettingsPanel, () => {
+            const backdrop = $('#panelBackdrop');
+            if (backdrop && backdrop.classList.contains('active')) {
+                backdrop.click();
+            }
+        });
+    }
 }

@@ -1440,14 +1440,18 @@ function showToast(msg) {
 // ==================== Mine Page ====================
 function initMinePage() {
     $$('.shortcut-btn').forEach(btn => {
-        btn.addEventListener('click', () => {
+        btn.addEventListener('click', (e) => {
+            e.preventDefault();
+            e.stopPropagation();
             const action = btn.dataset.action;
+            console.log('Shortcut button clicked, action:', action);
             if (action === 'settings') {
                 openSettings();
             } else if (action === 'create-role') {
                 openCreateRoleModal();
             } else if (action === 'import-card') {
                 // 导入角色卡 - 默认打开文件导入
+                console.log('Import card action triggered');
                 openImportFileModal();
             } else if (action === 'import-url') {
                 // 从URL导入
@@ -1866,10 +1870,18 @@ function renderCollections() {
 // ==================== Settings ====================
 function initSettings() {
     const settingsPanel = $('#settingsPanel');
+    const settingsOverlay = $('#settingsOverlay');
     const settingsBackBtn = $('#settingsBackBtn');
     const saveBtn = $('#saveSettingsBtn');
     const tempInput = $('#temperatureInput');
     const tempValue = $('#temperatureValue');
+
+    // 点击遮罩关闭
+    if (settingsOverlay) {
+        settingsOverlay.addEventListener('click', () => {
+            settingsPanel.classList.add('hidden');
+        });
+    }
 
     settingsBackBtn.addEventListener('click', () => {
         settingsPanel.classList.add('hidden');
@@ -2398,12 +2410,16 @@ let _pendingImportSource = 'file'; // 记录当前导入来源 'file' 或 'url'
 
 // 打开文件导入弹窗
 function openImportFileModal() {
+    console.log('openImportFileModal called');
     const modal = $('#importFileModal');
     if (modal) {
+        console.log('Modal found, removing hidden class');
         modal.classList.remove('hidden');
         resetFileImportUI();
         _pendingImportRole = null;
         _pendingImportSource = 'file';
+    } else {
+        console.error('importFileModal not found');
     }
 }
 
