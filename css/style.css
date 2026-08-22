@@ -1383,6 +1383,135 @@ body {
     background: rgba(255,255,255,0.15);
 }
 
+/* 导入角色卡相关样式 */
+.import-tabs {
+    display: flex;
+    gap: 0;
+}
+
+.import-tab {
+    flex: 1;
+    padding: 12px;
+    border: none;
+    background: transparent;
+    color: var(--text-secondary);
+    font-size: 14px;
+    border-bottom: 2px solid transparent;
+    cursor: pointer;
+    transition: all 0.2s;
+    font-weight: 500;
+}
+
+.import-tab:hover {
+    color: var(--text-primary);
+}
+
+.import-tab.active {
+    color: var(--accent-purple);
+    border-bottom-color: var(--accent-purple);
+}
+
+.import-tab-content {
+    animation: fadeIn 0.3s ease;
+}
+
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+        transform: translateY(10px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.platform-links {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+}
+
+.platform-link {
+    display: block;
+    padding: 10px 12px;
+    border-radius: 10px;
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-color);
+    color: var(--text-secondary);
+    font-size: 13px;
+    text-align: center;
+    text-decoration: none;
+    transition: all 0.2s;
+    cursor: pointer;
+}
+
+.platform-link:hover {
+    background: var(--bg-card);
+    border-color: var(--accent-purple);
+    color: var(--accent-purple);
+    transform: translateY(-2px);
+}
+
+#importCardDrop:hover {
+    border-color: var(--accent-purple);
+    background: rgba(147,51,234,0.1);
+}
+
+#importFromGallery:hover,
+#pasteFromClipboard:hover {
+    border-color: var(--accent-purple);
+    background: var(--bg-secondary);
+}
+
+#importFromUrl:hover {
+    opacity: 0.9;
+    transform: translateY(-1px);
+}
+
+/* 导入方式切换按钮 */
+.import-switch-btn {
+    transition: all 0.2s ease;
+}
+
+.import-switch-btn:not(.active):hover {
+    border-color: var(--accent-purple);
+    background: rgba(147,51,234,0.1);
+    color: var(--accent-purple);
+}
+
+.import-switch-btn.active {
+    background: var(--accent-gradient);
+    color: white;
+    border-color: transparent;
+}
+
+/* 文件导入方式选择弹窗 */
+.modal-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: var(--bg-overlay);
+    z-index: 400;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.modal-overlay.hidden {
+    display: none;
+}
+
+.modal-content {
+    background: var(--bg-secondary);
+    border-radius: 16px;
+    padding: 24px;
+    max-width: 90%;
+    animation: scaleIn 0.2s ease;
+}
+
 /* ==================== Custom Role Card (Mine Page) ==================== */
 .custom-role-card {
     display: flex;

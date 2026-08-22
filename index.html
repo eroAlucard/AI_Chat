@@ -13,12 +13,12 @@
     <meta name="apple-mobile-web-app-title" content="AI Chat">
 
     <!-- PWA Manifest -->
-    <link rel="manifest" href="/manifest.json">
+    <!-- <link rel="manifest" href="/manifest.json"> -->
 
     <!-- Icons -->
-    <link rel="icon" type="image/png" sizes="192x192" href="/icons/icon-192.png">
+    <!-- <link rel="icon" type="image/png" sizes="192x192" href="/icons/icon-192.png">
     <link rel="icon" type="image/png" sizes="512x512" href="/icons/icon-512.png">
-    <link rel="apple-touch-icon" href="/icons/icon-192.png">
+    <link rel="apple-touch-icon" href="/icons/icon-192.png"> -->
 
     <link rel="stylesheet" href="css/style.css">
 </head>
@@ -841,39 +841,149 @@
         </div>
     </div>
 
-        <!-- 导入人物卡预览弹窗 -->
-        <div class="role-detail-modal hidden" id="importCardModal">
+        <!-- 从文件导入角色卡弹窗 -->
+        <div class="role-detail-modal hidden" id="importFileModal">
             <div class="role-detail-overlay"></div>
-            <div class="role-detail-panel" style="max-height:85vh">
-                <button class="close-btn" id="closeImportCard">✕</button>
-                <div class="role-detail-info" style="padding:20px">
-                    <h2 style="margin-bottom:16px">🃏 导入人物卡</h2>
-                    <div id="importCardContent">
-                        <div id="importCardDrop" style="border:2px dashed rgba(255,255,255,0.2);border-radius:12px;padding:40px 20px;text-align:center;cursor:pointer;transition:border-color 0.2s">
-                            <div style="font-size:36px;margin-bottom:8px">📂</div>
-                            <p style="color:rgba(255,255,255,0.6);margin:0">点击选择或拖入 PNG 人物卡文件</p>
-                            <p style="color:rgba(255,255,255,0.3);font-size:12px;margin:8px 0 0">支持 SillyTavern / 酒馆AI V2/V3 格式</p>
+            <div class="role-detail-panel" style="max-height:90vh;max-width:500px">
+                <button class="close-btn" id="closeImportFile">✕</button>
+                <div class="role-detail-info" style="padding:0;display:flex;flex-direction:column;height:100%">
+                    <!-- 头部 -->
+                    <div style="padding:20px 20px 0">
+                        <h2 style="margin:0 0 16px;text-align:center;font-size:18px;font-weight:600">导入角色卡</h2>
+
+                        <!-- 切换按钮 -->
+                        <div style="display:flex;gap:8px;margin-bottom:16px">
+                            <button class="import-switch-btn active" data-target="file" style="flex:1;padding:10px;border-radius:12px;border:1px solid var(--border-color);background:var(--accent-gradient);color:white;font-size:14px;font-weight:500;cursor:pointer;transition:all 0.2s">
+                                📁 从文件导入
+                            </button>
+                            <button class="import-switch-btn" data-target="url" style="flex:1;padding:10px;border-radius:12px;border:1px solid var(--border-color);background:transparent;color:var(--text-secondary);font-size:14px;font-weight:500;cursor:pointer;transition:all 0.2s">
+                                🔗 从URL导入
+                            </button>
                         </div>
-                        <div id="importCardPreview" class="hidden" style="margin-top:16px">
-                            <div style="display:flex;gap:12px;align-items:flex-start;margin-bottom:16px">
-                                <div id="importPreviewAvatar" style="width:64px;height:64px;border-radius:12px;background:linear-gradient(135deg,#1a1a3e,#2d1b4e);flex-shrink:0;overflow:hidden"></div>
+                    </div>
+
+                    <!-- 内容区域 -->
+                    <div style="flex:1;overflow-y:auto;padding:0 20px 20px">
+                        <!-- 拖放上传区域 -->
+                        <div id="importFileDrop" style="border:2px dashed rgba(255,255,255,0.2);border-radius:16px;padding:60px 20px;text-align:center;cursor:pointer;transition:all 0.3s;background:rgba(147,51,234,0.05)">
+                            <div style="width:80px;height:80px;margin:0 auto 16px;background:var(--accent-purple);border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:36px">+</div>
+                            <p style="color:var(--text-primary);margin:0 0 8px;font-size:16px;font-weight:500">导入角色卡</p>
+                            <p style="color:var(--text-muted);margin:0;font-size:13px">支持 JSON 或 角色卡图片文件</p>
+                        </div>
+
+                        <!-- 预览区域 -->
+                        <div id="importFilePreview" class="hidden" style="margin-top:20px;padding:20px;border-radius:16px;background:var(--bg-card);border:1px solid var(--border-color)">
+                            <div style="display:flex;gap:16px;align-items:flex-start;margin-bottom:16px">
+                                <div class="import-preview-avatar" style="width:80px;height:80px;border-radius:50%;background:linear-gradient(135deg,#1a1a3e,#2d1b4e);flex-shrink:0;overflow:hidden"></div>
                                 <div style="flex:1;min-width:0">
-                                    <div id="importPreviewName" style="font-size:16px;font-weight:600;margin-bottom:4px"></div>
-                                    <div id="importPreviewSpec" style="font-size:11px;color:rgba(255,255,255,0.4)"></div>
+                                    <div class="import-preview-name" style="font-size:18px;font-weight:600;margin-bottom:6px;color:var(--text-primary)"></div>
+                                    <div class="import-preview-spec" style="font-size:12px;color:var(--text-muted);margin-bottom:8px"></div>
+                                    <div class="import-preview-tags" style="display:flex;flex-wrap:wrap;gap:6px"></div>
                                 </div>
                             </div>
-                            <div id="importPreviewDesc" style="font-size:13px;color:rgba(255,255,255,0.6);margin-bottom:12px;max-height:80px;overflow-y:auto;line-height:1.5"></div>
-                            <div id="importPreviewInfo" style="font-size:12px;color:rgba(255,255,255,0.5);margin-bottom:12px"></div>
-                            <div id="importPreviewTags" style="display:flex;flex-wrap:wrap;gap:4px;margin-bottom:16px"></div>
-                            <button class="btn-save-settings" id="confirmImportCard" style="width:100%">确认导入</button>
+                            <div style="padding:12px;border-radius:8px;background:var(--bg-secondary);margin-bottom:12px">
+                                <div style="font-size:13px;color:var(--text-muted);margin-bottom:4px">角色设定</div>
+                                <div class="import-preview-desc" style="font-size:13px;color:var(--text-secondary);line-height:1.6;max-height:120px;overflow-y:auto"></div>
+                            </div>
+                            <div class="import-preview-info" style="font-size:12px;color:var(--text-muted);margin-bottom:16px"></div>
+                            <button class="btn-save-settings" id="confirmImportFile" style="width:100%;background:var(--accent-gradient);padding:14px;font-size:15px;font-weight:600">导入角色</button>
                         </div>
-                        <div id="importCardError" class="hidden" style="margin-top:16px;padding:12px;border-radius:8px;background:rgba(220,38,38,0.15);color:#fca5a5;font-size:13px"></div>
-                        <div id="importCardLoading" class="hidden" style="margin-top:16px;text-align:center;padding:20px;color:rgba(255,255,255,0.5)">
-                            <div style="font-size:24px;margin-bottom:8px">⏳</div>
-                            <p>正在解析人物卡…</p>
+
+                        <!-- 错误提示 -->
+                        <div id="importFileError" class="hidden" style="margin-top:16px;padding:12px 16px;border-radius:12px;background:rgba(220,38,38,0.15);color:#fca5a5;font-size:13px;line-height:1.5"></div>
+
+                        <!-- 平台链接 -->
+                        <div style="margin-top:24px">
+                            <p style="color:var(--text-muted);font-size:12px;margin:0 0 12px">支持V1/V2/V3角色卡</p>
+                            <div class="platform-links" style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+                                <a href="https://t.onlycards.ai/index.html#/" target="_blank" class="platform-link">Only Cards</a>
+                                <a href="https://chub.ai/search" target="_blank" class="platform-link">Chub</a>
+                                <a href="https://janitorai.com" target="_blank" class="platform-link">JanitorAI</a>
+                                <a href="https://pygmalion.chat/explore" target="_blank" class="platform-link">Pygmalion</a>
+                                <a href="https://aicharactercards.com/#topDownloads" target="_blank" class="platform-link">AICharacterCards</a>
+                                <a href="https://realm.risuai.net" target="_blank" class="platform-link">RisuRealm</a>
+                            </div>
                         </div>
                     </div>
                 </div>
+            </div>
+        </div>
+
+        <!-- 从URL导入角色卡弹窗 -->
+        <div class="role-detail-modal hidden" id="importUrlModal">
+            <div class="role-detail-overlay"></div>
+            <div class="role-detail-panel" style="max-height:90vh;max-width:500px">
+                <button class="close-btn" id="closeImportUrl">✕</button>
+                <div class="role-detail-info" style="padding:0;display:flex;flex-direction:column;height:100%">
+                    <!-- 头部 -->
+                    <div style="padding:20px 20px 0">
+                        <h2 style="margin:0 0 16px;text-align:center;font-size:18px;font-weight:600">导入角色卡</h2>
+
+                        <!-- 切换按钮 -->
+                        <div style="display:flex;gap:8px;margin-bottom:16px">
+                            <button class="import-switch-btn" data-target="file" style="flex:1;padding:10px;border-radius:12px;border:1px solid var(--border-color);background:transparent;color:var(--text-secondary);font-size:14px;font-weight:500;cursor:pointer;transition:all 0.2s">
+                                📁 从文件导入
+                            </button>
+                            <button class="import-switch-btn active" data-target="url" style="flex:1;padding:10px;border-radius:12px;border:1px solid var(--border-color);background:var(--accent-gradient);color:white;font-size:14px;font-weight:500;cursor:pointer;transition:all 0.2s">
+                                🔗 从URL导入
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- 内容区域 -->
+                    <div style="flex:1;overflow-y:auto;padding:0 20px 20px">
+                        <!-- URL输入 -->
+                        <textarea id="importUrlInput" rows="4" placeholder="在此处粘贴或输入角色链接，支持：&#10;• Chub.ai 角色页面链接&#10;• PNG/JSON 文件直链" style="width:100%;padding:12px;border-radius:12px;border:1px solid var(--border-color);background:var(--bg-card);color:var(--text-primary);font-size:14px;resize:vertical;font-family:inherit"></textarea>
+
+                        <div style="display:flex;gap:8px;margin-top:12px">
+                            <button id="pasteFromClipboard" style="flex:1;padding:12px;border-radius:12px;border:1px solid var(--border-color);background:var(--bg-card);color:var(--text-primary);font-size:14px;cursor:pointer">📋 粘贴剪贴板</button>
+                            <button id="importFromUrl" style="flex:1;padding:12px;border-radius:12px;background:var(--accent-gradient);color:white;font-size:14px;font-weight:600;border:none;cursor:pointer">导入</button>
+                        </div>
+
+                        <!-- 预览区域 -->
+                        <div id="importUrlPreview" class="hidden" style="margin-top:20px;padding:20px;border-radius:16px;background:var(--bg-card);border:1px solid var(--border-color)">
+                            <div style="display:flex;gap:16px;align-items:flex-start;margin-bottom:16px">
+                                <div class="import-preview-avatar" style="width:80px;height:80px;border-radius:50%;background:linear-gradient(135deg,#1a1a3e,#2d1b4e);flex-shrink:0;overflow:hidden"></div>
+                                <div style="flex:1;min-width:0">
+                                    <div class="import-preview-name" style="font-size:18px;font-weight:600;margin-bottom:6px;color:var(--text-primary)"></div>
+                                    <div class="import-preview-spec" style="font-size:12px;color:var(--text-muted);margin-bottom:8px"></div>
+                                    <div class="import-preview-tags" style="display:flex;flex-wrap:wrap;gap:6px"></div>
+                                </div>
+                            </div>
+                            <div style="padding:12px;border-radius:8px;background:var(--bg-secondary);margin-bottom:12px">
+                                <div style="font-size:13px;color:var(--text-muted);margin-bottom:4px">角色设定</div>
+                                <div class="import-preview-desc" style="font-size:13px;color:var(--text-secondary);line-height:1.6;max-height:120px;overflow-y:auto"></div>
+                            </div>
+                            <div class="import-preview-info" style="font-size:12px;color:var(--text-muted);margin-bottom:16px"></div>
+                            <button class="btn-save-settings" id="confirmImportUrl" style="width:100%;background:var(--accent-gradient);padding:14px;font-size:15px;font-weight:600">导入角色</button>
+                        </div>
+
+                        <!-- 错误提示 -->
+                        <div id="importUrlError" class="hidden" style="margin-top:16px;padding:12px 16px;border-radius:12px;background:rgba(220,38,38,0.15);color:#fca5a5;font-size:13px;line-height:1.5"></div>
+
+                        <!-- 平台链接 -->
+                        <div style="margin-top:24px">
+                            <p style="color:var(--text-muted);font-size:12px;margin:0 0 12px">推荐角色网站</p>
+                            <div class="platform-links" style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+                                <a href="https://t.onlycards.ai/index.html#/" target="_blank" class="platform-link">Only Cards</a>
+                                <a href="https://chub.ai/search" target="_blank" class="platform-link">Chub</a>
+                                <a href="https://janitorai.com" target="_blank" class="platform-link">JanitorAI</a>
+                                <a href="https://pygmalion.chat/explore" target="_blank" class="platform-link">Pygmalion</a>
+                                <a href="https://aicharactercards.com/#topDownloads" target="_blank" class="platform-link">AICharacterCards</a>
+                                <a href="https://realm.risuai.net" target="_blank" class="platform-link">RisuRealm</a>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 文件导入方式选择弹窗 -->
+        <div class="modal-overlay hidden" id="fileImportMethodModal">
+            <div class="modal-content" style="max-width:320px;border-radius:16px;padding:24px">
+                <h3 style="margin:0 0 20px;font-size:16px;text-align:center">选择导入方式</h3>
+                <button id="selectFromFiles" class="btn-save-settings" style="width:100%;margin-bottom:12px;padding:14px;font-size:15px">📁 从文件选择</button>
+                <button id="selectFromGallery" class="btn-save-settings" style="width:100%;background:var(--bg-card);border:1px solid var(--border-color);color:var(--text-primary);padding:14px;font-size:15px">📱 从相册导入</button>
             </div>
         </div>
 
@@ -906,7 +1016,7 @@
     <script src="js/chat.js"></script>
 
     <!-- PWA 支持 -->
-    <script type="module">
+    <!-- <script type="module">
         import { registerServiceWorker, initPWAInstallPrompt } from './js/pwa.js';
 
         // 注册 Service Worker
@@ -914,6 +1024,6 @@
 
         // 初始化 PWA 安装提示
         initPWAInstallPrompt();
-    </script>
+    </script> -->
 </body>
 </html>

@@ -98,22 +98,32 @@ const CardParser = (function() {
     }
 
     /**
-     * 解析 PNG 人物卡文件
-     * @param {File} file — 用户选择的 PNG 文件
+     * 解析 PNG 人物卡文件或 JSON 文件
+     * @param {File} file — 用户选择的 PNG 或 JSON 文件
      * @returns {Promise<Object>} 解析后的角色数据
      */
     async function parseCard(file) {
+        const fileName = file.name.toLowerCase();
+
+        // 如果是 JSON 文件，直接读取并解析
+        if (fileName.endsWith('.json')) {
+            const text = await file.text();
+            const cardData = JSON.parse(text);
+            return cardData;
+        }
+
+        // 否则按 PNG 格式处理
         const buffer = await file.arrayBuffer();
         const chunks = extractTextChunks(buffer);
-        
+
         if (!chunks.chara) {
             throw new Error('该 PNG 文件不包含 SillyTavern 人物卡数据（未找到 chara tEXt chunk）');
         }
-        
+
         // Base64 解码 → JSON 解析
         const jsonStr = base64ToUtf8(chunks.chara);
         const cardData = JSON.parse(jsonStr);
-        
+
         return cardData;
     }
 
@@ -207,8 +217,13 @@ const CardParser = (function() {
         if (preservePath && sourcePath) {
             // 内置角色：直接使用相对路径，不转 base64（避免撑爆 localStorage）
             imageUrl = sourcePath;
+        } else if (file.name.toLowerCase().endsWith('.json')) {
+            // JSON文件：avatar字段可能是URL，直接使用
+            if (data.avatar) {
+                imageUrl = data.avatar;
+            }
         } else {
-            // 用户手动导入：转为 base64 data URL 以持久化到 localStorage
+            // PNG文件：转为 base64 data URL 以持久化到 localStorage
             try {
                 imageUrl = await new Promise((resolve, reject) => {
                     const reader = new FileReader();
@@ -267,20 +282,21 @@ const CardParser = (function() {
     }
 
     /**
-     * 一站式：解析 PNG 文件并映射为角色数据
-     * @param {File} file - PNG 文件
+     * 一站式：解析 PNG 或 JSON 文件并映射为角色数据
+     * @param {File} file - PNG 或 JSON 文件
      * @param {boolean} [preservePath=false] - 是否保留原始文件路径（内置角色用 true，避免 base64 撑爆 localStorage）
      * @param {string} [sourcePath=''] - 原始文件相对路径（当 preservePath=true 时使用）
      * @returns {Promise<Object>} 角色数据
      */
     async function importCard(file, preservePath = false, sourcePath = '') {
-        if (!file || !file.name.toLowerCase().endsWith('.png')) {
-            throw new Error('请选择 PNG 格式的人物卡文件');
+        const fileName = file?.name?.toLowerCase() || '';
+        if (!file || (!fileName.endsWith('.png') && !fileName.endsWith('.json'))) {
+            throw new Error('请选择 PNG 或 JSON 格式的角色卡文件');
         }
-        
+
         const cardData = await parseCard(file);
         const role = await mapCardToRole(cardData, file, preservePath, sourcePath);
-        
+
         return role;
     }
 
@@ -293,7 +309,7 @@ const CardParser = (function() {
         const cardData = await parseCard(file);
         const data = cardData.data || {};
         const charName = data.name || cardData.name || '未命名角色';
-        
+
         // character_book 统计
         let charbookInfo = null;
         if (data.character_book && data.character_book.entries) {
@@ -305,7 +321,26 @@ const CardParser = (function() {
                 totalContentChars: entries.reduce((sum, e) => sum + (e.content || '').length, 0),
             };
         }
-        
+
+        // 图片URL处理
+        let imageUrl = '';
+        if (file.name.toLowerCase().endsWith('.json')) {
+            // JSON文件：使用avatar字段的URL
+            imageUrl = data.avatar || '';
+        } else {
+            // PNG文件：读取文件生成base64
+            try {
+                imageUrl = await new Promise((resolve, reject) => {
+                    const reader = new FileReader();
+                    reader.onload = () => resolve(reader.result);
+                    reader.onerror = () => reject(new Error('FileReader 读取失败'));
+                    reader.readAsDataURL(file);
+                });
+            } catch (e) {
+                console.warn('无法读取图片:', e);
+            }
+        }
+
         return {
             name: charName,
             description: (data.description || '').substring(0, 200),
@@ -320,12 +355,7 @@ const CardParser = (function() {
             spec: cardData.spec || 'chara_card_v2',
             specVersion: cardData.spec_version || '2.0',
             creator: data.creator || '',
-            imageUrl: await new Promise((resolve, reject) => {
-                const reader = new FileReader();
-                reader.onload = () => resolve(reader.result);
-                reader.onerror = () => reject(new Error('FileReader 读取失败'));
-                reader.readAsDataURL(file);
-            }),
+            imageUrl: imageUrl,
         };
     }
 
