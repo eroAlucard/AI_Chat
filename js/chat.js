@@ -387,7 +387,6 @@ function renderMessages(roleId) {
 
         return `
             <div class="message ${isUser ? 'user' : 'ai'}" data-msg-idx="${idx}">
-                <div class="message-avatar-placeholder">${isUser ? '👤' : role.emoji}</div>
                 <div style="flex:1;position:relative;">
                     <div class="message-bubble">
                         ${bubbleContent}
@@ -948,10 +947,13 @@ function attachSwipeButtonEvents() {
 }
 
 function formatMessage(content) {
+    // 处理状态栏语法 :::status 标题\n内容\n:::
+    content = parseStatusBlocks(content);
+
     // 检测内容是否包含 HTML 标签（如角色卡返回的状态面板）
     // 如果包含 <div>/<span>/<table> 等 HTML 标签，则渲染而非转义
     const hasHtmlTags = /\<(div|span|table|tr|td|th|ul|ol|li|details|summary|style|img|svg|progress|meter|section|article|header|footer|nav|form|input|button|select|option|textarea|label|fieldset|legend|datalist|output|canvas|video|audio|source|picture)\b/i.test(content);
-    
+
     if (hasHtmlTags) {
         // 包含 HTML 标签：渲染而非转义
         // 安全策略：
@@ -970,13 +972,50 @@ function formatMessage(content) {
         safe = safe.replace(/\n/g, '<br>');
         return safe;
     }
-    
+
     // 普通文本：HTML 转义 + 换行转 <br>
     return content
         .replace(/&/g, '&amp;')
         .replace(/</g, '&lt;')
         .replace(/>/g, '&gt;')
         .replace(/\n/g, '<br>');
+}
+
+/**
+ * 解析状态栏语法：:::status 标题\n内容\n:::
+ * 支持别名：:::status 或 :::状态栏
+ */
+function parseStatusBlocks(content) {
+    // 匹配 :::status 或 :::状态栏 开头，直到 ::: 结束
+    const statusBlockRegex = /:::(?:status|状态栏)\s+([^\n]*)\n([\s\S]*?):::/g;
+
+    return content.replace(statusBlockRegex, (match, title, body) => {
+        // 转义标题和内容
+        const safeTitle = escapeHtml(title.trim());
+        const safeBody = escapeHtml(body.trim());
+
+        // 生成状态栏 HTML（使用 details + summary 实现折叠）
+        return `<div class="status-bar">
+            <details open>
+                <summary class="status-bar-title">
+                    <span class="status-bar-title-text">${safeTitle}</span>
+                </summary>
+                <div class="status-bar-content">${safeBody.replace(/\n/g, '<br>')}</div>
+            </details>
+        </div>`;
+    });
+}
+
+/**
+ * HTML 转义辅助函数
+ */
+function escapeHtml(text) {
+    return text
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#039;');
 }
 
 function scrollToBottom() {
@@ -1068,7 +1107,6 @@ async function sendMessage(skipInputCheck = false) {
         streamMsgEl.className = 'message ai';
         streamMsgEl.id = 'streamMessage';
         streamMsgEl.innerHTML = `
-            <div class="message-avatar-placeholder" style="background:var(--accent-gradient)">${role.emoji}</div>
             <div>
                 <div class="message-bubble" id="streamBubble"><span style="color:#aaa;font-style:italic;">💭 正在思考中…</span></div>
                 <div class="message-time" id="streamTime"></div>
@@ -1190,8 +1228,7 @@ async function sendMessage(skipInputCheck = false) {
             const errorMsgEl = document.createElement('div');
             errorMsgEl.className = 'message ai';
             errorMsgEl.innerHTML = `
-                <div class="message-avatar-placeholder" style="background:var(--accent-gradient)">✦</div>
-                <div class="message-content">
+                <div>
                     <div id="streamBubble" style="color:#f87171;font-size:0.9em;">
                         ️ 请求失败，可能是网络中断或模型服务暂不可用。<br>
                         <button onclick="retryLastMessage('${roleId}', ${JSON.stringify(text).replace(/'/g, "\'")})"
@@ -1217,7 +1254,6 @@ function showTypingIndicator() {
     indicator.className = 'message ai';
     indicator.id = 'typingIndicator';
     indicator.innerHTML = `
-        <div class="message-avatar-placeholder" style="background:var(--accent-gradient)">✦</div>
         <div class="message-bubble">
             <div class="typing-indicator">
                 <div class="typing-dot"></div>
@@ -1551,7 +1587,6 @@ async function readStreamResponse(response, role) {
         streamMsgEl.className = 'message ai';
         streamMsgEl.id = 'streamMessage';
         streamMsgEl.innerHTML = `
-            <div class="message-avatar-placeholder" style="background:var(--accent-gradient)">${role.emoji}</div>
             <div>
                 <div class="message-bubble" id="streamBubble"><span style="color:#aaa;font-style:italic;">💭 正在思考中…</span></div>
                 <div class="message-time" id="streamTime"></div>
@@ -1607,7 +1642,6 @@ async function readStreamResponse(response, role) {
                             streamMsgEl.className = 'message ai';
                             streamMsgEl.id = 'streamMessage';
                             streamMsgEl.innerHTML = `
-                                <div class="message-avatar-placeholder" style="background:var(--accent-gradient)">${role.emoji}</div>
                                 <div>
                                     <div class="message-bubble" id="streamBubble"></div>
                                     <div class="message-time" id="streamTime"></div>
@@ -1639,7 +1673,6 @@ async function readStreamResponse(response, role) {
                             streamMsgEl.className = 'message ai';
                             streamMsgEl.id = 'streamMessage';
                             streamMsgEl.innerHTML = `
-                                <div class="message-avatar-placeholder" style="background:var(--accent-gradient)">${role.emoji}</div>
                                 <div>
                                     <div class="message-bubble" id="streamBubble"></div>
                                     <div class="message-time" id="streamTime"></div>
@@ -2439,7 +2472,7 @@ function exportChatHistory() {
     const modal = document.createElement('div');
     modal.className = 'export-modal';
     modal.innerHTML = `
-        <div class="export-overlay"></div>
+        <div class="export-overlay" onclick="closeExportModal()"></div>
         <div class="export-panel">
             <div class="export-header">
                 <h3>导出聊天记录</h3>
@@ -3545,16 +3578,16 @@ function openChatThemePanel() {
     // 加载当前主题设置
     const session = AppState.chatSessions[AppState.currentChat];
     const theme = (session && session.chatTheme) || {
-        bgType: 'color',
+        bgType: 'role',
         bgColor: '#1a1a2e',
-        bubbleOpacity: 95,
-        fontSize: 14
+        bubbleOpacity: 50,
+        fontSize: 15
     };
 
-    $('#bgTypeSelect').value = theme.bgType || 'color';
+    $('#bgTypeSelect').value = theme.bgType || 'role';
     $('#bgColorInput').value = theme.bgColor || '#1a1a2e';
-    $('#bubbleOpacityInput').value = theme.bubbleOpacity || 95;
-    $('#fontSizeInput').value = theme.fontSize || 14;
+    $('#bubbleOpacityInput').value = theme.bubbleOpacity || 50;
+    $('#fontSizeInput').value = theme.fontSize || 15;
 
     updateThemePreview();
     handleBgTypeChange();
@@ -3601,7 +3634,12 @@ function applyChatTheme() {
     if (!AppState.currentChat) return;
 
     const session = AppState.chatSessions[AppState.currentChat];
-    const theme = (session && session.chatTheme) || {};
+    const theme = (session && session.chatTheme) || {
+        bgType: 'role',
+        bgColor: '#1a1a2e',
+        bubbleOpacity: 50,
+        fontSize: 15
+    };
     const chatMessages = $('#chatMessages');
 
     // 重置样式

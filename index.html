@@ -4,6 +4,22 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <title>AI Chat - 智能角色聊天</title>
+
+    <!-- PWA Meta Tags -->
+    <meta name="description" content="与 AI 角色进行智能对话，支持角色扮演、情感交流等多种场景">
+    <meta name="theme-color" content="#8b5cf6">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="AI Chat">
+
+    <!-- PWA Manifest -->
+    <link rel="manifest" href="/manifest.json">
+
+    <!-- Icons -->
+    <link rel="icon" type="image/png" sizes="192x192" href="/icons/icon-192.png">
+    <link rel="icon" type="image/png" sizes="512x512" href="/icons/icon-512.png">
+    <link rel="apple-touch-icon" href="/icons/icon-192.png">
+
     <link rel="stylesheet" href="css/style.css">
 </head>
 <body>
@@ -23,17 +39,6 @@
     </div>
 
     <div id="app">
-        <!-- 顶部导航栏 -->
-        <header class="top-bar">
-            <div class="top-bar-left">
-                <span class="app-logo">✦</span>
-                <span class="app-title">AI Chat</span>
-            </div>
-            <div class="top-bar-right">
-                <button class="icon-btn" id="searchBtn">🔍</button>
-            </div>
-        </header>
-
         <!-- 搜索栏 -->
         <div class="search-bar hidden" id="searchBar">
             <div class="search-bar-inner">
@@ -66,9 +71,14 @@
                         <button class="tab" data-tab="hot">热门</button>
                         <button class="tab" data-tab="latest">最新</button>
                     </div>
-                    <button class="filter-btn" id="filterBtn">
-                        <span class="filter-icon">⚙</span>
-                    </button>
+                    <div style="display: flex; gap: 8px;">
+                        <button class="filter-btn" id="searchBtn" title="搜索">
+                            <span class="filter-icon">🔍</span>
+                        </button>
+                        <button class="filter-btn" id="filterBtn" title="筛选">
+                            <span class="filter-icon">⚙</span>
+                        </button>
+                    </div>
                 </div>
 
                 <!-- 智能推荐标签 -->
@@ -301,7 +311,7 @@
                             <select class="setting-select" id="bgTypeSelect">
                                 <option value="color">纯色背景</option>
                                 <option value="image">图片背景</option>
-                                <option value="role">角色卡图片</option>
+                                <option value="role" selected>角色卡图片</option>
                             </select>
                         </div>
                         <div class="setting-item" id="bgColorSetting">
@@ -314,12 +324,12 @@
                             <input type="file" id="bgImageInput" accept="image/*" style="display:none">
                         </div>
                         <div class="setting-item">
-                            <label class="setting-label">气泡透明度 <span class="setting-value" id="bubbleOpacityValue">95%</span></label>
-                            <input type="range" class="setting-range" id="bubbleOpacityInput" min="50" max="100" value="95">
+                            <label class="setting-label">气泡透明度 <span class="setting-value" id="bubbleOpacityValue">50%</span></label>
+                            <input type="range" class="setting-range" id="bubbleOpacityInput" min="20" max="100" value="50">
                         </div>
                         <div class="setting-item">
-                            <label class="setting-label">字体大小 <span class="setting-value" id="fontSizeValue">14px</span></label>
-                            <input type="range" class="setting-range" id="fontSizeInput" min="12" max="20" value="14">
+                            <label class="setting-label">字体大小 <span class="setting-value" id="fontSizeValue">15px</span></label>
+                            <input type="range" class="setting-range" id="fontSizeInput" min="12" max="20" value="15">
                         </div>
                         <div class="chat-detail-actions">
                             <button class="btn-cancel" id="resetChatThemeBtn">重置</button>
@@ -862,5 +872,16 @@
     <script src="js/builtin-cards.js"></script>
     <script src="js/app.js"></script>
     <script src="js/chat.js"></script>
+
+    <!-- PWA 支持 -->
+    <script type="module">
+        import { registerServiceWorker, initPWAInstallPrompt } from './js/pwa.js';
+
+        // 注册 Service Worker
+        registerServiceWorker();
+
+        // 初始化 PWA 安装提示
+        initPWAInstallPrompt();
+    </script>
 </body>
 </html>
