@@ -206,7 +206,14 @@ body {
 
 /* ==================== Page Content ==================== */
 .page-content { flex: 1; overflow: hidden; position: relative; }
-.page { display: none; height: 100%; overflow-y: auto; padding-bottom: 16px; }
+.page {
+    display: none;
+    height: 100%;
+    overflow-y: auto;
+    padding-bottom: 16px;
+    /* iOS 刘海屏/灵动岛适配：为顶部系统状态栏预留空间 */
+    padding-top: env(safe-area-inset-top, 0px);
+}
 .page.active { display: block; }
 .page::-webkit-scrollbar { width: 4px; }
 .page::-webkit-scrollbar-thumb { background: var(--bg-card); border-radius: 2px; }
@@ -418,7 +425,11 @@ body {
 
 /* ==================== Chat List ==================== */
 .chat-list-view { height: 100%; display: flex; flex-direction: column; }
-.chat-list-header { padding: 16px 20px; border-bottom: 1px solid var(--border-color); }
+.chat-list-header {
+    padding: 16px 20px;
+    border-bottom: 1px solid var(--border-color);
+    /* 注意：已由父级 .page 的 padding-top 处理安全区域 */
+}
 .chat-list-header h2 { font-size: var(--font-xl); font-weight: 700; }
 .chat-list { flex: 1; overflow-y: auto; padding: 8px 16px; }
 .chat-list-item {
@@ -450,6 +461,7 @@ body {
 .chat-header {
     display: flex; align-items: center; gap: 12px; padding: 10px 16px;
     background: var(--bg-secondary); border-bottom: 1px solid var(--border-color); flex-shrink: 0;
+    /* 注意：已由父级 .page 的 padding-top 处理安全区域 */
 }
 .back-btn { background: none; border: none; color: var(--text-secondary); font-size: var(--font-xl); cursor: pointer; padding: 4px 8px; border-radius: var(--radius-sm); transition: var(--transition); }
 .back-btn:hover { color: var(--text-primary); background: var(--bg-card); }
@@ -971,7 +983,7 @@ body {
 /* ==================== Search Bar ==================== */
 .search-bar {
     position: fixed;
-    top: 0;
+    top: env(safe-area-inset-top, 0px);
     left: 50%;
     transform: translateX(-50%);
     width: 100%;
@@ -3181,11 +3193,4 @@ input:checked + .slider:before {
     }
 }
 
-/* iOS Safari 独立模式 */
-@media (display-mode: standalone) and (-webkit-touch-callout: none) {
-    body {
-        /* iOS 状态栏高度补偿 */
-        padding-top: constant(safe-area-inset-top);
-        padding-top: env(safe-area-inset-top);
-    }
-}
+/* iOS Safari 独立模式 - 已由 .page 的 padding-top 处理 */
