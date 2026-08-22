@@ -1977,17 +1977,71 @@ function startChatWithScene(roleId, sceneOpenerEncoded) {
 // ==================== Custom Role Creator ====================
 let _editingRoleId = null; // 编辑模式下的角色ID
 
+let _uploadedAvatarData = null; // 存储上传的头像数据
+
 function initCreateRoleModal() {
     const modal = $('#createRoleModal');
     const closeBtn = $('#closeCreateRole');
+    const backBtn = $('#createRoleBackBtn');
     const overlay = modal.querySelector('.role-detail-overlay');
     const saveBtn = $('#saveCreateRole');
+    const avatarInput = $('#crAvatarInput');
+    const avatarUploadBtn = $('#crAvatarUploadBtn');
+    const avatarPreview = $('#crAvatarPreview');
+    const avatarImg = $('#crAvatarImg');
+    const avatarPlaceholder = $('#crAvatarPlaceholder');
+    const advancedToggle = $('#crAdvancedToggle');
+    const advancedContent = $('#crAdvancedContent');
+    const toggleIcon = advancedToggle.querySelector('.cr-toggle-icon');
 
-    [closeBtn, overlay].forEach(el => {
+    [closeBtn, backBtn, overlay].forEach(el => {
         el.addEventListener('click', () => {
             modal.classList.add('hidden');
             _editingRoleId = null;
+            _uploadedAvatarData = null;
+            resetCreateRoleForm();
         });
+    });
+
+    // 高级定义折叠展开
+    advancedToggle.addEventListener('click', () => {
+        const isExpanded = advancedContent.style.display !== 'none';
+        if (isExpanded) {
+            advancedContent.style.display = 'none';
+            toggleIcon.style.transform = 'rotate(0deg)';
+        } else {
+            advancedContent.style.display = 'block';
+            toggleIcon.style.transform = 'rotate(180deg)';
+        }
+    });
+
+    // 头像上传功能
+    avatarUploadBtn.addEventListener('click', () => {
+        avatarInput.click();
+    });
+
+    avatarPreview.addEventListener('click', () => {
+        avatarInput.click();
+    });
+
+    avatarInput.addEventListener('change', (e) => {
+        const file = e.target.files[0];
+        if (!file) return;
+
+        if (!file.type.startsWith('image/')) {
+            showToast('请选择图片文件');
+            return;
+        }
+
+        const reader = new FileReader();
+        reader.onload = (e) => {
+            const imageData = e.target.result;
+            _uploadedAvatarData = imageData;
+            avatarImg.src = imageData;
+            avatarImg.style.display = 'block';
+            avatarPlaceholder.style.display = 'none';
+        };
+        reader.readAsDataURL(file);
     });
 
     // 标签按钮点击切换
@@ -1999,14 +2053,15 @@ function initCreateRoleModal() {
 
     saveBtn.addEventListener('click', () => {
         const name = $('#crName').value.trim();
-        const title = $('#crTitle').value.trim();
         const desc = $('#crDesc').value.trim();
         const opener = $('#crOpener').value.trim();
-        const systemPrompt = $('#crSystemPrompt').value.trim();
+        const personality = $('#crPersonality').value.trim();
+        const scenario = $('#crScenario').value.trim();
+        const example = $('#crExample').value.trim();
 
-        if (!name) { showToast('请输入角色名'); return; }
-        if (!title) { showToast('请输入一句话标题'); return; }
-        if (!systemPrompt) { showToast('请输入人设提示词'); return; }
+        if (!name) { showToast('请输入角色名字'); return; }
+        if (!desc) { showToast('请输入角色设定'); return; }
+        if (!opener) { showToast('请输入开场白'); return; }
 
         // 从预设按钮获取选中标签
         const tags = [];
@@ -2027,6 +2082,18 @@ function initCreateRoleModal() {
             'linear-gradient(135deg, #1a3e3e, #2d4e1b)',
         ];
 
+        // 构建系统提示词（整合各个字段）
+        let systemPrompt = desc;
+        if (personality) {
+            systemPrompt += `\n\n【性格特点】\n${personality}`;
+        }
+        if (scenario) {
+            systemPrompt += `\n\n【情景设定】\n${scenario}`;
+        }
+        if (example) {
+            systemPrompt += `\n\n【对话示例】\n${example}`;
+        }
+
         const customRoles = JSON.parse(localStorage.getItem(getCustomRolesKey()) || '[]');
 
         if (_editingRoleId) {
@@ -2035,19 +2102,31 @@ function initCreateRoleModal() {
             const roIdx = ROLES_DATA.findIndex(r => r.id === _editingRoleId);
             if (roleIdx >= 0) {
                 customRoles[roleIdx].name = name;
-                customRoles[roleIdx].title = title;
-                customRoles[roleIdx].desc = desc || '用户自定义角色';
+                customRoles[roleIdx].title = opener.substring(0, 60) + (opener.length > 60 ? '……' : '');
+                customRoles[roleIdx].desc = desc;
                 customRoles[roleIdx].tags = tags;
                 customRoles[roleIdx].systemPrompt = systemPrompt;
+                customRoles[roleIdx].personality = personality;
+                customRoles[roleIdx].scenario = scenario;
+                customRoles[roleIdx].example = example;
                 customRoles[roleIdx].scenes = opener ? [{ preview: opener.substring(0, 60) + (opener.length > 60 ? '……' : ''), opener: opener }] : [];
+                if (_uploadedAvatarData) {
+                    customRoles[roleIdx].image = _uploadedAvatarData;
+                }
             }
             if (roIdx >= 0) {
                 ROLES_DATA[roIdx].name = name;
-                ROLES_DATA[roIdx].title = title;
-                ROLES_DATA[roIdx].desc = desc || '用户自定义角色';
+                ROLES_DATA[roIdx].title = opener.substring(0, 60) + (opener.length > 60 ? '……' : '');
+                ROLES_DATA[roIdx].desc = desc;
                 ROLES_DATA[roIdx].tags = tags;
                 ROLES_DATA[roIdx].systemPrompt = systemPrompt;
+                ROLES_DATA[roIdx].personality = personality;
+                ROLES_DATA[roIdx].scenario = scenario;
+                ROLES_DATA[roIdx].example = example;
                 ROLES_DATA[roIdx].scenes = opener ? [{ preview: opener.substring(0, 60) + (opener.length > 60 ? '……' : ''), opener: opener }] : [];
+                if (_uploadedAvatarData) {
+                    ROLES_DATA[roIdx].image = _uploadedAvatarData;
+                }
             }
             localStorage.setItem(getCustomRolesKey(), JSON.stringify(customRoles));
             _editingRoleId = null;
@@ -2056,17 +2135,26 @@ function initCreateRoleModal() {
             const customRole = {
                 id: Date.now(),
                 name: name,
-                title: title,
-                desc: desc || '用户自定义角色',
+                title: opener.substring(0, 60) + (opener.length > 60 ? '……' : ''),
+                desc: desc,
                 rarity: 'R',
                 isNew: true,
                 tags: tags,
                 emoji: '🎭',
                 gradient: gradients[Math.floor(Math.random() * gradients.length)],
                 systemPrompt: systemPrompt,
+                personality: personality,
+                scenario: scenario,
+                example: example,
                 scenes: opener ? [{ preview: opener.substring(0, 60) + (opener.length > 60 ? '……' : ''), opener: opener }] : [],
                 isCustom: true
             };
+
+            // 如果上传了头像，添加到角色数据
+            if (_uploadedAvatarData) {
+                customRole.image = _uploadedAvatarData;
+            }
+
             customRoles.push(customRole);
             localStorage.setItem(getCustomRolesKey(), JSON.stringify(customRoles));
             ROLES_DATA.push(customRole);
@@ -2078,35 +2166,65 @@ function initCreateRoleModal() {
 
         // 关闭弹窗并清空表单
         modal.classList.add('hidden');
-        clearCreateRoleForm();
+        resetCreateRoleForm();
+        _uploadedAvatarData = null;
         showToast(_editingRoleId ? '角色修改成功！' : '角色创建成功！');
     });
 }
 
-function clearCreateRoleForm() {
+function resetCreateRoleForm() {
     $('#crName').value = '';
-    $('#crTitle').value = '';
     $('#crDesc').value = '';
     $('#crOpener').value = '';
-    $('#crSystemPrompt').value = '';
+    $('#crPersonality').value = '';
+    $('#crScenario').value = '';
+    $('#crExample').value = '';
     $$('#crTagsSelect .cr-tag-btn').forEach(btn => btn.classList.remove('selected'));
+
+    // 重置头像
+    const avatarImg = $('#crAvatarImg');
+    const avatarPlaceholder = $('#crAvatarPlaceholder');
+    avatarImg.style.display = 'none';
+    avatarImg.src = '';
+    avatarPlaceholder.style.display = 'flex';
+    _uploadedAvatarData = null;
+
+    // 收起高级定义
+    const advancedContent = $('#crAdvancedContent');
+    const toggleIcon = $('#crAdvancedToggle').querySelector('.cr-toggle-icon');
+    advancedContent.style.display = 'none';
+    toggleIcon.style.transform = 'rotate(0deg)';
 }
 
 function openCreateRoleModal(editRole) {
     const modal = $('#createRoleModal');
     modal.classList.remove('hidden');
-    clearCreateRoleForm();
+    resetCreateRoleForm();
 
     if (editRole) {
         // 编辑模式：填充已有数据
         _editingRoleId = editRole.id;
-        modal.querySelector('h2').textContent = '✏️ 修改角色';
+        modal.querySelector('h2').textContent = '修改角色';
         $('#saveCreateRole').textContent = '保存修改';
         $('#crName').value = editRole.name || '';
-        $('#crTitle').value = editRole.title || '';
         $('#crDesc').value = editRole.desc || '';
         $('#crOpener').value = (editRole.scenes && editRole.scenes[0]) ? editRole.scenes[0].opener : '';
-        $('#crSystemPrompt').value = editRole.systemPrompt || '';
+        $('#crPersonality').value = editRole.personality || '';
+        $('#crScenario').value = editRole.scenario || '';
+        $('#crExample').value = editRole.example || '';
+
+        // 加载头像（编辑时保留原有头像）
+        if (editRole.image) {
+            _uploadedAvatarData = editRole.image;
+            const avatarImg = $('#crAvatarImg');
+            const avatarPlaceholder = $('#crAvatarPlaceholder');
+            avatarImg.src = editRole.image;
+            avatarImg.style.display = 'block';
+            avatarPlaceholder.style.display = 'none';
+        } else {
+            _uploadedAvatarData = null;
+        }
+
         // 选中已有标签
         if (editRole.tags) {
             editRole.tags.forEach(tag => {
@@ -2116,7 +2234,8 @@ function openCreateRoleModal(editRole) {
         }
     } else {
         _editingRoleId = null;
-        modal.querySelector('h2').textContent = '✨ 创建自定义角色';
+        _uploadedAvatarData = null;
+        modal.querySelector('h2').textContent = '新建角色';
         $('#saveCreateRole').textContent = '创建角色';
     }
 }
