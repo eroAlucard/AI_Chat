@@ -373,7 +373,7 @@ const UserBehavior = {
  * 注意：必须是可写普通数组，app.js 中多处直接 push/splice/修改属性
  */
 (function() {
-    // 保留 roles-data.js 中的自制角色（id 1-10），图片路径已修正为 cards/role_00X.png
+    // roles-data.js 现在是空数组，所有角色都通过 BuiltinCards 动态加载
     const builtinSelfMade = (typeof ROLES_DATA !== 'undefined' && Array.isArray(ROLES_DATA)) ? [...ROLES_DATA].filter(r => r && r.id) : [];
     const _customKey = getCurrentUser() ? `ai_custom_roles_${getCurrentUser()}` : 'ai_custom_roles';
     const custom = (JSON.parse(localStorage.getItem(_customKey) || '[]')).filter(r => r && r.id);
@@ -941,9 +941,9 @@ function renderRoleGrid() {
         } else if (tabName === 'latest') {
             // 按创建时间降序，最新导入/创建的排前面
             roles.sort((a, b) => {
-                const tA = a.createdAt || a.id;
-                const tB = b.createdAt || b.id;
-                return (tB > tA) ? 1 : (tB < tA) ? -1 : 0;
+                const tA = a.createdAt || a.id || 0;
+                const tB = b.createdAt || b.id || 0;
+                return tB - tA; // 数字降序排序
             });
         }
         // recommend 保持原始顺序
@@ -2164,7 +2164,8 @@ function initCreateRoleModal() {
                 scenario: scenario,
                 example: example,
                 scenes: opener ? [{ preview: opener.substring(0, 60) + (opener.length > 60 ? '……' : ''), opener: opener }] : [],
-                isCustom: true
+                isCustom: true,
+                createdAt: Date.now()
             };
 
             // 如果上传了头像，添加到角色数据
@@ -2341,7 +2342,7 @@ function reloadCustomRoles() {
     // 从当前用户的 key 重新加载自定义角色
     const customKey = getCustomRolesKey();
     const custom = (JSON.parse(localStorage.getItem(customKey) || '[]')).filter(r => r && r.id);
-    // 保留内置自制角色（id 1-8）
+    // roles-data.js 现在是空数组，所有内置角色通过 BuiltinCards 加载
     const builtinSelfMade = (typeof ROLES_DATA !== 'undefined' && Array.isArray(ROLES_DATA))
         ? [...ROLES_DATA].filter(r => r && r.id) : [];
     // 重建 ROLES_DATA（替换 IIFE 的结果）
