@@ -112,12 +112,23 @@ const BuiltinCards = (function() {
         for (let i = 0; i < metadataList.length; i++) {
             const meta = metadataList[i];
             try {
-                // 从 tags 推断性别
+                // pov 来自 cards/ 子目录（MalePOV=男性向，FemalePOV=女性向），
+                // 由生成器写入 metadata，是受众视角的权威信号（优先于标签推断）
+                const pov = meta.pov || '';
+
+                // 从 tags 推断性别（pov 有值时以 pov 为准，否则退回标签推断）
                 const tags = meta.tags || [];
                 const hasMaleTag = tags.some(t => t === 'Male' || t === 'male' || t === '男性' || t === '男性向');
                 const hasFemaleTag = tags.some(t => t === 'Female' || t === 'female' || t === '女性' || t === '女性向');
-                const inferredGender = hasMaleTag ? 'male' : (hasFemaleTag ? 'female' : 'female');
-                
+
+                // POV 逻辑：MalePOV(male) → 女性角色 → gender='female'
+                //          FemalePOV(female) → 男性角色 → gender='male'
+                const inferredGender = pov === 'male' ? 'female'
+                    : pov === 'female' ? 'male'
+                    : hasMaleTag ? 'male'
+                    : hasFemaleTag ? 'female'
+                    : 'female';  // 无法判断时默认 female
+
                 // 构建开场白数组（包含 first_mes 和 alternate_greetings）
                 const scenes = [];
                 if (meta.first_mes) {
@@ -147,8 +158,10 @@ const BuiltinCards = (function() {
                     isNew: true,
                     tags: tags,
                     gender: inferredGender,
+                    pov: pov,
                     emoji: '',
-                    image: `cards/${encodeURIComponent(meta.filename)}`,
+                    // filename 可能含子目录（如 MalePOV/xxx.png），逐段编码保留 /
+                    image: 'cards/' + String(meta.filename).split('/').map(encodeURIComponent).join('/'),
                     gradient: getRandomGradient(),
                     systemPrompt: buildSystemPrompt(meta),
                     scenes: scenes,

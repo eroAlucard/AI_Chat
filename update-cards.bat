@@ -21,6 +21,7 @@ if %ERRORLEVEL% EQU 0 (
     echo.
     echo 📋 已生成以下文件：
     echo    - cards/cards-metadata.json
+    echo    - cards/manifest.json
     echo    - js/cards-metadata.js
     echo.
     echo 💡 提示：
