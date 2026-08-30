@@ -969,8 +969,16 @@ function renderRoleCard(role) {
     // 防御性检查：跳过无效角色
     if (!role || !role.id) return '';
 
+    // 角色卡的 name/title/desc/tags 均来自导入的 PNG 元数据（用户可控内容），
+    // 其中一些描述文本包含原始的 <标签> 格式（如 <角色卡><基本信息>...），
+    // 若不转义，一旦被 substring 截断成未闭合标签，会破坏后续所有卡片的 DOM 结构
+    // （被错误地嵌套进这个未闭合标签内），导致 grid 双列布局错位甚至丢列。
+    const safeName = escapeHtml(role.name || '');
+    const safeTitle = escapeHtml(role.title || '');
+    const safeDesc = escapeHtml(role.desc || '');
+
     const coverHtml = role.image
-        ? `<img class="role-card-cover" src="${role.image}" alt="${role.name}" loading="lazy" onerror="this.style.display='none';this.nextElementSibling.style.display='flex'"><div class="role-card-cover-placeholder" style="background:${role.gradient};display:none"><span>${role.emoji}</span></div>`
+        ? `<img class="role-card-cover" src="${role.image}" alt="${safeName}" loading="lazy" onerror="this.style.display='none';this.nextElementSibling.style.display='flex'"><div class="role-card-cover-placeholder" style="background:${role.gradient};display:none"><span>${role.emoji}</span></div>`
         : `<div class="role-card-cover-placeholder" style="background:${role.gradient}"><span>${role.emoji}</span></div>`;
     return `
         <div class="role-card" data-role-id="${role.id}">
@@ -978,10 +986,10 @@ function renderRoleCard(role) {
             <span class="role-card-rarity rarity-${(role.rarity || "N").toLowerCase()}">${role.rarity}</span>
             ${role.isNew ? '<span class="role-card-new">✨ NEW</span>' : ''}
             <div class="role-card-info">
-                <div class="role-card-title">${role.title}</div>
-                <div class="role-card-desc">${role.desc}</div>
+                <div class="role-card-title">${safeTitle}</div>
+                <div class="role-card-desc">${safeDesc}</div>
                 <div class="role-card-tags">
-                    ${(role.tags || []).map(t => `<span class="role-card-tag">${t}</span>`).join('')}
+                    ${(role.tags || []).map(t => `<span class="role-card-tag">${escapeHtml(t)}</span>`).join('')}
                 </div>
             </div>
         </div>
@@ -1060,15 +1068,16 @@ function renderRecentViewed() {
         const role = ROLES_DATA.find(r => String(r.id) === String(roleId));
         if (!role) return '';
 
+        const safeName = escapeHtml(role.name || '');
         const coverHtml = role.image
-            ? `<img src="${role.image}" alt="${role.name}" loading="lazy" onerror="this.style.display='none';this.nextElementSibling.style.display='flex'">
+            ? `<img src="${role.image}" alt="${safeName}" loading="lazy" onerror="this.style.display='none';this.nextElementSibling.style.display='flex'">
                <div class="recent-viewed-placeholder" style="background:${role.gradient};display:none"><span>${role.emoji}</span></div>`
             : `<div class="recent-viewed-placeholder" style="background:${role.gradient}"><span>${role.emoji}</span></div>`;
 
         return `
             <div class="recent-viewed-item" data-role-id="${roleId}">
                 <div class="recent-viewed-cover">${coverHtml}</div>
-                <div class="recent-viewed-name">${role.name}</div>
+                <div class="recent-viewed-name">${safeName}</div>
             </div>
         `;
     }).join('');
@@ -1170,7 +1179,7 @@ function openRoleDetail(roleId) {
     }
 
     $('#roleDetailName').textContent = role.name;
-    $('#roleDetailTags').innerHTML = (role.tags || []).map(t => `<span class="role-card-tag">${t}</span>`).join('');
+    $('#roleDetailTags').innerHTML = (role.tags || []).map(t => `<span class="role-card-tag">${escapeHtml(t)}</span>`).join('');
     $('#roleDetailDesc').textContent = role.desc;
 
     // 解析 systemPrompt 中的玩法规则并显示
