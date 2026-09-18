@@ -21,6 +21,8 @@
     <link rel="apple-touch-icon" href="/icons/icon-192.png"> -->
 
     <link rel="stylesheet" href="css/style.css">
+    <link rel="stylesheet" href="css/markdown-renderer.css">
+    <link rel="stylesheet" href="css/status-panel.css">
 </head>
 <body>
     <!-- 登录验证遮罩 -->
@@ -611,6 +613,12 @@
                             <h3>设置</h3>
                         </div>
                         <div class="settings-body">
+                            <!-- 用户身份 -->
+                            <div class="setting-item">
+                                <span class="setting-label">默认用户名 <span style="color:rgba(255,255,255,0.3);font-size:0.8em">（{{user}} 替换值）</span></span>
+                                <input type="text" class="setting-input" id="defaultUserNameInput" value="用户" placeholder="角色卡中 {{user}} 将替换为此名称">
+                            </div>
+                            <!-- 模型设置 -->
                             <div class="setting-item">
                                 <span class="setting-label">API 地址</span>
                                 <input type="text" class="setting-input" id="apiUrlInput" value="http://169.254.83.107:1234" placeholder="LM Studio API 地址">
@@ -620,13 +628,18 @@
                                 <input type="text" class="setting-input" id="modelNameInput" value="" placeholder="留空使用默认模型">
                             </div>
                             <div class="setting-item">
-                                <span class="setting-label">温度</span>
-                                <input type="range" class="setting-range" id="temperatureInput" min="0" max="2" step="0.1" value="0.7">
-                                <span class="setting-value" id="temperatureValue">0.7</span>
+                                <span class="setting-label">记忆长度 <span class="setting-value" id="memoryLengthValue">20</span></span>
+                                <input type="range" class="setting-range" id="memoryLengthInput" min="1" max="100" step="1" value="20">
+                                <span style="color:rgba(255,255,255,0.3);font-size:0.75em;display:block;margin-top:2px">仅发送最后 N 条历史消息给模型</span>
                             </div>
                             <div class="setting-item">
-                                <span class="setting-label">最大回复长度</span>
-                                <input type="number" class="setting-input" id="maxTokensInput" value="2048" min="128" max="8192">
+                                <span class="setting-label">回复令牌限制 <span class="setting-value" id="maxTokensValue">2048</span></span>
+                                <input type="range" class="setting-range" id="maxTokensInput" min="128" max="32768" step="128" value="2048">
+                                <span style="color:rgba(255,255,255,0.3);font-size:0.75em;display:block;margin-top:2px">模型回复消息的最大长度</span>
+                            </div>
+                            <div class="setting-item">
+                                <span class="setting-label">温度 <span class="setting-value" id="temperatureValue">0.7</span></span>
+                                <input type="range" class="setting-range" id="temperatureInput" min="0" max="2" step="0.1" value="0.7">
                             </div>
                             <div class="setting-item">
                                 <span class="setting-label">系统提示词</span>
@@ -1095,6 +1108,8 @@
     <script src="js/image-store.js"></script>
     <script src="js/builtin-cards.js"></script>
     <script src="js/app.js"></script>
+    <script src="js/markdown-renderer.js"></script>
+    <script src="js/status-panel.js"></script>
     <script src="js/chat.js"></script>
 
     <!-- PWA 支持 -->

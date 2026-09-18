@@ -141,7 +141,8 @@ const CardParser = (function() {
         const data = cardData.data || {};
         
         const charName = data.name || cardData.name || '未命名角色';
-        const userName = '用户';
+        // 从全局设置读取默认用户名，确保 {{user}} 替换联动生效
+        const userName = (typeof AppState !== 'undefined' && AppState.settings && AppState.settings.defaultUserName) || '用户';
         
         // === 构建 systemPrompt ===
         let systemPrompt = '';
@@ -273,6 +274,7 @@ const CardParser = (function() {
                 characterVersion: data.character_version || '',
                 creatorNotes: data.creator_notes || data.creatorcomment || '',
                 createData: cardData.create_date || '',
+                regexScripts: data.extensions?.regex_scripts || [],
             },
             isCustom: true,
             createdAt: Date.now(),

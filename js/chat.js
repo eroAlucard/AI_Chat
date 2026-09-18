@@ -249,6 +249,22 @@ function showChatView(roleId) {
     const role = ROLES_DATA.find(r => String(r.id) === String(roleId));
     if (!role) return;
 
+    // 初始化状态面板数据（切换角色时重置并重新加载）
+    if (typeof StatusPanel !== 'undefined') {
+        StatusPanel.reset();
+        // 加载角色定义（始终调用，即使没有 regexScripts 也会使用默认角色定义）
+        StatusPanel.loadCharDefs(role.sourceData?.regexScripts || []);
+        // 回放历史消息中的变量更新（重新加载页面后状态面板需要恢复数据）
+        const session = AppState.chatSessions[roleId];
+        if (session && session.messages) {
+            for (const msg of session.messages) {
+                if (msg.role === 'assistant' && msg.content) {
+                    StatusPanel.processMessage(msg.content);
+                }
+            }
+        }
+    }
+
     // 只在切换到不同角色时取消前一个流式请求（返回列表再回来时不取消，让请求在后台完成）
     if (currentStreamAbort && currentStreamRoleId !== roleId) {
         currentStreamAbort.abort();
@@ -332,6 +348,7 @@ function showChatView(roleId) {
 
     // 滚动到底部
     scrollToBottom();
+
 }
 
 function getWelcomeMessage(role) {
@@ -962,6 +979,12 @@ function attachSwipeButtonEvents() {
 }
 
 function formatMessage(content) {
+    // 使用高级渲染引擎
+    if (typeof MarkdownRenderer !== 'undefined') {
+        return MarkdownRenderer.render(content);
+    }
+
+    // 降级：原有渲染逻辑
     // 处理状态栏语法 :::status 标题\n内容\n:::
     content = parseStatusBlocks(content);
 
@@ -1193,6 +1216,10 @@ async function sendMessage(skipInputCheck = false) {
                 delete AppState._generatingSwipeFor;
             } else {
                 // 正常消息：创建新消息
+                // 提取 JSONPatch 变量更新（在保存消息之前处理）
+                if (typeof StatusPanel !== 'undefined') {
+                    StatusPanel.processMessage(fullContent);
+                }
                 const msgData = {
                     role: 'assistant',
                     content: fullContent,
@@ -1288,11 +1315,11 @@ function hideTypingIndicator() {
 
 // ==================== LM Studio API ====================
 async function callLMApi(role, messages, useStream = true) {
-    const { apiUrl, modelName, temperature, maxTokens, systemPrompt } = AppState.settings;
+    const { apiUrl, modelName, temperature, maxTokens, memoryLength, systemPrompt } = AppState.settings;
 
-    // 获取会话中的用户名设置
+    // 获取会话中的用户名设置（优先级：session → 全局设置 → 默认值）
     const session = AppState.chatSessions[AppState.currentChat];
-    const userName = (session && session.userName) || '用户';
+    const userName = (session && session.userName) || (AppState.settings.defaultUserName) || '用户';
 
     let baseSystem = systemPrompt || role.systemPrompt;
 
@@ -1437,7 +1464,7 @@ async function callLMApi(role, messages, useStream = true) {
             let droppedCount = 0;
             
             for (const entry of constantEntries) {
-                const entryContent = CardParser.replaceTemplateVars(entry.content, role.name, '用户') + '\n\n';
+                const entryContent = CardParser.replaceTemplateVars(entry.content, role.name, userName) + '\n\n';
                 if (remaining >= entryContent.length) {
                     truncatedCB += entryContent;
                     remaining -= entryContent.length;
@@ -1473,6 +1500,13 @@ async function callLMApi(role, messages, useStream = true) {
         }
     }
 
+    // 记忆长度截断：仅发送最后 N 条历史消息给模型
+    const memLen = memoryLength || 20;
+    if (messagesToSend.length > memLen) {
+        messagesToSend = messagesToSend.slice(-memLen);
+        console.log(`[callLMApi] 记忆截断：保留最后 ${memLen} 条消息（共 ${messages.length} 条）`);
+    }
+
     const apiMessages = [
         { role: 'system', content: systemMessage },
         ...messagesToSend.map(m => ({
@@ -1485,7 +1519,7 @@ async function callLMApi(role, messages, useStream = true) {
     if (role.sourceData && role.sourceData.postHistoryInstructions) {
         const phi = role.sourceData.postHistoryInstructions.trim();
         if (phi) {
-            const replacedPhi = CardParser.replaceTemplateVars(phi, role.name, '用户');
+            const replacedPhi = CardParser.replaceTemplateVars(phi, role.name, userName);
             // 注入到最后一条用户消息的末尾
             const lastUserMsg = apiMessages.findLast(m => m.role === 'user');
             if (lastUserMsg) {
@@ -1667,7 +1701,7 @@ async function readStreamResponse(response, role) {
                         }
                         if (bubble) {
                             // 思考过程用灰色斜体显示
-                            bubble.innerHTML = `<span style="color:#888;font-style:italic;">💭 思考中…</span><br><span style="color:#aaa;font-style:italic;font-size:0.9em;">${formatMessage(reasoningContent)}</span>`;
+                            bubble.innerHTML = `<span style="color:#888;font-style:italic;">💭 思考中…</span><br><span style="color:#aaa;font-style:italic;font-size:0.9em;">${typeof MarkdownRenderer !== 'undefined' ? MarkdownRenderer.renderStream(reasoningContent) : formatMessage(reasoningContent)}</span>`;
                             smartScrollToBottom(container);
                         }
                     }
@@ -1699,10 +1733,10 @@ async function readStreamResponse(response, role) {
                         if (bubble) {
                             if (reasoningContent) {
                                 // 有思考过程：折叠思考，显示正文
-                                bubble.innerHTML = `<details style="margin-bottom:8px;"><summary style="color:#888;font-size:0.85em;cursor:pointer;">💭 思考过程</summary><div style="color:#aaa;font-style:italic;font-size:0.9em;margin-top:4px;padding-left:8px;">${formatMessage(reasoningContent)}</div></details>${formatMessage(fullContent)}`;
+                                bubble.innerHTML = `<details style="margin-bottom:8px;"><summary style="color:#888;font-size:0.85em;cursor:pointer;">💭 思考过程</summary><div style="color:#aaa;font-style:italic;font-size:0.9em;margin-top:4px;padding-left:8px;">${typeof MarkdownRenderer !== 'undefined' ? MarkdownRenderer.renderStream(reasoningContent) : formatMessage(reasoningContent)}</div></details>${typeof MarkdownRenderer !== 'undefined' ? MarkdownRenderer.renderStream(fullContent) : formatMessage(fullContent)}`;
                             } else {
                                 // 无思考过程：直接显示正文
-                                bubble.innerHTML = formatMessage(fullContent);
+                                bubble.innerHTML = typeof MarkdownRenderer !== 'undefined' ? MarkdownRenderer.renderStream(fullContent) : formatMessage(fullContent);
                             }
                             smartScrollToBottom(container);
                         }
@@ -1720,10 +1754,11 @@ async function readStreamResponse(response, role) {
             let bubble = $('#streamBubble');
             if (bubble) {
                 // 保持已显示的内容，添加中断提示
+                const _fmt = typeof MarkdownRenderer !== 'undefined' ? MarkdownRenderer.renderStream : formatMessage;
                 if (reasoningContent) {
-                    bubble.innerHTML = `<details style="margin-bottom:8px;"><summary style="color:#888;font-size:0.85em;cursor:pointer;">💭 思考过程</summary><div style="color:#aaa;font-style:italic;font-size:0.9em;margin-top:4px;padding-left:8px;">${formatMessage(reasoningContent)}</div></details>${formatMessage(fullContent)}<br><span style="color:#f59e0b;font-size:0.85em;margin-top:8px;display:inline-block;">⚠️ 流中断</span>`;
+                    bubble.innerHTML = `<details style="margin-bottom:8px;"><summary style="color:#888;font-size:0.85em;cursor:pointer;">💭 思考过程</summary><div style="color:#aaa;font-style:italic;font-size:0.9em;margin-top:4px;padding-left:8px;">${_fmt(reasoningContent)}</div></details>${_fmt(fullContent)}<br><span style="color:#f59e0b;font-size:0.85em;margin-top:8px;display:inline-block;">⚠️ 流中断</span>`;
                 } else {
-                    bubble.innerHTML = `${formatMessage(fullContent)}<br><span style="color:#f59e0b;font-size:0.85em;margin-top:8px;display:inline-block;">⚠️ 流中断</span>`;
+                    bubble.innerHTML = `${_fmt(fullContent)}<br><span style="color:#f59e0b;font-size:0.85em;margin-top:8px;display:inline-block;">⚠️ 流中断</span>`;
                 }
             }
             return { content: fullContent, reasoning: reasoningContent || '', interrupted: true };

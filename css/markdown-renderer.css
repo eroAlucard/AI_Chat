@@ -1,0 +1,283 @@
+/* ==================== Markdown 高级渲染样式 ==================== */
+
+/* ---- 段落 ---- */
+.md-paragraph {
+    margin: 0;
+    line-height: 1.7;
+}
+.md-paragraph + .md-paragraph {
+    margin-top: 0.5em;
+}
+
+/* ---- 标题 ---- */
+.md-heading {
+    color: var(--accent-purple, #8b5cf6);
+    margin: 0.6em 0 0.3em;
+    font-weight: 700;
+    line-height: 1.3;
+}
+h1.md-heading { font-size: 1.4em; }
+h2.md-heading { font-size: 1.25em; }
+h3.md-heading { font-size: 1.1em; }
+h4.md-heading { font-size: 1em; }
+
+/* ---- 粗体 / 斜体 ---- */
+.message-bubble strong {
+    color: #e0d4ff;
+    font-weight: 700;
+}
+.message-bubble em {
+    color: #c4b5fd;
+    font-style: italic;
+}
+.message-bubble del {
+    opacity: 0.5;
+    text-decoration: line-through;
+}
+
+/* ---- 引用块 ---- */
+.md-quote {
+    border-left: 3px solid var(--accent-purple, #8b5cf6);
+    margin: 0.6em 0;
+    padding: 0.4em 0.8em;
+    background: rgba(139, 92, 246, 0.08);
+    border-radius: 0 6px 6px 0;
+    color: #c4b5fd;
+    font-style: italic;
+}
+
+/* ---- 分隔线 ---- */
+.md-hr {
+    border: none;
+    height: 1px;
+    background: linear-gradient(90deg, transparent, rgba(139, 92, 246, 0.4), transparent);
+    margin: 0.8em 0;
+}
+
+/* ---- 代码块 ---- */
+.md-code-block {
+    background: rgba(0, 0, 0, 0.35);
+    border: 1px solid rgba(139, 92, 246, 0.2);
+    border-radius: 8px;
+    padding: 12px;
+    margin: 0.6em 0;
+    overflow-x: auto;
+    font-size: 0.9em;
+    line-height: 1.5;
+}
+.md-code-block code {
+    color: #e0d4ff;
+    font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+    white-space: pre;
+}
+
+/* 行内代码 */
+.md-inline-code {
+    background: rgba(139, 92, 246, 0.15);
+    border: 1px solid rgba(139, 92, 246, 0.25);
+    border-radius: 4px;
+    padding: 1px 5px;
+    font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+    font-size: 0.9em;
+    color: #c4b5fd;
+}
+
+/* ---- 列表 ---- */
+.md-list {
+    margin: 0.4em 0;
+    padding-left: 1.5em;
+}
+.md-list li {
+    margin: 0.2em 0;
+    line-height: 1.6;
+}
+.md-list ul, .md-list ol {
+    margin: 0.2em 0;
+}
+
+/* ---- 链接 ---- */
+.md-link {
+    color: var(--accent-purple, #8b5cf6);
+    text-decoration: underline;
+    text-decoration-color: rgba(139, 92, 246, 0.4);
+    text-underline-offset: 2px;
+}
+.md-link:hover {
+    text-decoration-color: var(--accent-purple, #8b5cf6);
+}
+
+/* ---- 图片 ---- */
+.md-image {
+    max-width: 100%;
+    max-height: 400px;
+    border-radius: 8px;
+    margin: 0.5em 0;
+    object-fit: cover;
+    border: 1px solid rgba(139, 92, 246, 0.15);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+    cursor: zoom-in;
+}
+
+.md-image:hover {
+    transform: scale(1.02);
+    box-shadow: 0 4px 16px rgba(139, 92, 246, 0.2);
+    border-color: rgba(139, 92, 246, 0.3);
+}
+
+/* 消息气泡中的图片适配 */
+.message-bubble .md-image {
+    max-width: calc(100% + 8px);
+    margin-left: -4px;
+    margin-right: -4px;
+    border-radius: 6px;
+}
+
+/* ---- 对话引号 ---- */
+.md-dialogue {
+    color: #f0abfc;
+}
+
+/* ==================== 场景头部（☞...☜） ==================== */
+.md-scene-header {
+    background: linear-gradient(135deg, rgba(139, 92, 246, 0.12), rgba(59, 130, 246, 0.08));
+    border: 1px solid rgba(139, 92, 246, 0.2);
+    border-radius: 10px;
+    padding: 10px 14px;
+    margin: 0.6em 0;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.md-scene-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    align-items: center;
+}
+
+.md-scene-row-sub {
+    opacity: 0.75;
+    font-size: 0.9em;
+}
+
+.md-scene-date,
+.md-scene-time,
+.md-scene-location,
+.md-scene-weather,
+.md-scene-atmosphere {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 3px 10px;
+    border-radius: 6px;
+    font-size: 0.9em;
+    white-space: nowrap;
+}
+
+.md-scene-date {
+    background: rgba(251, 191, 36, 0.15);
+    color: #fbbf24;
+    border: 1px solid rgba(251, 191, 36, 0.25);
+    font-weight: 600;
+}
+
+.md-scene-time {
+    background: rgba(139, 92, 246, 0.15);
+    color: #c4b5fd;
+    border: 1px solid rgba(139, 92, 246, 0.25);
+    font-weight: 600;
+    font-size: 1em;
+}
+
+.md-scene-location {
+    background: rgba(59, 130, 246, 0.15);
+    color: #93c5fd;
+    border: 1px solid rgba(59, 130, 246, 0.25);
+    font-weight: 600;
+}
+
+.md-scene-weather {
+    background: rgba(56, 189, 248, 0.12);
+    color: #7dd3fc;
+    border: 1px solid rgba(56, 189, 248, 0.2);
+}
+
+.md-scene-atmosphere {
+    background: rgba(251, 113, 133, 0.12);
+    color: #fda4af;
+    border: 1px solid rgba(251, 113, 133, 0.2);
+}
+
+/* ==================== 状态块折叠 ==================== */
+.md-state-block {
+    margin: 0.5em 0;
+    border: 1px solid rgba(139, 92, 246, 0.15);
+    border-radius: 8px;
+    overflow: hidden;
+}
+
+.md-state-summary {
+    padding: 6px 12px;
+    background: rgba(139, 92, 246, 0.08);
+    color: #a78bfa;
+    font-size: 0.85em;
+    cursor: pointer;
+    user-select: none;
+}
+
+.md-state-summary:hover {
+    background: rgba(139, 92, 246, 0.15);
+}
+
+.md-state-content {
+    padding: 8px 12px;
+    background: rgba(0, 0, 0, 0.2);
+    font-size: 0.85em;
+    color: #888;
+    max-height: 200px;
+    overflow-y: auto;
+}
+
+.md-state-content pre {
+    margin: 0;
+    white-space: pre-wrap;
+    word-break: break-all;
+    font-family: 'Consolas', 'Monaco', monospace;
+    font-size: 0.9em;
+}
+
+/* ==================== 消息气泡内的渲染优化 ==================== */
+.message-bubble .md-scene-header {
+    margin-left: -4px;
+    margin-right: -4px;
+}
+
+.message-bubble .md-code-block {
+    margin-left: -4px;
+    margin-right: -4px;
+}
+
+.message-bubble .md-quote {
+    margin-left: -4px;
+}
+
+/* 确保 message-bubble 内的文字样式正确继承 */
+.message-bubble p {
+    margin: 0;
+}
+
+.message-bubble details {
+    margin: 0.5em 0;
+}
+
+.message-bubble details summary {
+    cursor: pointer;
+    color: #a78bfa;
+    font-size: 0.85em;
+}
+
+.message-bubble details summary:hover {
+    color: #c4b5fd;
+}

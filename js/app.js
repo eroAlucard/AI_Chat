@@ -159,6 +159,8 @@ const AppState = {
         modelName: '',
         temperature: 0.7,
         maxTokens: 2048,
+        memoryLength: 20,
+        defaultUserName: '用户',
         systemPrompt: '',
 
     }
@@ -1900,11 +1902,31 @@ function initSettings() {
         tempValue.textContent = tempInput.value;
     });
 
+    // 记忆长度滑块实时显示
+    const memLenInput = $('#memoryLengthInput');
+    const memLenValue = $('#memoryLengthValue');
+    if (memLenInput) {
+        memLenInput.addEventListener('input', () => {
+            memLenValue.textContent = memLenInput.value;
+        });
+    }
+
+    // 回复令牌限制滑块实时显示
+    const maxTokInput = $('#maxTokensInput');
+    const maxTokValue = $('#maxTokensValue');
+    if (maxTokInput) {
+        maxTokInput.addEventListener('input', () => {
+            maxTokValue.textContent = maxTokInput.value;
+        });
+    }
+
     saveBtn.addEventListener('click', () => {
         AppState.settings.apiUrl = $('#apiUrlInput').value.trim();
         AppState.settings.modelName = $('#modelNameInput').value.trim();
         AppState.settings.temperature = parseFloat($('#temperatureInput').value);
         AppState.settings.maxTokens = parseInt($('#maxTokensInput').value);
+        AppState.settings.memoryLength = parseInt($('#memoryLengthInput').value);
+        AppState.settings.defaultUserName = $('#defaultUserNameInput').value.trim() || '用户';
         AppState.settings.systemPrompt = $('#systemPromptInput').value.trim();
         saveState();
         showToast('设置已保存');
@@ -1927,6 +1949,10 @@ function loadSettingsForm() {
     $('#temperatureInput').value = s.temperature;
     $('#temperatureValue').textContent = s.temperature;
     $('#maxTokensInput').value = s.maxTokens;
+    $('#maxTokensValue').textContent = s.maxTokens;
+    $('#memoryLengthInput').value = s.memoryLength || 20;
+    $('#memoryLengthValue').textContent = s.memoryLength || 20;
+    $('#defaultUserNameInput').value = s.defaultUserName || '用户';
     $('#systemPromptInput').value = s.systemPrompt;
 }
 
