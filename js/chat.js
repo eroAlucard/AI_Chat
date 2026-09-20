@@ -352,8 +352,16 @@ function showChatView(roleId) {
 }
 
 function getWelcomeMessage(role) {
+    // 获取当前用户名（优先会话设置 → 全局设置 → 默认值）
+    const session = AppState.chatSessions[AppState.currentChat];
+    const userName = (session && session.userName) || (AppState.settings && AppState.settings.defaultUserName) || '用户';
+
     // 优先使用角色卡中的开场白（first_mes）
     if (role.scenes && role.scenes.length > 0 && role.scenes[0].opener) {
+        // 替换开场白中的模板变量 {{user}} / {{char}}
+        if (typeof CardParser !== 'undefined' && CardParser.replaceTemplateVars) {
+            return CardParser.replaceTemplateVars(role.scenes[0].opener, role.name, userName);
+        }
         return role.scenes[0].opener;
     }
 
@@ -1480,6 +1488,8 @@ async function callLMApi(role, messages, useStream = true) {
             
             // 重建 baseSystem：角色描述 + 原始 systemPrompt + 截断后的常驻条目
             baseSystem = descPart + baseWithoutCB + '\n\n' + truncatedCB;
+            // 重建后需要重新替换模板变量（baseWithoutCB 来自 role.systemPrompt，未替换 {{user}}/{{char}}）
+            baseSystem = CardParser.replaceTemplateVars(baseSystem, role.name, userName);
         }
     }
 
