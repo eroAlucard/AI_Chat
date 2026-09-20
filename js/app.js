@@ -1155,6 +1155,19 @@ function openRoleDetail(roleId) {
     const role = ROLES_DATA.find(r => String(r.id) === String(roleId));
     if (!role) return;
 
+    // 获取当前用户名，用于模板变量替换
+    const userName = (AppState.settings && AppState.settings.defaultUserName) || '用户';
+    const charName = role.name || '角色';
+
+    // 辅助函数：替换模板变量
+    const replaceVars = (text) => {
+        if (!text) return '';
+        if (typeof CardParser !== 'undefined' && CardParser.replaceTemplateVars) {
+            return CardParser.replaceTemplateVars(text, charName, userName);
+        }
+        return text;
+    };
+
     // 添加到最近浏览
     addToRecentViewed(roleId);
 
@@ -1182,11 +1195,11 @@ function openRoleDetail(roleId) {
 
     $('#roleDetailName').textContent = role.name;
     $('#roleDetailTags').innerHTML = (role.tags || []).map(t => `<span class="role-card-tag">${escapeHtml(t)}</span>`).join('');
-    $('#roleDetailDesc').textContent = role.desc;
+    $('#roleDetailDesc').textContent = replaceVars(role.desc);
 
-    // 解析 systemPrompt 中的玩法规则并显示
+    // 解析 systemPrompt 中的玩法规则并显示（替换模板变量后再解析）
     const rulesEl = $('#roleDetailRules');
-    const rulesHtml = parseSystemPromptRules(role.systemPrompt);
+    const rulesHtml = parseSystemPromptRules(replaceVars(role.systemPrompt));
     rulesEl.innerHTML = rulesHtml;
 
     $('#startChatBtn').dataset.roleId = roleId;
@@ -1290,13 +1303,22 @@ function renderWorldBookEntries(role) {
 
     const entries = role.sourceData.characterBook.entries.filter(e => e.content && e.content.trim());
     const charName = role.name || '角色';
+    // 获取用户名用于模板变量替换
+    const userName = (AppState.settings && AppState.settings.defaultUserName) || '用户';
+    const replaceVars = (text) => {
+        if (!text) return '';
+        if (typeof CardParser !== 'undefined' && CardParser.replaceTemplateVars) {
+            return CardParser.replaceTemplateVars(text, charName, userName);
+        }
+        return text;
+    };
 
     let html = '';
     entries.forEach((entry, idx) => {
         const isConstant = entry.constant === true || (!entry.keys || entry.keys.length === 0);
         const isEnabled = entry.enabled !== false;
         const keys = (entry.keys || []).filter(k => k.trim());
-        const contentPreview = (entry.content || '').substring(0, 150).replace(/\n/g, ' ');
+        const contentPreview = replaceVars((entry.content || '').substring(0, 150)).replace(/\n/g, ' ');
         const typeLabel = isConstant ? '<span class="wb-tag wb-constant">常驻</span>' : '<span class="wb-tag wb-trigger">触发</span>';
         const enabledClass = isEnabled ? 'wb-enabled' : 'wb-disabled';
 
@@ -1963,6 +1985,17 @@ function renderSceneSelector(role) {
     const countEl = $('#sceneCount');
     const scenes = role.scenes || [];
 
+    // 获取用户名用于模板变量替换
+    const userName = (AppState.settings && AppState.settings.defaultUserName) || '用户';
+    const charName = role.name || '角色';
+    const replaceVars = (text) => {
+        if (!text) return '';
+        if (typeof CardParser !== 'undefined' && CardParser.replaceTemplateVars) {
+            return CardParser.replaceTemplateVars(text, charName, userName);
+        }
+        return text;
+    };
+
     if (scenes.length === 0) {
         container.innerHTML = '';
         countEl.textContent = '';
@@ -1972,9 +2005,9 @@ function renderSceneSelector(role) {
     countEl.textContent = `${scenes.length} 个开场`;
 
     container.innerHTML = scenes.map((scene, idx) => `
-        <div class="scene-item ${idx === 0 ? 'selected' : ''}" data-index="${idx}" data-opener="${encodeURIComponent(scene.opener || '')}">
+        <div class="scene-item ${idx === 0 ? 'selected' : ''}" data-index="${idx}" data-opener="${encodeURIComponent(replaceVars(scene.opener) || '')}">
             <div class="scene-item-label">${idx === 0 ? '默认' : '备选 ' + idx}${idx === 0 ? ' 已选中' : ''}</div>
-            <div class="scene-item-text">${scene.preview}</div>
+            <div class="scene-item-text">${replaceVars(scene.preview)}</div>
         </div>
     `).join('');
 
