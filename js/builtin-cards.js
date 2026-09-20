@@ -1,10 +1,10 @@
 /**
  * builtin-cards.js — 内置角色卡运行时加载
  * 
- * 内置角色数据从 cards-metadata.json 动态加载，不存入 localStorage（避免 5MB 限制）。
+ * 内置角色数据从 cards-metadata-female.json 和 cards-metadata-male.json 动态加载，不存入 localStorage（避免 5MB 限制）。
  * 加载策略（按优先级）：
- *   1. 全局变量 CARDS_METADATA（由 js/cards-metadata.js 通过 <script> 标签加载）
- *   2. fetch（HTTP 服务器环境）
+ *   1. 全局变量 CARDS_METADATA（向后兼容，由 <script> 标签加载）
+ *   2. fetch 依次加载拆分后的多个 JSON 文件，合并结果
  *   3. XMLHttpRequest 回退（兼容部分 file:// 环境）
  * 只有自定义角色才存 localStorage。
  */
@@ -17,23 +17,47 @@ const BuiltinCards = (function() {
     let _builtinRolesCache = null;
 
     /**
-     * 加载 metadata JSON（三级回退策略）
+     * 拆分后的 metadata 文件列表（按 POV 拆分，避免单文件超过 Cloudflare Pages 25 MiB 限制）
+     */
+    const METADATA_FILES = [
+        'cards/cards-metadata-female.json',
+        'cards/cards-metadata-male.json',
+    ];
+
+    /**
+     * 加载 metadata JSON（多文件合并 + 三级回退策略）
+     * 
+     * 优先级：
+     *   1. 全局变量 CARDS_METADATA（向后兼容，由 <script> 标签加载）
+     *   2. fetch 依次加载拆分后的多个 JSON 文件，合并结果
+     *   3. XMLHttpRequest 回退（兼容部分 file:// 环境）
      */
     async function loadMetadata() {
-        // 优先级 1：全局变量（由 <script src="js/cards-metadata.js"> 加载，file:// 安全）
+        // 优先级 1：全局变量（向后兼容）
         if (typeof window.CARDS_METADATA !== 'undefined' && Array.isArray(window.CARDS_METADATA) && window.CARDS_METADATA.length > 0) {
             console.log(`[BuiltinCards] 从全局变量 CARDS_METADATA 加载 ${window.CARDS_METADATA.length} 张角色卡`);
             return window.CARDS_METADATA;
         }
 
-        // 优先级 2：fetch（HTTP 服务器环境）
+        // 优先级 2：fetch 依次加载拆分文件并合并
         try {
-            const resp = await fetch('cards/cards-metadata.json');
-            if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
-            const data = await resp.json();
-            if (data && data.length > 0) {
-                console.log(`[BuiltinCards] 从 fetch 加载 ${data.length} 张角色卡`);
-                return data;
+            const allData = [];
+            for (const url of METADATA_FILES) {
+                try {
+                    const resp = await fetch(url);
+                    if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+                    const data = await resp.json();
+                    if (Array.isArray(data) && data.length > 0) {
+                        console.log(`[BuiltinCards] 从 ${url} 加载 ${data.length} 张角色卡`);
+                        allData.push(...data);
+                    }
+                } catch (fileErr) {
+                    console.warn(`[BuiltinCards] 加载 ${url} 失败:`, fileErr.message);
+                }
+            }
+            if (allData.length > 0) {
+                console.log(`[BuiltinCards] fetch 合计加载 ${allData.length} 张角色卡`);
+                return allData;
             }
         } catch (fetchErr) {
             console.log('[BuiltinCards] fetch 失败:', fetchErr.message);
@@ -41,23 +65,34 @@ const BuiltinCards = (function() {
 
         // 优先级 3：XMLHttpRequest 回退
         try {
-            const data = await new Promise((resolve, reject) => {
-                const xhr = new XMLHttpRequest();
-                xhr.open('GET', 'cards/cards-metadata.json', true);
-                xhr.responseType = 'json';
-                xhr.onload = () => {
-                    if ((xhr.status >= 200 && xhr.status < 300) || xhr.status === 0) {
-                        resolve(xhr.response);
-                    } else {
-                        reject(new Error(`HTTP ${xhr.status}`));
+            const allData = [];
+            for (const url of METADATA_FILES) {
+                try {
+                    const data = await new Promise((resolve, reject) => {
+                        const xhr = new XMLHttpRequest();
+                        xhr.open('GET', url, true);
+                        xhr.responseType = 'json';
+                        xhr.onload = () => {
+                            if ((xhr.status >= 200 && xhr.status < 300) || xhr.status === 0) {
+                                resolve(xhr.response);
+                            } else {
+                                reject(new Error(`HTTP ${xhr.status}`));
+                            }
+                        };
+                        xhr.onerror = () => reject(new Error('网络错误'));
+                        xhr.send();
+                    });
+                    if (Array.isArray(data) && data.length > 0) {
+                        console.log(`[BuiltinCards] XHR 从 ${url} 加载 ${data.length} 张角色卡`);
+                        allData.push(...data);
                     }
-                };
-                xhr.onerror = () => reject(new Error('网络错误'));
-                xhr.send();
-            });
-            if (data && data.length > 0) {
-                console.log(`[BuiltinCards] 从 XHR 加载 ${data.length} 张角色卡`);
-                return data;
+                } catch (xhrFileErr) {
+                    console.warn(`[BuiltinCards] XHR 加载 ${url} 失败:`, xhrFileErr.message);
+                }
+            }
+            if (allData.length > 0) {
+                console.log(`[BuiltinCards] XHR 合计加载 ${allData.length} 张角色卡`);
+                return allData;
             }
         } catch (xhrErr) {
             console.log('[BuiltinCards] XHR 也失败:', xhrErr.message);

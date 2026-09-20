@@ -369,7 +369,7 @@ const UserBehavior = {
 /**
  * 全局角色数组
  * - 自定义角色：从 localStorage (ai_custom_roles) 加载
- * - 内置角色：由 BuiltinCards.autoImport() 运行时从 cards-metadata.json 动态加载
+ * - 内置角色：由 BuiltinCards.autoImport() 运行时从 cards-metadata-female/male.json 动态加载
  *   不存 localStorage，避免 5MB 限制
  *
  * 注意：必须是可写普通数组，app.js 中多处直接 push/splice/修改属性
