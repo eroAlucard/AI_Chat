@@ -33,10 +33,15 @@ const BuiltinCards = (function() {
      *   3. XMLHttpRequest 回退（兼容部分 file:// 环境）
      */
     async function loadMetadata() {
-        // 优先级 1：全局变量（向后兼容）
-        if (typeof window.CARDS_METADATA !== 'undefined' && Array.isArray(window.CARDS_METADATA) && window.CARDS_METADATA.length > 0) {
-            console.log(`[BuiltinCards] 从全局变量 CARDS_METADATA 加载 ${window.CARDS_METADATA.length} 张角色卡`);
-            return window.CARDS_METADATA;
+        // 优先级 1：全局变量（由 <script> 标签加载，兼容 file:// 协议）
+        const femaleData = typeof window.CARDS_METADATA_FEMALE !== 'undefined' ? window.CARDS_METADATA_FEMALE : [];
+        const maleData = typeof window.CARDS_METADATA_MALE !== 'undefined' ? window.CARDS_METADATA_MALE : [];
+        // 向后兼容：旧版单文件全局变量
+        const legacyData = typeof window.CARDS_METADATA !== 'undefined' && Array.isArray(window.CARDS_METADATA) ? window.CARDS_METADATA : [];
+        const globalData = [...femaleData, ...maleData, ...legacyData];
+        if (globalData.length > 0) {
+            console.log(`[BuiltinCards] 从全局变量加载 ${globalData.length} 张角色卡 (female:${femaleData.length} male:${maleData.length} legacy:${legacyData.length})`);
+            return globalData;
         }
 
         // 优先级 2：fetch 依次加载拆分文件并合并
