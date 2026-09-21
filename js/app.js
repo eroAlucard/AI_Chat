@@ -421,8 +421,8 @@ document.addEventListener('DOMContentLoaded', async () => {
     loadCustomRoles();
     initNavigation();
     initSearch();
-    initCategoryTabs();
     initFilterModal();
+    renderQuickFilterChips();
     initRecentViewed(); // 初始化最近浏览
     renderRoleGrid();
     // 异步从 IndexedDB 加载自定义角色图片
@@ -679,40 +679,26 @@ function performSearch(query) {
     }
 }
 
-// ==================== Category Tabs ====================
-function initCategoryTabs() {
-    $$('.category-tabs .tab').forEach(tab => {
-        tab.addEventListener('click', () => {
-            $$('.category-tabs .tab').forEach(t => t.classList.remove('active'));
-            tab.classList.add('active');
-            renderRoleGrid();
-        });
-    });
 
-    // 初始化快捷筛选
-    renderQuickFilters();
-}
-
-function renderQuickFilters() {
-    const container = $('#quickFilters');
+// ==================== Quick Filter Chips ====================
+function renderQuickFilterChips() {
+    const container = $('#quickFilterChips');
     if (!container) return;
 
-    // 使用智能推荐算法获取标签
-    let quickTags = UserBehavior.getRecommendedTags(8);
-
-    // 如果用户行为数据不足（新用户或得分太低），使用热门标签
-    if (quickTags.length < 4) {
-        quickTags = UserBehavior.getPopularTags(8);
+    // 获取推荐标签（基于用户行为），不足则用热门标签
+    let chips = UserBehavior.getRecommendedTags(10);
+    if (chips.length < 5) {
+        chips = UserBehavior.getPopularTags(10);
     }
 
     // 渲染标签
-    container.innerHTML = quickTags.map(tag => {
-        const isActive = AppState.filters[tag.group] && AppState.filters[tag.group].has(tag.name);
-        return `<button class="quick-filter-chip ${isActive ? 'active' : ''}" data-group="${tag.group}" data-value="${tag.name}">${tag.name}</button>`;
+    container.innerHTML = chips.map(chip => {
+        const isActive = AppState.filters[chip.group] && AppState.filters[chip.group].has(chip.name);
+        return `<button class="filter-chip ${isActive ? 'active' : ''}" data-group="${chip.group}" data-value="${chip.name}">${chip.name}</button>`;
     }).join('');
 
     // 绑定点击事件
-    container.querySelectorAll('.quick-filter-chip').forEach(chip => {
+    container.querySelectorAll('.filter-chip').forEach(chip => {
         chip.addEventListener('click', () => {
             const group = chip.dataset.group;
             const value = chip.dataset.value;
@@ -722,62 +708,19 @@ function renderQuickFilters() {
             }
 
             if (chip.classList.contains('active')) {
-                // 取消选中
                 chip.classList.remove('active');
                 AppState.filters[group].delete(value);
                 if (AppState.filters[group].size === 0) {
                     delete AppState.filters[group];
                 }
             } else {
-                // 选中
                 chip.classList.add('active');
                 AppState.filters[group].add(value);
-
-                // 记录筛选行为
                 UserBehavior.trackFilter(value);
             }
 
             renderRoleGrid();
         });
-    });
-
-    // PC端鼠标拖拽滑动支持
-    initChipsDrag(container);
-}
-
-// PC端鼠标拖拽滑动（复制快捷回复的实现）
-function initChipsDrag(container) {
-    let isDragging = false;
-    let startX = 0;
-    let scrollLeft = 0;
-
-    container.style.cursor = 'grab';
-
-    container.addEventListener('mousedown', (e) => {
-        // 如果点击的是按钮，不启动拖拽
-        if (e.target.classList.contains('quick-filter-chip')) {
-            return;
-        }
-        isDragging = true;
-        startX = e.pageX - container.offsetLeft;
-        scrollLeft = container.scrollLeft;
-        container.style.cursor = 'grabbing';
-        container.style.userSelect = 'none';
-    });
-
-    document.addEventListener('mousemove', (e) => {
-        if (!isDragging) return;
-        e.preventDefault();
-        const x = e.pageX - container.offsetLeft;
-        const walk = (x - startX) * 1.5;
-        container.scrollLeft = scrollLeft - walk;
-    });
-
-    document.addEventListener('mouseup', () => {
-        if (!isDragging) return;
-        isDragging = false;
-        container.style.cursor = 'grab';
-        container.style.userSelect = '';
     });
 }
 
@@ -881,7 +824,6 @@ function initFilterModal() {
         modal.classList.remove('active');
         renderRoleGrid();
         // 刷新智能chips（用户行为可能已更新）
-        renderQuickFilters();
     });
 
     // filter-tag 事件已在 renderFilterTags 中绑定，此处不再重复
@@ -933,23 +875,6 @@ function getFilteredRoles() {
 function renderRoleGrid() {
     const grid = $('#roleGrid');
     let roles = getFilteredRoles();
-
-    // 按选项卡排序
-    const activeTab = document.querySelector('.category-tabs .tab.active');
-    if (activeTab) {
-        const tabName = activeTab.dataset.tab;
-        if (tabName === 'hot') {
-            // 热度排序已移除，改为默认排序
-        } else if (tabName === 'latest') {
-            // 按创建时间降序，最新导入/创建的排前面
-            roles.sort((a, b) => {
-                const tA = a.createdAt || a.id || 0;
-                const tB = b.createdAt || b.id || 0;
-                return tB - tA; // 数字降序排序
-            });
-        }
-        // recommend 保持原始顺序
-    }
 
     if (AppState.searchQuery && roles.length > 0) {
         grid.innerHTML = `<div class="search-results-hint">找到 ${roles.length} 个角色</div>` + roles.filter(r => r && r.id).map(role => renderRoleCard(role)).join('');
@@ -1114,12 +1039,12 @@ function initRoleDetailModal() {
     const continueChatBtn = $('#continueChatBtn');
     const collectBtn = $('#collectBtn');
     initWorldBookToggle();
+    initSceneModal(); // 初始化场景选择按钮
 
     [closeBtn, overlay].forEach(el => {
         el.addEventListener('click', () => {
             modal.classList.add('hidden');
             // 刷新智能chips（浏览行为已更新）
-            renderQuickFilters();
         });
     });
 
@@ -1132,10 +1057,12 @@ function initRoleDetailModal() {
             delete AppState.chatSessions[roleId];
         }
         modal.classList.add('hidden');
-        // 获取选中的场景开场白
-        const selectedScene = document.querySelector('.scene-item.selected');
-        const sceneOpener = selectedScene ? selectedScene.dataset.opener : '';
-        startChatWithScene(roleId, sceneOpener);
+        // 如果有选中的场景开场白，使用场景模式启动
+        if (_selectedSceneOpener) {
+            startChatWithScene(roleId, _selectedSceneOpener);
+        } else {
+            startChat(roleId);
+        }
     });
 
     // 继续对话
@@ -1224,7 +1151,13 @@ function openRoleDetail(roleId) {
     renderWorldBookInfo(role);
 
     // 渲染场景选择
-    renderSceneSelector(role);
+    // 显示/隐藏开场白按钮
+    const sceneSelectBtn = $('#sceneSelectBtn');
+    if (role.scenes && role.scenes.length > 0) {
+        sceneSelectBtn.classList.remove('hidden');
+    } else {
+        sceneSelectBtn.classList.add('hidden');
+    }
 
     // 内容填充完成后，初始化折叠功能（需要在内容渲染后才能测量高度）
     initCollapsible();
@@ -1271,24 +1204,23 @@ function parseSystemPromptRules(systemPrompt) {
 
 // ==================== World Book UI ====================
 function renderWorldBookInfo(role) {
-    const entryEl = document.getElementById('worldbookEntry');
-    const countEl = document.getElementById('worldbookCount');
+    const worldbookBtn = document.getElementById('worldbookBtn');
 
     if (!role.sourceData || !role.sourceData.characterBook || !role.sourceData.characterBook.entries) {
-        entryEl.classList.add('hidden');
+        worldbookBtn.classList.add('hidden');
         return;
     }
 
     const entries = role.sourceData.characterBook.entries.filter(e => e.content && e.content.trim());
     if (entries.length === 0) {
-        entryEl.classList.add('hidden');
+        worldbookBtn.classList.add('hidden');
         return;
     }
 
-    entryEl.classList.remove('hidden');
+    worldbookBtn.classList.remove('hidden');
     const constantCount = entries.filter(e => e.constant === true || (!e.keys || e.keys.length === 0)).length;
     const triggerCount = entries.length - constantCount;
-    countEl.textContent = `${entries.length}条（常驻${constantCount}，触发${triggerCount}）`;
+    worldbookBtn.textContent = `📖 世界书 (${entries.length}条)`;
 
     // 渲染条目列表
     renderWorldBookEntries(role);
@@ -1377,13 +1309,21 @@ function saveCustomRoleWorldBook(role) {
 }
 
 function initWorldBookToggle() {
-    const toggleBtn = document.getElementById('worldbookToggleBtn');
-    const panel = document.getElementById('worldbookPanel');
-    const arrow = toggleBtn.querySelector('.worldbook-arrow');
+    const worldbookBtn = document.getElementById('worldbookBtn');
+    const modal = document.getElementById('worldbookModal');
+    const overlay = document.getElementById('worldbookModalOverlay');
+    const closeBtn = document.getElementById('worldbookModalClose');
 
-    toggleBtn.addEventListener('click', () => {
-        panel.classList.toggle('hidden');
-        arrow.textContent = panel.classList.contains('hidden') ? '▸' : '▾';
+    worldbookBtn.addEventListener('click', () => {
+        modal.classList.remove('hidden');
+    });
+
+    overlay.addEventListener('click', () => {
+        modal.classList.add('hidden');
+    });
+
+    closeBtn.addEventListener('click', () => {
+        modal.classList.add('hidden');
     });
 }
 
@@ -1495,6 +1435,10 @@ function initMinePage() {
                 openQuickRepliesModal();
             } else if (action === 'data-manager') {
                 openDataManager();
+            } else if (action === 'worldbook-overview') {
+                openWorldbookOverview();
+            } else if (action === 'regex-overview') {
+                openRegexOverview();
             }
         });
     });
@@ -1979,7 +1923,651 @@ function loadSettingsForm() {
 }
 
 
+
+// ==================== Worldbook / Regex Overview ====================
+function openWorldbookOverview() {
+    const modal = $('#worldbookOverviewModal');
+    const listEl = $('#worldbookOverviewList');
+    const emptyEl = $('#worldbookOverviewEmpty');
+    const searchInput = $('#worldbookOverviewSearch');
+
+    modal.classList.remove('hidden');
+    searchInput.value = '';
+
+    // 收集所有有世界书的角色
+    const worldbooks = [];
+    ROLES_DATA.forEach(role => {
+        if (role.sourceData && role.sourceData.characterBook && role.sourceData.characterBook.entries) {
+            const entries = role.sourceData.characterBook.entries.filter(e => e.content && e.content.trim());
+            if (entries.length > 0) {
+                worldbooks.push({
+                    id: role.id,
+                    name: role.name || '未命名',
+                    emoji: role.emoji || '🌐',
+                    entryCount: entries.length,
+                    book: role.sourceData.characterBook
+                });
+            }
+        }
+    });
+    // 加入独立世界书
+    _standaloneWorldbooks.forEach(wb => {
+        worldbooks.push({
+            id: wb.id,
+            name: wb.name,
+            emoji: wb.emoji || '📋',
+            entryCount: wb.entryCount || (wb.book?.entries?.length || 0),
+            book: wb.book,
+            isStandalone: true
+        });
+    });
+
+    function renderList(filter = '') {
+        const filtered = filter
+            ? worldbooks.filter(w => w.name.toLowerCase().includes(filter.toLowerCase()))
+            : worldbooks;
+
+        if (filtered.length === 0) {
+            listEl.innerHTML = '';
+            emptyEl.classList.remove('hidden');
+            return;
+        }
+
+        emptyEl.classList.add('hidden');
+        listEl.innerHTML = filtered.map(wb => `
+            <div class="overview-item" data-role-id="${wb.id}">
+                <div class="overview-item-icon">${wb.emoji}</div>
+                <div class="overview-item-info">
+                    <div class="overview-item-name">${wb.name}'s Lorebook</div>
+                    <div class="overview-item-desc">${wb.entryCount} 条目</div>
+                </div>
+                <button class="overview-item-menu-btn" data-role-id="${wb.id}" title="更多操作"><svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="5" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="12" cy="19" r="2"/></svg></button>
+            </div>
+        `).join('');
+
+        // 条目点击 -> 弹出菜单
+        listEl.querySelectorAll('.overview-item').forEach(item => {
+            item.addEventListener('click', (e) => {
+                const roleId = item.dataset.roleId;
+                const menuBtn = item.querySelector('.overview-item-menu-btn');
+                showOverviewContextMenu(menuBtn || item, roleId, 'worldbook');
+            });
+        });
+    }
+
+    renderList();
+
+    // 搜索
+    searchInput.oninput = () => renderList(searchInput.value);
+
+    // 关闭
+    $('#closeWorldbookOverview').onclick = () => modal.classList.add('hidden');
+    modal.querySelector('.role-detail-overlay').onclick = () => modal.classList.add('hidden');
+
+    // 新建按钮（暂提示）
+    $('#addWorldbookBtn').onclick = () => {
+        showToast('新建世界书功能开发中');
+    };
+}
+
+function openRegexOverview() {
+    const modal = $('#regexOverviewModal');
+    const listEl = $('#regexOverviewList');
+    const emptyEl = $('#regexOverviewEmpty');
+    const searchInput = $('#regexOverviewSearch');
+
+    modal.classList.remove('hidden');
+    searchInput.value = '';
+
+    // 收集所有有正则组的角色
+    const regexGroups = [];
+    ROLES_DATA.forEach(role => {
+        if (role.sourceData && role.sourceData.regexScripts && role.sourceData.regexScripts.length > 0) {
+            regexGroups.push({
+                id: role.id,
+                name: role.name || '未命名',
+                emoji: role.emoji || '🔧',
+                scriptCount: role.sourceData.regexScripts.length,
+                scripts: role.sourceData.regexScripts
+            });
+        }
+    });
+    // 加入独立正则组
+    _standaloneRegexGroups.forEach(rg => {
+        regexGroups.push({
+            id: rg.id,
+            name: rg.name,
+            emoji: rg.emoji || '📋',
+            scriptCount: rg.scriptCount || (rg.scripts?.length || 0),
+            scripts: rg.scripts,
+            isStandalone: true
+        });
+    });
+
+    function renderList(filter = '') {
+        const filtered = filter
+            ? regexGroups.filter(g => g.name.toLowerCase().includes(filter.toLowerCase()))
+            : regexGroups;
+
+        if (filtered.length === 0) {
+            listEl.innerHTML = '';
+            emptyEl.classList.remove('hidden');
+            return;
+        }
+
+        emptyEl.classList.add('hidden');
+        listEl.innerHTML = filtered.map(g => `
+            <div class="overview-item" data-role-id="${g.id}">
+                <div class="overview-item-icon">(.*)</div>
+                <div class="overview-item-info">
+                    <div class="overview-item-name">${g.name}'s Regex</div>
+                    <div class="overview-item-desc">${g.scriptCount} 规则</div>
+                </div>
+                <button class="overview-item-menu-btn" data-role-id="${g.id}" title="更多操作"><svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="5" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="12" cy="19" r="2"/></svg></button>
+            </div>
+        `).join('');
+
+        // 条目点击 -> 弹出菜单
+        listEl.querySelectorAll('.overview-item').forEach(item => {
+            item.addEventListener('click', (e) => {
+                const roleId = item.dataset.roleId;
+                const menuBtn = item.querySelector('.overview-item-menu-btn');
+                showOverviewContextMenu(menuBtn || item, roleId, 'regex');
+            });
+        });
+    }
+
+    renderList();
+
+    // 搜索
+    searchInput.oninput = () => renderList(searchInput.value);
+
+    // 关闭
+    $('#closeRegexOverview').onclick = () => modal.classList.add('hidden');
+    modal.querySelector('.role-detail-overlay').onclick = () => modal.classList.add('hidden');
+
+    // 新建按钮
+    $('#addRegexGroupBtn').onclick = () => {
+        showToast('新建正则组功能开发中');
+    };
+}
+
+// 总览三点菜单
+function showOverviewContextMenu(btn, roleId, type) {
+    // 移除已有菜单
+    document.querySelectorAll('.overview-context-menu').forEach(m => m.remove());
+
+    const role = ROLES_DATA.find(r => String(r.id) === String(roleId));
+    const isStandalone = String(roleId).startsWith('standalone_');
+    const itemName = role ? role.name : (isStandalone ? (type === 'worldbook' ? _standaloneWorldbooks.find(w => String(w.id) === String(roleId))?.name : _standaloneRegexGroups.find(g => String(g.id) === String(roleId))?.name) : '') || '未命名';
+
+    const menu = document.createElement('div');
+    menu.className = 'overview-context-menu';
+    const typeName = type === 'worldbook' ? '世界书' : '正则组';
+    menu.innerHTML = `
+        <button class="ctx-item" data-action="select"><span class="ctx-icon">☑️</span>多选</button>
+        ${!isStandalone ? '<button class="ctx-item" data-action="edit"><span class="ctx-icon">✏️</span>编辑</button>' : ''}
+        <button class="ctx-item" data-action="copy"><span class="ctx-icon">📋</span>复制</button>
+        <div class="ctx-divider"></div>
+        <button class="ctx-item" data-action="export"><span class="ctx-icon">📤</span>导出</button>
+        <button class="ctx-item danger" data-action="delete"><span class="ctx-icon">🗑️</span>删除</button>
+    `;
+
+    // 定位菜单
+    const rect = btn.getBoundingClientRect();
+    menu.style.position = 'fixed';
+    menu.style.top = (rect.bottom + 4) + 'px';
+    menu.style.right = (window.innerWidth - rect.right) + 'px';
+
+    document.body.appendChild(menu);
+
+    // 点击外部关闭
+    const closeMenu = () => {
+        menu.remove();
+        document.removeEventListener('click', closeMenu);
+    };
+    setTimeout(() => document.addEventListener('click', closeMenu), 0);
+
+    // 菜单项事件
+    menu.querySelectorAll('.ctx-item').forEach(item => {
+        item.addEventListener('click', (e) => {
+            e.stopPropagation();
+            const action = item.dataset.action;
+            closeMenu();
+
+            if (action === 'select') {
+                enterOverviewMultiSelect(type);
+            } else if (action === 'edit') {
+                if (type === 'worldbook') {
+                    $('#worldbookOverviewModal').classList.add('hidden');
+                    openRoleDetail(roleId);
+                    setTimeout(() => {
+                        const wbBtn = document.getElementById('worldbookBtn');
+                        if (wbBtn) wbBtn.click();
+                    }, 300);
+                } else {
+                    showToast('正则组编辑功能开发中');
+                }
+            } else if (action === 'copy') {
+                copyOverviewItem(roleId, type);
+            } else if (action === 'export') {
+                exportOverviewItem(roleId, type);
+            } else if (action === 'delete') {
+                if (confirm(`确定删除 ${itemName} 的${typeName}？`)) {
+                    deleteOverviewItem(roleId, type);
+                }
+            }
+        });
+    });
+}
+
+// ==================== Overview 操作功能 ====================
+
+// 独立世界书/正则组（不绑定角色）
+let _standaloneWorldbooks = [];
+let _standaloneRegexGroups = [];
+
+// 多选模式状态
+let _overviewMultiSelectType = null; // 'worldbook' | 'regex'
+let _overviewMultiSelectIds = new Set();
+
+function enterOverviewMultiSelect(type) {
+    _overviewMultiSelectType = type;
+    _overviewMultiSelectIds.clear();
+
+    const modalId = type === 'worldbook' ? 'worldbookOverviewModal' : 'regexOverviewModal';
+    const listId = type === 'worldbook' ? 'worldbookOverviewList' : 'regexOverviewList';
+    const modal = document.getElementById(modalId);
+    const listEl = document.getElementById(listId);
+    if (!modal || !listEl) return;
+
+    // 给每个条目添加复选框
+    listEl.querySelectorAll('.overview-item').forEach(item => {
+        const roleId = item.dataset.roleId;
+        // 在条目前插入复选框
+        if (!item.querySelector('.overview-checkbox')) {
+            const cb = document.createElement('div');
+            cb.className = 'overview-checkbox';
+            cb.innerHTML = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="4"/></svg>';
+            item.insertBefore(cb, item.firstChild);
+        }
+        item.classList.add('multi-select-mode');
+
+        item.addEventListener('click', function toggleSelect(e) {
+            if (_overviewMultiSelectType !== type) {
+                item.removeEventListener('click', toggleSelect);
+                return;
+            }
+            e.stopPropagation();
+            const id = item.dataset.roleId;
+            if (_overviewMultiSelectIds.has(id)) {
+                _overviewMultiSelectIds.delete(id);
+                item.classList.remove('selected');
+                item.querySelector('.overview-checkbox').innerHTML = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="4"/></svg>';
+            } else {
+                _overviewMultiSelectIds.add(id);
+                item.classList.add('selected');
+                item.querySelector('.overview-checkbox').innerHTML = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--accent-purple)" stroke-width="2.5"><rect x="3" y="3" width="18" height="18" rx="4"/><polyline points="8,12 11,15 16,9" stroke="var(--accent-purple)" stroke-width="2.5" fill="none"/></svg>';
+            }
+            updateMultiSelectBar(type);
+        }, { capture: true });
+    });
+
+    // 显示底部操作栏
+    showMultiSelectBar(type);
+}
+
+function showMultiSelectBar(type) {
+    // 移除已有的
+    document.querySelectorAll('.overview-multi-bar').forEach(b => b.remove());
+
+    const modalId = type === 'worldbook' ? 'worldbookOverviewModal' : 'regexOverviewModal';
+    const panel = document.getElementById(modalId)?.querySelector('.overview-panel');
+    if (!panel) return;
+
+    const bar = document.createElement('div');
+    bar.className = 'overview-multi-bar';
+    bar.innerHTML = `
+        <span class="overview-multi-count">已选 0 项</span>
+        <div class="overview-multi-actions">
+            <button class="overview-multi-btn" data-action="export-selected">📤 导出</button>
+            <button class="overview-multi-btn danger" data-action="delete-selected">🗑️ 删除</button>
+            <button class="overview-multi-btn cancel" data-action="cancel-select">取消</button>
+        </div>
+    `;
+    panel.appendChild(bar);
+
+    bar.querySelectorAll('.overview-multi-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+            const action = btn.dataset.action;
+            if (action === 'cancel-select') {
+                exitOverviewMultiSelect(type);
+            } else if (action === 'export-selected') {
+                exportSelectedItems(type);
+            } else if (action === 'delete-selected') {
+                deleteSelectedItems(type);
+            }
+        });
+    });
+}
+
+function updateMultiSelectBar(type) {
+    const bar = document.querySelector('.overview-multi-bar');
+    if (!bar) return;
+    const count = bar.querySelector('.overview-multi-count');
+    if (count) count.textContent = `已选 ${_overviewMultiSelectIds.size} 项`;
+}
+
+function exitOverviewMultiSelect(type) {
+    _overviewMultiSelectType = null;
+    _overviewMultiSelectIds.clear();
+
+    const modalId = type === 'worldbook' ? 'worldbookOverviewModal' : 'regexOverviewModal';
+    const listId = type === 'worldbook' ? 'worldbookOverviewList' : 'regexOverviewList';
+    const listEl = document.getElementById(listId);
+    if (listEl) {
+        listEl.querySelectorAll('.overview-item').forEach(item => {
+            item.classList.remove('multi-select-mode', 'selected');
+            const cb = item.querySelector('.overview-checkbox');
+            if (cb) cb.remove();
+        });
+    }
+    document.querySelectorAll('.overview-multi-bar').forEach(b => b.remove());
+
+    // 重新绑定点击事件（恢复弹出菜单行为）
+    if (type === 'worldbook') {
+        openWorldbookOverview();
+    } else {
+        openRegexOverview();
+    }
+}
+
+function copyOverviewItem(roleId, type) {
+    if (type === 'worldbook') {
+        // 从角色世界书或独立世界书获取源数据
+        let srcBook = null;
+        let srcName = '';
+        const role = ROLES_DATA.find(r => String(r.id) === String(roleId));
+        if (role && role.sourceData?.characterBook) {
+            srcBook = role.sourceData.characterBook;
+            srcName = role.name || '未命名';
+        } else {
+            const standalone = _standaloneWorldbooks.find(w => String(w.id) === String(roleId));
+            if (standalone) {
+                srcBook = standalone.book;
+                srcName = standalone.name;
+            }
+        }
+        if (!srcBook) { showToast('没有可复制的世界书数据'); return; }
+
+        // 深拷贝为独立世界书
+        const bookCopy = JSON.parse(JSON.stringify(srcBook));
+        if (bookCopy.entries) {
+            bookCopy.entries = bookCopy.entries.map(e => ({ ...e, id: Date.now() + Math.random(), name: (e.name || '') + ' 副本' }));
+        }
+        const newId = 'standalone_wb_' + Date.now();
+        _standaloneWorldbooks.push({
+            id: newId,
+            name: srcName + ' 副本',
+            emoji: '📋',
+            entryCount: bookCopy.entries?.length || 0,
+            book: bookCopy
+        });
+        showToast(`世界书已复制为独立世界书`);
+        openWorldbookOverview();
+    } else {
+        // 正则组同理
+        let srcScripts = null;
+        let srcName = '';
+        const role = ROLES_DATA.find(r => String(r.id) === String(roleId));
+        if (role && role.sourceData?.regexScripts?.length) {
+            srcScripts = role.sourceData.regexScripts;
+            srcName = role.name || '未命名';
+        } else {
+            const standalone = _standaloneRegexGroups.find(g => String(g.id) === String(roleId));
+            if (standalone) {
+                srcScripts = standalone.scripts;
+                srcName = standalone.name;
+            }
+        }
+        if (!srcScripts) { showToast('没有可复制的正则组数据'); return; }
+
+        const scriptsCopy = JSON.parse(JSON.stringify(srcScripts));
+        scriptsCopy.forEach(s => { s.id = Date.now() + Math.random(); s.scriptName = (s.scriptName || '') + ' 副本'; });
+        const newId = 'standalone_rg_' + Date.now();
+        _standaloneRegexGroups.push({
+            id: newId,
+            name: srcName + ' 副本',
+            emoji: '📋',
+            scriptCount: scriptsCopy.length,
+            scripts: scriptsCopy
+        });
+        showToast(`正则组已复制为独立正则组`);
+        openRegexOverview();
+    }
+}
+
+function exportOverviewItem(roleId, type) {
+    const isStandalone = String(roleId).startsWith('standalone_');
+    let data, filename;
+
+    if (type === 'worldbook') {
+        if (isStandalone) {
+            const wb = _standaloneWorldbooks.find(w => String(w.id) === String(roleId));
+            if (!wb) { showToast('世界书不存在'); return; }
+            data = wb.book;
+            filename = `${wb.name}_worldbook.json`;
+        } else {
+            const role = ROLES_DATA.find(r => String(r.id) === String(roleId));
+            if (!role || !role.sourceData?.characterBook) { showToast('该角色没有世界书数据'); return; }
+            data = role.sourceData.characterBook;
+            filename = `${role.name}_worldbook.json`;
+        }
+    } else {
+        if (isStandalone) {
+            const rg = _standaloneRegexGroups.find(g => String(g.id) === String(roleId));
+            if (!rg) { showToast('正则组不存在'); return; }
+            data = rg.scripts;
+            filename = `${rg.name}_regex.json`;
+        } else {
+            const role = ROLES_DATA.find(r => String(r.id) === String(roleId));
+            if (!role || !role.sourceData?.regexScripts?.length) { showToast('该角色没有正则组数据'); return; }
+            data = role.sourceData.regexScripts;
+            filename = `${role.name}_regex.json`;
+        }
+    }
+
+    const json = JSON.stringify(data, null, 2);
+    const blob = new Blob([json], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    a.click();
+    URL.revokeObjectURL(url);
+    showToast(`${type === 'worldbook' ? '世界书' : '正则组'}已导出`);
+}
+
+function deleteOverviewItem(roleId, type) {
+    const isStandalone = String(roleId).startsWith('standalone_');
+
+    if (isStandalone) {
+        // 从独立世界书/正则组中删除
+        if (type === 'worldbook') {
+            _standaloneWorldbooks = _standaloneWorldbooks.filter(w => String(w.id) !== String(roleId));
+            showToast('独立世界书已删除');
+        } else {
+            _standaloneRegexGroups = _standaloneRegexGroups.filter(g => String(g.id) !== String(roleId));
+            showToast('独立正则组已删除');
+        }
+    } else {
+        const role = ROLES_DATA.find(r => String(r.id) === String(roleId));
+        if (!role) return;
+        if (type === 'worldbook') {
+            if (role.sourceData) role.sourceData.characterBook = null;
+            showToast('世界书已删除');
+        } else {
+            if (role.sourceData) role.sourceData.regexScripts = [];
+            showToast('正则组已删除');
+        }
+    }
+
+    // 刷新列表
+    if (type === 'worldbook') {
+        openWorldbookOverview();
+    } else {
+        openRegexOverview();
+    }
+}
+
+function exportSelectedItems(type) {
+    if (_overviewMultiSelectIds.size === 0) { showToast('请先选择条目'); return; }
+
+    const items = [];
+    _overviewMultiSelectIds.forEach(roleId => {
+        const isStandalone = String(roleId).startsWith('standalone_');
+        if (isStandalone) {
+            const arr = type === 'worldbook' ? _standaloneWorldbooks : _standaloneRegexGroups;
+            const item = arr.find(i => String(i.id) === String(roleId));
+            if (!item) return;
+            if (type === 'worldbook') {
+                items.push({ name: item.name, characterBook: item.book });
+            } else {
+                items.push({ name: item.name, regexScripts: item.scripts });
+            }
+        } else {
+            const role = ROLES_DATA.find(r => String(r.id) === String(roleId));
+            if (!role) return;
+            if (type === 'worldbook' && role.sourceData?.characterBook) {
+                items.push({ name: role.name, characterBook: role.sourceData.characterBook });
+            } else if (type === 'regex' && role.sourceData?.regexScripts?.length) {
+                items.push({ name: role.name, regexScripts: role.sourceData.regexScripts });
+            }
+        }
+    });
+
+    if (items.length === 0) { showToast('选中的条目没有数据'); return; }
+
+    const json = JSON.stringify(items.length === 1 ? items[0] : items, null, 2);
+    const typeName = type === 'worldbook' ? 'worldbook' : 'regex';
+    const filename = items.length === 1 ? `${items[0].name}_${typeName}.json` : `${typeName}_batch_${items.length}.json`;
+    const blob = new Blob([json], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    a.click();
+    URL.revokeObjectURL(url);
+    showToast(`已导出 ${items.length} 个${type === 'worldbook' ? '世界书' : '正则组'}`);
+    exitOverviewMultiSelect(type);
+}
+
+function deleteSelectedItems(type) {
+    if (_overviewMultiSelectIds.size === 0) { showToast('请先选择条目'); return; }
+    const typeName = type === 'worldbook' ? '世界书' : '正则组';
+    if (!confirm(`确定删除选中的 ${_overviewMultiSelectIds.size} 个${typeName}？`)) return;
+
+    let deletedCount = 0;
+    _overviewMultiSelectIds.forEach(roleId => {
+        const isStandalone = String(roleId).startsWith('standalone_');
+        if (isStandalone) {
+            if (type === 'worldbook') {
+                _standaloneWorldbooks = _standaloneWorldbooks.filter(w => String(w.id) !== String(roleId));
+            } else {
+                _standaloneRegexGroups = _standaloneRegexGroups.filter(g => String(g.id) !== String(roleId));
+            }
+            deletedCount++;
+        } else {
+            const role = ROLES_DATA.find(r => String(r.id) === String(roleId));
+            if (!role) return;
+            if (type === 'worldbook') {
+                if (role.sourceData) role.sourceData.characterBook = null;
+            } else {
+                if (role.sourceData) role.sourceData.regexScripts = [];
+            }
+            deletedCount++;
+        }
+    });
+
+    showToast(`已删除 ${deletedCount} 个${typeName}`);
+    exitOverviewMultiSelect(type);
+}
+
 // ==================== Scene Selector ====================
+
+// ==================== Scene Selection Modal ====================
+let _selectedSceneOpener = '';
+
+function initSceneModal() {
+    const sceneSelectBtn = $('#sceneSelectBtn');
+    const sceneModal = $('#sceneModal');
+    const sceneModalOverlay = $('#sceneModalOverlay');
+    const sceneModalCancel = $('#sceneModalCancel');
+    const sceneModalConfirm = $('#sceneModalConfirm');
+
+    sceneSelectBtn.addEventListener('click', () => {
+        const roleId = $('#startChatBtn').dataset.roleId;
+        const role = ROLES_DATA.find(r => String(r.id) === String(roleId));
+        if (!role || !role.scenes || role.scenes.length === 0) return;
+        renderSceneModalList(role);
+        sceneModal.classList.remove('hidden');
+    });
+
+    sceneModalCancel.addEventListener('click', () => {
+        sceneModal.classList.add('hidden');
+    });
+
+    sceneModalOverlay.addEventListener('click', () => {
+        sceneModal.classList.add('hidden');
+    });
+
+    sceneModalConfirm.addEventListener('click', () => {
+        sceneModal.classList.add('hidden');
+        // 只关闭场景选择弹窗，不关闭角色详情页也不直接进入聊天
+        // 用户需点击"开始对话"按钮才真正进入聊天
+    });
+}
+
+function renderSceneModalList(role) {
+    const container = $('#sceneModalList');
+    const scenes = role.scenes || [];
+    const userName = (AppState.settings && AppState.settings.defaultUserName) || '用户';
+    const charName = role.name || '角色';
+    const replaceVars = (text) => {
+        if (!text) return '';
+        if (typeof CardParser !== 'undefined' && CardParser.replaceTemplateVars) {
+            return CardParser.replaceTemplateVars(text, charName, userName);
+        }
+        return text;
+    };
+
+    _selectedSceneOpener = '';
+
+    container.innerHTML = scenes.map((scene, idx) => {
+        const opener = replaceVars(scene.opener) || '';
+        const preview = replaceVars(scene.preview);
+        const isSelected = idx === 0;
+        if (isSelected) _selectedSceneOpener = encodeURIComponent(opener);
+        return `
+            <div class="scene-modal-item ${isSelected ? 'selected' : ''}" data-index="${idx}" data-opener="${encodeURIComponent(opener)}">
+                <div class="scene-modal-item-header">
+                    <span class="scene-modal-item-avatar">${role.emoji || '🎭'}</span>
+                    <span class="scene-modal-item-name">${charName}</span>
+                </div>
+                <div class="scene-modal-item-text">${preview}</div>
+            </div>
+        `;
+    }).join('');
+
+    container.querySelectorAll('.scene-modal-item').forEach(item => {
+        item.addEventListener('click', () => {
+            container.querySelectorAll('.scene-modal-item').forEach(i => i.classList.remove('selected'));
+            item.classList.add('selected');
+            _selectedSceneOpener = item.dataset.opener;
+        });
+    });
+}
+
 function renderSceneSelector(role) {
     const container = $('#sceneList');
     const countEl = $('#sceneCount');
@@ -3292,7 +3880,6 @@ function cleanBehaviorData() {
         UserBehavior.clear();
         alert('✅ 行为数据已清除');
         calculateStorageUsage();
-        renderQuickFilters(); // 刷新chips
     } catch (e) {
         alert('❌ 清除失败：' + e.message);
     }

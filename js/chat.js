@@ -406,9 +406,9 @@ function renderMessages(roleId) {
             }
         }
 
-        // 如果消息被中断，添加警告标记和"继续生成"按钮
+        // 如果消息被中断，添加警告标记（继续生成按钮已移至bubble-actions）
         if (!isUser && msg.interrupted && idx === session.messages.length - 1) {
-            bubbleContent += `<br><span style="color:#f59e0b;font-size:0.85em;margin-top:8px;display:inline-block;">⚠️ 流中断</span><br><button onclick="continueGeneration('${roleId}')" style="margin-top:8px;padding:4px 12px;background:var(--accent-gradient);border:none;border-radius:6px;color:#fff;cursor:pointer;font-size:0.85em;">🔄 继续生成</button>`;
+            bubbleContent += `<br><span style="color:#f59e0b;font-size:0.85em;margin-top:8px;display:inline-block;">⚠️ 流中断</span>`;
         }
 
         // Swipe 功能：显示候选回复计数和左右箭头
@@ -425,15 +425,47 @@ function renderMessages(roleId) {
             `;
         }
 
+        // 气泡下方操作按钮组
+        let actionBtns = '';
+        if (!isUser) {
+            actionBtns = `
+                <div class="bubble-actions">
+                    <button class="bubble-action-btn" data-action="regenerate" data-msg-idx="${idx}" title="重新生成">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>
+                    </button>
+                    <button class="bubble-action-btn" data-action="swipe-new" data-msg-idx="${idx}" title="生成新候选">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+                    </button>
+                    <button class="bubble-action-btn" data-action="continue" data-role-id="${roleId}" title="继续生成">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"/></svg>
+                    </button>
+                    <button class="bubble-action-btn" data-action="more" data-msg-idx="${idx}" title="更多">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="1"/><circle cx="12" cy="5" r="1"/><circle cx="12" cy="19" r="1"/></svg>
+                    </button>
+                </div>
+            `;
+        } else {
+            actionBtns = `
+                <div class="bubble-actions">
+                    <button class="bubble-action-btn" data-action="edit" data-msg-idx="${idx}" title="编辑">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+                    </button>
+                    <button class="bubble-action-btn" data-action="more" data-msg-idx="${idx}" title="更多">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="1"/><circle cx="12" cy="5" r="1"/><circle cx="12" cy="19" r="1"/></svg>
+                    </button>
+                </div>
+            `;
+        }
+
         return `
             <div class="message ${isUser ? 'user' : 'ai'}" data-msg-idx="${idx}">
                 <div style="flex:1;position:relative;">
                     <div class="message-bubble">
                         ${bubbleContent}
-                        <button class="message-menu-btn" data-msg-idx="${idx}" title="更多操作" style="position:absolute;right:8px;bottom:8px;margin:0;">⋮</button>
                     </div>
                     <div class="message-time">${timeStr}</div>
                     ${swipeControls}
+                    ${actionBtns}
                 </div>
             </div>
         `;
@@ -454,32 +486,40 @@ function renderMessages(roleId) {
     scrollToBottom();
 }
 
-// ==================== Message Menu Button ====================
+// ==================== Bubble Action Buttons ====================
 function attachMessageMenuButtons() {
-    const menuButtons = $$('.message-menu-btn');
+    const actionBtns = $$('.bubble-action-btn');
 
-    menuButtons.forEach(btn => {
-        // 移除旧的监听器，避免重复绑定
+    actionBtns.forEach(btn => {
         btn.replaceWith(btn.cloneNode(true));
     });
 
-    // 重新获取克隆后的按钮
-    $$('.message-menu-btn').forEach(btn => {
+    $$('.bubble-action-btn').forEach(btn => {
         btn.addEventListener('click', (e) => {
             e.preventDefault();
             e.stopPropagation();
 
+            const action = btn.dataset.action;
             const msgIdx = parseInt(btn.dataset.msgIdx);
-            const msgEl = btn.closest('.message');
 
-            // 如果菜单已存在且点击的是同一个按钮，关闭菜单
-            const existingMenu = $('.message-context-menu');
-            if (existingMenu && existingMenu.dataset.msgIdx === String(msgIdx)) {
-                existingMenu.remove();
-                return;
+            if (action === 'regenerate') {
+                regenerateMessage(msgIdx);
+            } else if (action === 'swipe-new') {
+                generateNewSwipe(msgIdx);
+            } else if (action === 'continue') {
+                const roleId = btn.dataset.roleId;
+                if (roleId) continueGeneration(roleId);
+            } else if (action === 'edit') {
+                editMessage(msgIdx);
+            } else if (action === 'more') {
+                const msgEl = btn.closest('.message');
+                const existingMenu = $('.message-context-menu');
+                if (existingMenu && existingMenu.dataset.msgIdx === String(msgIdx)) {
+                    existingMenu.remove();
+                    return;
+                }
+                showMessageContextMenu(msgEl, msgIdx, btn);
             }
-
-            showMessageContextMenu(msgEl, msgIdx, btn);
         });
     });
 }
@@ -1180,12 +1220,12 @@ async function sendMessage(skipInputCheck = false) {
             // 流式完成后，将临时元素转为正式消息
             const streamEl = $('#streamMessage');
             if (streamEl) {
-                // 如果流中断，在气泡下方添加"继续生成"按钮
+                // 如果流中断，在气泡下方添加警告标记（继续生成按钮由renderMessages的bubble-actions渲染）
                 if (interrupted) {
                     const streamBubble = streamEl.querySelector('#streamBubble');
                     if (streamBubble) {
                         const currentHTML = streamBubble.innerHTML;
-                        streamBubble.innerHTML = currentHTML + `<br><button onclick="continueGeneration('${roleId}')" style="margin-top:8px;padding:4px 12px;background:var(--accent-gradient);border:none;border-radius:6px;color:#fff;cursor:pointer;font-size:0.85em;">🔄 继续生成</button>`;
+                        streamBubble.innerHTML = currentHTML + `<br><span style="color:#f59e0b;font-size:0.85em;margin-top:8px;display:inline-block;">⚠️ 流中断</span>`;
                     }
                 }
 
@@ -1915,8 +1955,8 @@ async function continueGeneration(roleId) {
         if (lastAIMsg) {
             const bubble = lastAIMsg.querySelector('.message-bubble');
             if (bubble) {
-                // 移除"⚠️ 流中断"和"继续生成"按钮
-                bubble.innerHTML = bubble.innerHTML.replace(/<br><span style="color:#f59e0b[^>]*>⚠️ 流中断<\/span>/g, '').replace(/<br><button onclick="continueGeneration[^>]*>.*?<\/button>/g, '');
+                // 移除"⚠️ 流中断"标记
+                bubble.innerHTML = bubble.innerHTML.replace(/<br><span style="color:#f59e0b[^>]*>⚠️ 流中断<\/span>/g, '');
             }
         }
     }
@@ -1969,10 +2009,13 @@ function renderChatList() {
         const msgCount = session.messages.length;
 
         const checkboxHtml = chatBatchMode ? `<div class="chat-item-checkbox" data-role-id="${session.roleId}"></div>` : '';
+        const avatarHtml = role.image 
+            ? `<img class="chat-list-item-avatar" src="${role.image}" alt="${role.name}" loading="lazy" onerror="this.style.display='none';this.nextElementSibling.style.display='flex'"><div class="chat-list-item-avatar-placeholder" style="display:none">${role.emoji || '💬'}</div>`
+            : `<div class="chat-list-item-avatar-placeholder">${role.emoji || '💬'}</div>`;
         return `
             <div class="chat-list-item ${chatBatchMode ? 'batch-mode' : ''}" data-role-id="${session.roleId}">
                 ${checkboxHtml}
-                <div class="chat-list-item-avatar-placeholder">${role.emoji}</div>
+                ${avatarHtml}
                 <div class="chat-list-item-content">
                     <div class="chat-list-item-title">${role.name}</div>
                     <div class="chat-list-item-preview">${preview}</div>

@@ -66,28 +66,21 @@
                     </div>
                 </div>
 
-                <!-- 分类导航 -->
-                <div class="category-nav">
-                    <div class="category-tabs">
-                        <button class="tab active" data-tab="recommend">推荐</button>
-                        <button class="tab" data-tab="hot">热门</button>
-                        <button class="tab" data-tab="latest">最新</button>
-                    </div>
-                    <div style="display: flex; gap: 8px;">
-                        <button class="filter-btn" id="searchBtn" title="搜索">
-                            <span class="filter-icon">🔍</span>
-                        </button>
-                        <button class="filter-btn" id="filterBtn" title="筛选">
-                            <span class="filter-icon">⚙</span>
-                        </button>
-                    </div>
+                <!-- 首页工具栏：搜索 + 筛选 -->
+                <div class="home-toolbar">
+                    <button class="toolbar-btn" id="searchBtn" title="搜索">
+                        <span class="toolbar-icon">🔍</span>
+                        <span class="toolbar-label">搜索</span>
+                    </button>
+                    <button class="toolbar-btn" id="filterBtn" title="筛选">
+                        <span class="toolbar-icon">⚙</span>
+                        <span class="toolbar-label">筛选</span>
+                    </button>
                 </div>
 
-                <!-- 智能推荐标签 -->
-                <div class="smart-chips-container">
-                    <div class="quick-filters" id="quickFilters">
-                        <!-- 快捷筛选标签由 JS 动态生成 -->
-                    </div>
+                <!-- 快速筛选标签 -->
+                <div class="quick-filter-chips" id="quickFilterChips">
+                    <!-- 由 JS 动态生成 -->
                 </div>
 
                 <!-- 角色卡片网格 -->
@@ -507,31 +500,47 @@
                         <div class="role-detail-tags" id="roleDetailTags"></div>
                         <p class="role-detail-desc" id="roleDetailDesc"></p>
                         <div class="role-detail-rules collapsible collapsed" id="roleDetailRules"></div>
-                        <!-- 世界书入口 -->
-                        <div class="worldbook-entry hidden" id="worldbookEntry">
-                            <button class="worldbook-toggle-btn" id="worldbookToggleBtn">
-                                <span class="worldbook-icon">📖</span>
-                                <span>世界书</span>
-                                <span class="worldbook-count" id="worldbookCount"></span>
-                                <span class="worldbook-arrow">▸</span>
-                            </button>
-                            <div class="worldbook-panel hidden" id="worldbookPanel">
-                                <div class="worldbook-header">
-                                    <span>关键词触发条目（匹配对话内容自动注入）</span>
-                                </div>
-                                <div class="worldbook-entries" id="worldbookEntries"></div>
-                            </div>
-                        </div>
-                        <!-- 场景选择区域 -->
-                        <div class="scene-selector" id="sceneSelector">
-                            <div class="scene-selector-title">选择开场场景 <span class="scene-count" id="sceneCount"></span></div>
-                            <div class="scene-list" id="sceneList"></div>
-                        </div>
+                        <!-- 世界书内容面板（已移至独立弹出面板） -->
+
                     </div>
                     <div class="role-detail-actions">
+                        <button class="btn-worldbook hidden" id="worldbookBtn">📖 世界书</button>
+                        <button class="btn-scene-select hidden" id="sceneSelectBtn">📋 选择开场白</button>
                         <button class="btn-start-chat" id="startChatBtn">开始对话</button>
                         <button class="btn-continue-chat hidden" id="continueChatBtn">继续对话</button>
                         <button class="btn-collect" id="collectBtn">♡ 收藏</button>
+                    </div>
+                </div>
+            </div>
+
+
+            <!-- 开场白选择弹窗 -->
+            <div class="scene-modal hidden" id="sceneModal">
+                <div class="scene-modal-overlay" id="sceneModalOverlay"></div>
+                <div class="scene-modal-panel">
+                    <div class="scene-modal-header">
+                        <button class="scene-modal-cancel" id="sceneModalCancel">取消</button>
+                        <span class="scene-modal-title">开场白</span>
+                        <button class="scene-modal-confirm" id="sceneModalConfirm">确定</button>
+                    </div>
+                    <div class="scene-modal-list" id="sceneModalList">
+                        <!-- 由 JS 动态生成 -->
+                    </div>
+                </div>
+            </div>
+
+            <!-- 世界书弹出面板 -->
+            <div class="scene-modal hidden" id="worldbookModal">
+                <div class="scene-modal-overlay" id="worldbookModalOverlay"></div>
+                <div class="scene-modal-panel">
+                    <div class="scene-modal-header">
+                        <button class="scene-modal-cancel" id="worldbookModalClose">关闭</button>
+                        <span class="scene-modal-title">📖 世界书</span>
+                        <span></span>
+                    </div>
+                    <div class="scene-modal-list" id="worldbookModalList">
+                        <div class="worldbook-modal-hint">关键词触发条目（匹配对话内容自动注入）</div>
+                        <div class="worldbook-entries" id="worldbookEntries"></div>
                     </div>
                 </div>
             </div>
@@ -576,6 +585,14 @@
                     <button class="shortcut-btn" data-action="data-manager">
                         <span class="shortcut-icon">💾</span>
                         <span>数据管理</span>
+                    </button>
+                    <button class="shortcut-btn" data-action="worldbook-overview">
+                        <span class="shortcut-icon">📖</span>
+                        <span>世界书</span>
+                    </button>
+                    <button class="shortcut-btn" data-action="regex-overview">
+                        <span class="shortcut-icon">🔧</span>
+                        <span>正则组</span>
                     </button>
                     <button class="shortcut-btn" data-action="settings">
                         <span class="shortcut-icon">⚙️</span>
@@ -1102,6 +1119,55 @@
                 </div>
             </div>
         </div>
+
+        <!-- 世界书总览弹窗 -->
+        <div class="role-detail-modal hidden" id="worldbookOverviewModal">
+            <div class="role-detail-overlay"></div>
+            <div class="overview-panel">
+                <button class="close-btn" id="closeWorldbookOverview">✕</button>
+                <div class="overview-header">
+                    <h2>世界书</h2>
+                    <button class="overview-add-btn" id="addWorldbookBtn">+ 新建</button>
+                </div>
+                <div class="overview-search">
+                    <span class="overview-search-icon">🔍</span>
+                    <input type="text" class="overview-search-input" id="worldbookOverviewSearch" placeholder="搜索世界书">
+                </div>
+                <div class="overview-list" id="worldbookOverviewList">
+                    <!-- 由 JS 动态生成 -->
+                </div>
+                <div class="overview-empty hidden" id="worldbookOverviewEmpty">
+                    <div style="font-size:48px;opacity:0.3;margin-bottom:12px">📖</div>
+                    <p>还没有世界书</p>
+                    <p style="font-size:13px;color:var(--text-muted)">点击右上角"+ 新建"创建</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- 正则组总览弹窗 -->
+        <div class="role-detail-modal hidden" id="regexOverviewModal">
+            <div class="role-detail-overlay"></div>
+            <div class="overview-panel">
+                <button class="close-btn" id="closeRegexOverview">✕</button>
+                <div class="overview-header">
+                    <h2>正则组</h2>
+                    <button class="overview-add-btn" id="addRegexGroupBtn">+ 新建</button>
+                </div>
+                <div class="overview-search">
+                    <span class="overview-search-icon">🔍</span>
+                    <input type="text" class="overview-search-input" id="regexOverviewSearch" placeholder="搜索正则组">
+                </div>
+                <div class="overview-list" id="regexOverviewList">
+                    <!-- 由 JS 动态生成 -->
+                </div>
+                <div class="overview-empty hidden" id="regexOverviewEmpty">
+                    <div style="font-size:48px;opacity:0.3;margin-bottom:12px">🔧</div>
+                    <p>暂无正则组</p>
+                    <p style="font-size:13px;color:var(--text-muted)">导入的角色卡中未包含正则脚本</p>
+                </div>
+            </div>
+        </div>
+
     <script src="js/roles-data.js"></script>
     <script src="js/card-parser.js"></script>
     <script src="js/cards-metadata-female.js"></script>

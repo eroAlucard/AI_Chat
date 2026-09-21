@@ -211,6 +211,7 @@ const BuiltinCards = (function() {
                         characterBook: meta.character_book || null,
                         postHistoryInstructions: meta.post_history_instructions || '',
                         alternateGreetings: meta.alternate_greetings || [],
+                        regexScripts: meta.regex_scripts || [],
                     },
                 };
                 roles.push(role);
