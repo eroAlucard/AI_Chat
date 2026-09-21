@@ -943,12 +943,6 @@ body {
 .role-detail-desc { font-size: var(--font-sm); color: var(--text-secondary); line-height: 1.6; margin-bottom: 12px; }
 .role-detail-tags { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 12px; }
 .role-detail-meta { display: flex; justify-content: space-between; font-size: var(--font-sm); color: var(--text-muted); }
-.role-detail-actions { display: flex; gap: 12px; padding: 16px 20px; padding-bottom: calc(16px + env(safe-area-inset-bottom, 0px)); border-top: 1px solid var(--border-color); }
-.btn-start-chat { flex: 2; padding: 12px; border-radius: var(--radius-md); background: var(--accent-gradient); color: white; font-size: var(--font-md); font-weight: 600; border: none; cursor: pointer; transition: var(--transition); }
-.btn-start-chat:hover { opacity: 0.9; transform: scale(1.02); }
-.btn-collect { flex: 1; padding: 12px; border-radius: var(--radius-md); background: var(--bg-card); color: var(--text-secondary); font-size: var(--font-md); font-weight: 600; border: 1px solid var(--border-light); cursor: pointer; transition: var(--transition); }
-.btn-collect:hover { border-color: var(--accent-pink); color: var(--accent-pink); }
-.btn-collect.collected { color: var(--accent-pink); border-color: var(--accent-pink); background: rgba(236, 72, 153, 0.1); }
 
 /* 玩法规则区域 */
 .role-detail-info { flex: 1; min-height: 0; }
@@ -1833,22 +1827,6 @@ body {
     -webkit-box-orient: vertical;
     overflow: hidden;
 }
-.btn-continue-chat {
-    flex: 1;
-    padding: 12px;
-    border-radius: var(--radius-md);
-    border: 1px solid var(--accent-purple);
-    background: transparent;
-    color: var(--accent-purple);
-    font-size: var(--font-md);
-    font-weight: 600;
-    cursor: pointer;
-    transition: all 0.15s ease;
-}
-.btn-continue-chat:active {
-    background: rgba(139, 92, 246, 0.1);
-}
-
 /* ==================== 世界书 ==================== */
 .worldbook-entry {
     margin-top: 12px;
@@ -3956,11 +3934,21 @@ input:checked + .slider:before {
 /* ==================== Role Detail Actions (优化按钮布局) ==================== */
 .role-detail-actions {
     display: flex;
+    flex-direction: column;
     gap: 8px;
     padding: 12px 16px;
     padding-bottom: calc(12px + env(safe-area-inset-bottom, 0px));
     border-top: 1px solid var(--border-color);
+}
+
+.role-detail-actions-row {
+    display: flex;
+    gap: 8px;
     align-items: center;
+}
+/* 当功能按钮行中所有按钮都隐藏时，该行不占空间 */
+.role-detail-actions-row:not(:has(:not(.hidden))) {
+    display: none;
 }
 
 .role-detail-actions .btn-worldbook,
@@ -3972,6 +3960,28 @@ input:checked + .slider:before {
 .role-detail-actions .btn-continue-chat {
     flex: 1;
     min-width: 0;
+    padding: 14px 20px;
+    border-radius: 14px;
+    border: none;
+    background: linear-gradient(135deg, #8b5cf6, #a855f7, #ec4899);
+    color: #fff;
+    font-size: 15px;
+    font-weight: 700;
+    letter-spacing: 0.5px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    box-shadow: 0 4px 16px rgba(139, 92, 246, 0.35);
+}
+.role-detail-actions .btn-start-chat:hover,
+.role-detail-actions .btn-continue-chat:hover {
+    opacity: 0.92;
+    transform: translateY(-1px);
+    box-shadow: 0 6px 20px rgba(139, 92, 246, 0.45);
+}
+.role-detail-actions .btn-start-chat:active,
+.role-detail-actions .btn-continue-chat:active {
+    transform: translateY(0);
+    box-shadow: 0 2px 10px rgba(139, 92, 246, 0.3);
 }
 
 .role-detail-actions .btn-collect {
@@ -3992,4 +4002,33 @@ input:checked + .slider:before {
 
 .role-detail-actions .btn-collect.collected {
     color: var(--accent-pink);
+}
+
+/* 移动端按钮布局 */
+@media (max-width: 480px) {
+    .role-detail-actions {
+        padding: 10px 12px;
+        padding-bottom: calc(10px + env(safe-area-inset-bottom, 0px));
+    }
+    .role-detail-actions-row {
+        gap: 8px;
+    }
+    .role-detail-actions .btn-worldbook,
+    .role-detail-actions .btn-scene-select {
+        flex: 1;
+        min-width: 0;
+        justify-content: center;
+        padding: 10px 8px;
+        font-size: 13px;
+    }
+    .role-detail-actions .btn-start-chat,
+    .role-detail-actions .btn-continue-chat {
+        flex: 1;
+        min-width: 0;
+        padding: 12px 8px;
+    }
+    .role-detail-actions .btn-collect {
+        padding: 10px 14px;
+        font-size: 13px;
+    }
 }
