@@ -23,6 +23,47 @@
     <link rel="stylesheet" href="css/style.css">
     <link rel="stylesheet" href="css/markdown-renderer.css">
     <link rel="stylesheet" href="css/status-panel.css">
+
+<style>
+/* 导入聊天文件选择器样式 */
+.import-file-wrapper {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-top: 4px;
+}
+.import-file-btn {
+    padding: 10px 18px;
+    border-radius: 10px;
+    background: var(--accent-gradient, linear-gradient(135deg, #8b5cf6, #6366f1));
+    color: #fff;
+    border: none;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    white-space: nowrap;
+    transition: opacity 0.2s, transform 0.1s;
+}
+.import-file-btn:hover {
+    opacity: 0.9;
+}
+.import-file-btn:active {
+    transform: scale(0.97);
+}
+.import-file-name {
+    font-size: 13px;
+    color: var(--text-muted, #888);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    flex: 1;
+    min-width: 0;
+}
+.import-file-hidden {
+    display: none;
+}
+</style>
+
 </head>
 <body>
     <!-- 登录验证遮罩 -->
@@ -243,6 +284,11 @@
                                         <span class="setting-item-arrow">→</span>
                                     </div>
 
+                                    <div class="chat-settings-item" id="settingImport">
+                                        <span class="setting-item-label">导入聊天</span>
+                                        <span class="setting-item-arrow">→</span>
+                                    </div>
+
                                     <div class="chat-settings-item" id="settingClearChat">
                                         <span class="setting-item-label">清空记录</span>
                                         <span class="setting-item-arrow">→</span>
@@ -408,6 +454,41 @@
                         </div>
                         <div class="chat-detail-actions">
                             <button class="btn-save" id="confirmExportBtn">导出</button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 导入聊天面板 -->
+                <div class="chat-detail-panel hidden" id="importChatPanel">
+                    <div class="chat-detail-header">
+                        <button class="back-btn" id="importChatBackBtn">←</button>
+                        <h3>导入聊天记录</h3>
+                    </div>
+                    <div class="chat-detail-body">
+                        <div class="setting-item">
+                            <p class="hint-text">从之前导出的 JSON 文件导入聊天记录。导入的消息将追加到当前对话末尾。</p>
+                        </div>
+                        <div class="setting-item">
+                            <label class="setting-label">选择文件</label>
+                            <div class="import-file-wrapper">
+                                <button type="button" class="import-file-btn" id="importFileBtn">📁 选择文件</button>
+                                <span class="import-file-name" id="importFileName">未选择文件</span>
+                                <input type="file" id="importChatFile" accept=".json,.txt,.md,.html,.htm" class="import-file-hidden">
+                            </div>
+                        </div>
+                        <div class="setting-item">
+                            <label class="setting-label">导入模式</label>
+                            <select class="setting-select" id="importMode">
+                                <option value="append">追加到末尾</option>
+                                <option value="replace">替换当前记录</option>
+                            </select>
+                        </div>
+                        <div class="setting-item hidden" id="importPreviewSection">
+                            <label class="setting-label">预览</label>
+                            <div id="importPreview" style="padding:12px;border-radius:8px;background:var(--bg-secondary);font-size:13px;color:var(--text-secondary);max-height:200px;overflow-y:auto;line-height:1.5"></div>
+                        </div>
+                        <div class="chat-detail-actions">
+                            <button class="btn-save" id="confirmImportBtn" disabled>导入</button>
                         </div>
                     </div>
                 </div>

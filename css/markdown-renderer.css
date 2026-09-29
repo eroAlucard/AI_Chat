@@ -127,9 +127,7 @@ h4.md-heading { font-size: 1em; }
 
 /* 消息气泡中的图片适配 */
 .message-bubble .md-image {
-    max-width: calc(100% + 8px);
-    margin-left: -4px;
-    margin-right: -4px;
+    max-width: 100%;
     border-radius: 6px;
 }
 
@@ -250,17 +248,17 @@ h4.md-heading { font-size: 1em; }
 
 /* ==================== 消息气泡内的渲染优化 ==================== */
 .message-bubble .md-scene-header {
-    margin-left: -4px;
-    margin-right: -4px;
+    margin-left: 0;
+    margin-right: 0;
 }
 
 .message-bubble .md-code-block {
-    margin-left: -4px;
-    margin-right: -4px;
+    margin-left: 0;
+    margin-right: 0;
 }
 
 .message-bubble .md-quote {
-    margin-left: -4px;
+    margin-left: 0;
 }
 
 /* 确保 message-bubble 内的文字样式正确继承 */

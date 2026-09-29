@@ -181,7 +181,8 @@ function initChatView() {
     initUserIdentityPanel(); // 初始化用户身份
     initChatThemePanel(); // 初始化聊天主题
     initPromptTemplatePanel(); // 初始化提示词模板
-    initExportChatPanel(); // 初始化导出聊天
+    initExportChatPanel();
+    initImportChatPanel(); // 初始化导出聊天
     initPanelBackdrop(); // 初始化背景遮罩
     initSwipeBackGestures(); // 初始化手势返回
     const backBtn = $('#chatBackBtn');
@@ -2326,6 +2327,11 @@ function initChatSettingsSidebar() {
         openExportChatPanel();
     });
 
+    // 导入聊天
+    $('#settingImport').addEventListener('click', () => {
+        openImportChatPanel();
+    });
+
     // 清空记录
     $('#settingClearChat').addEventListener('click', () => {
         if (!AppState.currentChat) return;
@@ -2609,6 +2615,298 @@ function initExportChatPanel() {
         confirmBtn.addEventListener('click', confirmExport);
     }
 }
+
+
+// ==================== Import Chat History ====================
+function openImportChatPanel() {
+    if (!AppState.currentChat) {
+        showToast('请先选择一个对话');
+        return;
+    }
+
+    const panel = $('#importChatPanel');
+    const backdrop = $('#panelBackdrop');
+    const sidebar = $('#chatSettingsSidebar');
+
+    // 重置面板状态
+    const fileInput = $('#importChatFile');
+    if (fileInput) fileInput.value = '';
+    const previewSection = $('#importPreviewSection');
+    if (previewSection) previewSection.classList.add('hidden');
+    const confirmBtn = $('#confirmImportBtn');
+    if (confirmBtn) confirmBtn.disabled = true;
+
+    // 清除之前的数据
+    panel._importData = null;
+
+    sidebar.classList.add('detail-open');
+    backdrop.classList.add('active');
+    panel.classList.remove('hidden');
+}
+
+function closeImportChatPanel() {
+    const panel = $('#importChatPanel');
+    const backdrop = $('#panelBackdrop');
+    const sidebar = $('#chatSettingsSidebar');
+
+    backdrop.classList.remove('active');
+    panel.classList.add('hidden');
+    sidebar.classList.remove('detail-open');
+
+    // 确保设置面板保持打开状态
+    if (!sidebar.classList.contains('active')) {
+        openChatSettingsSidebar();
+    }
+}
+
+function initImportChatPanel() {
+    const backBtn = $('#importChatBackBtn');
+    const fileInput = $('#importChatFile');
+    const confirmBtn = $('#confirmImportBtn');
+    const fileBtn = $('#importFileBtn');
+
+    if (backBtn) {
+        backBtn.addEventListener('click', closeImportChatPanel);
+    }
+
+    // 自定义按钮点击触发隐藏的file input
+    if (fileBtn && fileInput) {
+        fileBtn.addEventListener('click', function() {
+            fileInput.click();
+        });
+    }
+
+    if (fileInput) {
+        fileInput.addEventListener('change', handleImportFileSelect);
+    }
+
+    if (confirmBtn) {
+        confirmBtn.addEventListener('click', confirmImport);
+    }
+}
+
+function handleImportFileSelect(e) {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    // 更新文件名显示
+    const fileNameSpan = $('#importFileName');
+    if (fileNameSpan) {
+        fileNameSpan.textContent = file.name;
+        fileNameSpan.style.color = 'var(--text-primary, #fff)';
+    }
+
+    const confirmBtn = $('#confirmImportBtn');
+    const previewSection = $('#importPreviewSection');
+    const previewDiv = $('#importPreview');
+
+    const validExts = ['.json', '.txt', '.md', '.html', '.htm'];
+    const fileExt = '.' + file.name.split('.').pop().toLowerCase();
+    if (!validExts.includes(fileExt)) {
+        showToast('请选择 JSON / TXT / Markdown / HTML 格式的文件');
+        if (confirmBtn) confirmBtn.disabled = true;
+        return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = function(evt) {
+        try {
+            const text = evt.target.result;
+            let data = null;
+
+            if (fileExt === '.json') {
+                // JSON格式：直接解析
+                data = JSON.parse(text);
+            } else if (fileExt === '.txt') {
+                // TXT格式：按行解析，交替识别 user/assistant
+                const lines = text.split('\n').filter(l => l.trim());
+                const messages = [];
+                let currentRole = 'user';
+                let currentContent = [];
+                for (const line of lines) {
+                    if (line.match(/^【?用户?】?[:：]/) || line.match(/^\[?User\]?[:：]/i)) {
+                        if (currentContent.length) messages.push({ role: currentRole, content: currentContent.join('\n') });
+                        currentRole = 'user';
+                        currentContent = [line.replace(/^[^:：]+[:：]\s*/, '')];
+                    } else if (line.match(/^【?(?:AI|助手|角色|Assistant|Character)】?[:：]/i) || line.match(/^\[?(?:AI|Assistant)\]?[:：]/i)) {
+                        if (currentContent.length) messages.push({ role: currentRole, content: currentContent.join('\n') });
+                        currentRole = 'assistant';
+                        currentContent = [line.replace(/^[^:：]+[:：]\s*/, '')];
+                    } else {
+                        currentContent.push(line);
+                    }
+                }
+                if (currentContent.length) messages.push({ role: currentRole, content: currentContent.join('\n') });
+                data = { messages, role: '导入角色', exportTime: new Date().toISOString() };
+            } else if (fileExt === '.md') {
+                // Markdown格式：按标题或分隔符分割
+                const sections = text.split(/\n(?=##\s|---\n|\*\*\*)/);
+                const messages = [];
+                let currentRole = 'user';
+                let currentContent = [];
+                for (const section of sections) {
+                    const trimmed = section.trim();
+                    if (!trimmed) continue;
+                    const userMatch = trimmed.match(/^##\s*(?:用户|User)\s*$/im);
+                    const aiMatch = trimmed.match(/^##\s*(?:AI|助手|Assistant|角色|Character)\s*$/im);
+                    if (userMatch) {
+                        if (currentContent.length) messages.push({ role: currentRole, content: currentContent.join('\n').trim() });
+                        currentRole = 'user';
+                        currentContent = [];
+                    } else if (aiMatch) {
+                        if (currentContent.length) messages.push({ role: currentRole, content: currentContent.join('\n').trim() });
+                        currentRole = 'assistant';
+                        currentContent = [];
+                    } else {
+                        currentContent.push(trimmed);
+                    }
+                }
+                if (currentContent.length) messages.push({ role: currentRole, content: currentContent.join('\n').trim() });
+                // 如果没有标题分割，尝试按行交替分配
+                if (messages.length === 0 && sections.length > 0) {
+                    const allLines = text.split('\n').filter(l => l.trim());
+                    let role = 'user';
+                    for (const line of allLines) {
+                        messages.push({ role, content: line });
+                        role = role === 'user' ? 'assistant' : 'user';
+                    }
+                }
+                data = { messages, role: '导入角色', exportTime: new Date().toISOString() };
+            } else if (fileExt === '.html' || fileExt === '.htm') {
+                // HTML格式：提取文本内容，按常见聊天结构解析
+                const parser = new DOMParser();
+                const doc = parser.parseFromString(text, 'text/html');
+                const messages = [];
+                // 尝试按 .message / .chat-message 等常见类名提取
+                const msgEls = doc.querySelectorAll('.message, .chat-message, [data-role]');
+                if (msgEls.length > 0) {
+                    msgEls.forEach(el => {
+                        const role = el.dataset.role || (el.classList.contains('user') || el.classList.contains('self') ? 'user' : 'assistant');
+                        const content = el.textContent.trim();
+                        if (content) messages.push({ role, content });
+                    });
+                } else {
+                    // 回退：按段落提取
+                    const paras = doc.querySelectorAll('p, div > div, li');
+                    let role = 'user';
+                    paras.forEach(p => {
+                        const content = p.textContent.trim();
+                        if (content && content.length > 5) {
+                            messages.push({ role, content });
+                            role = role === 'user' ? 'assistant' : 'user';
+                        }
+                    });
+                }
+                data = { messages, role: '导入角色', exportTime: new Date().toISOString() };
+            }
+
+            if (!data || !data.messages || !Array.isArray(data.messages)) {
+                showToast('无效的聊天记录格式：缺少 messages 数组');
+                if (confirmBtn) confirmBtn.disabled = true;
+                return;
+            }
+
+            // 验证消息格式
+            const validMessages = data.messages.filter(msg => msg.role && msg.content);
+            if (validMessages.length === 0) {
+                showToast('文件中没有有效的聊天消息');
+                if (confirmBtn) confirmBtn.disabled = true;
+                return;
+            }
+
+            // 存储导入数据到面板元素上
+            const panel = $('#importChatPanel');
+            panel._importData = data;
+
+            // 显示预览
+            if (previewSection && previewDiv) {
+                const roleName = data.role || '未知角色';
+                const exportTime = data.exportTime ? new Date(data.exportTime).toLocaleString('zh-CN') : '未知';
+                const msgCount = validMessages.length;
+
+                let previewHtml = `<div style="margin-bottom:8px"><strong>角色：</strong>${roleName}</div>`;
+                previewHtml += `<div style="margin-bottom:8px"><strong>导出时间：</strong>${exportTime}</div>`;
+                previewHtml += `<div style="margin-bottom:8px"><strong>消息数量：</strong>${msgCount} 条</div>`;
+                previewHtml += `<div style="margin-top:12px;font-size:12px;color:var(--text-muted)">消息预览：</div>`;
+
+                // 显示前3条消息预览
+                const previewMsgs = validMessages.slice(0, 3);
+                previewMsgs.forEach(msg => {
+                    const speaker = msg.role === 'user' ? '用户' : (msg.role === 'assistant' ? 'AI' : msg.role);
+                    const content = msg.content.length > 80 ? msg.content.substring(0, 80) + '...' : msg.content;
+                    previewHtml += `<div style="padding:6px 8px;margin:4px 0;border-radius:6px;background:var(--bg-card);font-size:12px"><strong>${speaker}：</strong>${content}</div>`;
+                });
+
+                if (validMessages.length > 3) {
+                    previewHtml += `<div style="padding:4px 8px;font-size:11px;color:var(--text-muted)">... 还有 ${validMessages.length - 3} 条消息</div>`;
+                }
+
+                previewDiv.innerHTML = previewHtml;
+                previewSection.classList.remove('hidden');
+            }
+
+            if (confirmBtn) confirmBtn.disabled = false;
+            showToast('文件解析成功，点击导入按钮确认');
+
+        } catch (err) {
+            showToast('文件解析失败：' + err.message);
+            if (confirmBtn) confirmBtn.disabled = true;
+        }
+    };
+    reader.readAsText(file);
+}
+
+function confirmImport() {
+    const panel = $('#importChatPanel');
+    const data = panel._importData;
+    if (!data || !data.messages) {
+        showToast('没有可导入的数据');
+        return;
+    }
+
+    const mode = $('#importMode') ? $('#importMode').value : 'append';
+    const session = AppState.chatSessions[AppState.currentChat];
+    if (!session) {
+        showToast('当前没有活跃的对话');
+        return;
+    }
+
+    // 转换消息格式
+    const importMessages = data.messages.filter(msg => msg.role && msg.content).map(msg => {
+        const item = {
+            role: msg.role,
+            content: msg.content,
+            time: msg.time || new Date().toISOString()
+        };
+        if (msg.reasoning) {
+            item.reasoning = msg.reasoning;
+        }
+        return item;
+    });
+
+    if (importMessages.length === 0) {
+        showToast('没有有效的消息可导入');
+        return;
+    }
+
+    if (mode === 'replace') {
+        if (!confirm('替换模式将清除当前所有聊天记录，确定继续？')) return;
+        session.messages = importMessages;
+    } else {
+        // 追加模式
+        session.messages = session.messages.concat(importMessages);
+    }
+
+    session.lastTime = new Date().toISOString();
+    saveState();
+    renderMessages(AppState.currentChat);
+    renderChatList();
+
+    const modeText = mode === 'replace' ? '替换' : '追加';
+    showToast(`成功导入 ${importMessages.length} 条消息（${modeText}模式）`);
+    closeImportChatPanel();
+}
+
 
 function confirmExport() {
     const format = $('#exportFormat').value;
@@ -3582,6 +3880,7 @@ function initPanelBackdrop() {
         const chatThemePanel = $('#chatThemePanel');
         const promptTemplatePanel = $('#promptTemplatePanel');
         const exportChatPanel = $('#exportChatPanel');
+        const importChatPanel = $('#importChatPanel');
 
         if (scenarioPanel && !scenarioPanel.classList.contains('hidden')) {
             closeScenarioPanel();
@@ -3591,6 +3890,8 @@ function initPanelBackdrop() {
             closeChatThemePanel();
         } else if (promptTemplatePanel && !promptTemplatePanel.classList.contains('hidden')) {
             closePromptTemplatePanel();
+        } else if (importChatPanel && !importChatPanel.classList.contains('hidden')) {
+            closeImportChatPanel();
         } else if (exportChatPanel && !exportChatPanel.classList.contains('hidden')) {
             closeExportChatPanel();
         }
@@ -4063,6 +4364,12 @@ function initSwipeBackGestures() {
     const promptTemplatePanel = $('#promptTemplatePanel');
     if (promptTemplatePanel) {
         new SwipeBackGesture(promptTemplatePanel, closePromptTemplatePanel);
+    }
+
+    // 导入聊天面板
+    const importChatPanel = $('#importChatPanel');
+    if (importChatPanel) {
+        new SwipeBackGesture(importChatPanel, closeImportChatPanel);
     }
 
     // 导出聊天面板
