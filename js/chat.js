@@ -246,9 +246,16 @@ function showChatListView() {
     renderChatList();
 }
 
-function showChatView(roleId) {
+async function showChatView(roleId) {
     const role = ROLES_DATA.find(r => String(r.id) === String(roleId));
     if (!role) return;
+
+    // 内置角色详情按需加载（欢迎开场白/系统提示词/世界书/正则定义依赖完整数据）
+    if (role.isBuiltin && !role._detailsLoaded && typeof BuiltinCards !== 'undefined') {
+        await BuiltinCards.ensureDetails(role);
+        // 加载期间用户可能已切换到其他聊天，放弃过期渲染
+        if (String(AppState.currentChat) !== String(roleId)) return;
+    }
 
     // 初始化状态面板数据（切换角色时重置并重新加载）
     if (typeof StatusPanel !== 'undefined') {
@@ -1136,6 +1143,13 @@ async function sendMessage(skipInputCheck = false) {
     const roleId = AppState.currentChat;
     const session = AppState.chatSessions[roleId];
     if (!session) return;
+
+    // 兜底：内置角色详情未加载时先加载（正常情况打开聊天时已水合，
+    // 系统提示词/世界书注入依赖完整数据）
+    const sendRole = ROLES_DATA.find(r => String(r.id) === String(roleId));
+    if (sendRole && sendRole.isBuiltin && !sendRole._detailsLoaded && typeof BuiltinCards !== 'undefined') {
+        await BuiltinCards.ensureDetails(sendRole);
+    }
 
     const input = $('#chatInput');
     const text = input.value.trim();
@@ -3505,11 +3519,16 @@ function initCommonPhrases() {
 // ==================== Worldbook Manager ====================
 let currentEditingEntryIndex = null;
 
-function openWorldbookManager() {
+async function openWorldbookManager() {
     if (!AppState.currentChat) return;
 
     const role = ROLES_DATA.find(r => String(r.id) === String(AppState.currentChat));
     if (!role) return;
+
+    // 内置角色详情未加载时先按需加载（避免覆盖已有世界书数据）
+    if (role.isBuiltin && !role._detailsLoaded && typeof BuiltinCards !== 'undefined') {
+        await BuiltinCards.ensureDetails(role);
+    }
 
     // 确保角色有世界书数据结构
     if (!role.sourceData) role.sourceData = {};

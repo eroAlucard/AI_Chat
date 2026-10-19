@@ -450,7 +450,8 @@ const UserBehavior = {
 /**
  * 全局角色数组
  * - 自定义角色：从 localStorage (ai_custom_roles) 加载
- * - 内置角色：由 BuiltinCards.autoImport() 运行时从 cards-metadata-female/male.json 动态加载
+ * - 内置角色：由 BuiltinCards.autoImport() 运行时从 cards/cards-index.json 加载索引，
+ *   完整数据（cards/data/*.json）在打开角色/聊天时按需加载
  *   不存 localStorage，避免 5MB 限制
  *
  * 注意：必须是可写普通数组，app.js 中多处直接 push/splice/修改属性
@@ -496,16 +497,28 @@ const $$ = (sel) => document.querySelectorAll(sel);
 // ==================== Initialize ====================
 document.addEventListener('DOMContentLoaded', async () => {
     initLogin();
+
+    // 内置角色加载最先启动（与 UI 初始化并行），任何初始化步骤出错都不会阻塞角色加载
+    const builtinLoadPromise = BuiltinCards.autoImport().catch(e => {
+        console.warn('[BuiltinCards] 内置角色加载失败:', e);
+        return 0;
+    });
+
     await loadState();
-    // 自定义角色先加载（立即可用）；内置角色改为后台异步加载，不阻塞首屏
-    loadCustomRoles();
-    initNavigation();
-    initSearch();
-    initFilterModal();
-    renderQuickFilterChips();
-    initRecentViewed(); // 初始化最近浏览
+
+    // 单个初始化步骤异常不影响后续步骤（隔离执行）
+    const safeInit = (name, fn) => {
+        try { fn(); } catch (e) { console.error(`[Init] ${name} 执行失败:`, e); }
+    };
+    safeInit('loadCustomRoles', loadCustomRoles);
+    safeInit('initNavigation', initNavigation);
+    safeInit('initSearch', initSearch);
+    safeInit('initFilterModal', initFilterModal);
+    safeInit('renderQuickFilterChips', renderQuickFilterChips);
+    safeInit('initRecentViewed', initRecentViewed); // 初始化最近浏览
+
     AppState.builtinLoading = true;
-    renderRoleGrid();
+    safeInit('renderRoleGrid', renderRoleGrid);
     // 异步从 IndexedDB 加载自定义角色图片
     if (typeof ImageStore !== 'undefined') {
         setTimeout(() => {
@@ -513,32 +526,34 @@ document.addEventListener('DOMContentLoaded', async () => {
             ImageStore.applyImages(document.getElementById('customRolesGrid'));
         }, 200);
     }
-    renderChatList();
-    initChatView();
-    initRoleDetailModal();
-    initCreateRoleModal();
-    initMinePage();
-    initSettings();
+    safeInit('renderChatList', renderChatList);
+    safeInit('initChatView', initChatView);
+    safeInit('initRoleDetailModal', initRoleDetailModal);
+    safeInit('initCreateRoleModal', initCreateRoleModal);
+    safeInit('initMinePage', initMinePage);
+    safeInit('initSettings', initSettings);
 
-    // 后台加载内置角色卡（metadata JSON 体积较大，通过 fetch 异步加载），
-    // 完成后重新渲染所有依赖 ROLES_DATA 的区域
-    BuiltinCards.autoImport().then(added => {
+    // 内置角色索引加载完成后，重新渲染所有依赖 ROLES_DATA 的区域
+    builtinLoadPromise.then(added => {
         AppState.builtinLoading = false;
-        // 重新执行以将世界书覆盖数据应用到新加载的内置角色（幂等，自定义角色按 id 去重）
-        loadCustomRoles();
-        renderRoleGrid();
-        renderChatList();
-        if (added > 0) {
-            renderCollections();
-            renderRecentViewed();
-            if (typeof ImageStore !== 'undefined') {
-                ImageStore.applyImages(document.getElementById('roleGrid'));
+        try {
+            // 重新执行以将世界书覆盖数据应用到新加载的内置角色（幂等，自定义角色按 id 去重）
+            loadCustomRoles();
+            renderRoleGrid();
+            renderChatList();
+            // 筛选标签/推荐chips 基于 ROLES_DATA 生成，需重建
+            renderFilterTags();
+            renderQuickFilterChips();
+            if (added > 0) {
+                renderCollections();
+                renderRecentViewed();
+                if (typeof ImageStore !== 'undefined') {
+                    ImageStore.applyImages(document.getElementById('roleGrid'));
+                }
             }
+        } catch (e) {
+            console.error('[Init] 内置角色加载后重渲染失败:', e);
         }
-    }).catch(e => {
-        AppState.builtinLoading = false;
-        console.warn('[BuiltinCards] 内置角色加载失败:', e);
-        renderRoleGrid();
     });
 });
 
@@ -1225,7 +1240,7 @@ function initRoleDetailModal() {
     });
 }
 
-function openRoleDetail(roleId) {
+async function openRoleDetail(roleId) {
     const role = ROLES_DATA.find(r => String(r.id) === String(roleId));
     if (!role) return;
 
@@ -1271,13 +1286,27 @@ function openRoleDetail(roleId) {
     $('#roleDetailTags').innerHTML = (role.tags || []).map(t => `<span class="role-card-tag">${escapeHtml(t)}</span>`).join('');
     $('#roleDetailDesc').textContent = replaceVars(role.desc);
 
-    // 解析 systemPrompt 中的玩法规则并显示（替换模板变量后再解析）
-    const rulesEl = $('#roleDetailRules');
-    const rulesHtml = parseSystemPromptRules(replaceVars(role.systemPrompt));
-    rulesEl.innerHTML = rulesHtml;
-
+    // 先绑定按钮 roleId（同时作为水合期间用户切换角色的校验依据）
     $('#startChatBtn').dataset.roleId = roleId;
     $('#collectBtn').dataset.roleId = roleId;
+
+    const rulesEl = $('#roleDetailRules');
+    const sceneSelectBtn = $('#sceneSelectBtn');
+
+    // 内置角色详情按需加载：基础信息（名称/标签/简介/封面）已渲染，
+    // 玩法规则/世界书/开场白依赖完整数据，水合后再填充
+    if (role.isBuiltin && !role._detailsLoaded && typeof BuiltinCards !== 'undefined') {
+        rulesEl.innerHTML = '<div class="grid-loading" style="padding:24px;">' + (typeof svgIcon === 'function' ? svgIcon('refresh') : '') + '<span>角色数据加载中…</span></div>';
+        sceneSelectBtn.classList.add('hidden');
+        document.getElementById('worldbookBtn')?.classList.add('hidden');
+        await BuiltinCards.ensureDetails(role);
+        // 水合期间用户可能已切换到其他角色，放弃过期填充
+        if ($('#startChatBtn').dataset.roleId !== String(roleId)) return;
+    }
+
+    // 解析 systemPrompt 中的玩法规则并显示（替换模板变量后再解析）
+    const rulesHtml = parseSystemPromptRules(replaceVars(role.systemPrompt));
+    rulesEl.innerHTML = rulesHtml;
 
     const isCollected = AppState.collections.has(roleId);
     $('#collectBtn').innerHTML = isCollected ? `${svgIcon('heart')} 已收藏` : `${svgIcon('heart')} 收藏`;
@@ -1299,7 +1328,6 @@ function openRoleDetail(roleId) {
 
     // 渲染场景选择
     // 显示/隐藏开场白按钮
-    const sceneSelectBtn = $('#sceneSelectBtn');
     if (role.scenes && role.scenes.length > 0) {
         sceneSelectBtn.classList.remove('hidden');
     } else {
@@ -2095,6 +2123,16 @@ function openWorldbookOverview() {
                     book: role.sourceData.characterBook
                 });
             }
+        } else if (role._meta && role._meta.hasBook && role._meta.bookCount > 0) {
+            // 内置角色详情尚未加载：用索引中的条目数展示，操作时再按需加载内容
+            worldbooks.push({
+                id: role.id,
+                name: role.name || '未命名',
+                emoji: role.emoji || '🌐',
+                entryCount: role._meta.bookCount,
+                book: null,
+                lazy: true
+            });
         }
     });
     // 加入独立世界书
@@ -2176,6 +2214,16 @@ function openRegexOverview() {
                 emoji: role.emoji || '🔧',
                 scriptCount: role.sourceData.regexScripts.length,
                 scripts: role.sourceData.regexScripts
+            });
+        } else if (role._meta && role._meta.hasRegex && role._meta.regexCount > 0) {
+            // 内置角色详情尚未加载：用索引中的规则数展示，操作时再按需加载内容
+            regexGroups.push({
+                id: role.id,
+                name: role.name || '未命名',
+                emoji: role.emoji || '🔧',
+                scriptCount: role._meta.regexCount,
+                scripts: null,
+                lazy: true
             });
         }
     });
@@ -2287,11 +2335,12 @@ function showOverviewContextMenu(btn, roleId, type) {
             } else if (action === 'edit') {
                 if (type === 'worldbook') {
                     $('#worldbookOverviewModal').classList.add('hidden');
-                    openRoleDetail(roleId);
-                    setTimeout(() => {
+                    // openRoleDetail 是异步的（内置角色详情按需加载），
+                    // 等渲染完成后再点击世界书按钮，避免按钮尚未显示
+                    Promise.resolve(openRoleDetail(roleId)).then(() => {
                         const wbBtn = document.getElementById('worldbookBtn');
-                        if (wbBtn) wbBtn.click();
-                    }, 300);
+                        if (wbBtn && !wbBtn.classList.contains('hidden')) wbBtn.click();
+                    });
                 } else {
                     showToast('正则组编辑功能开发中');
                 }
@@ -2429,12 +2478,16 @@ function exitOverviewMultiSelect(type) {
     }
 }
 
-function copyOverviewItem(roleId, type) {
+async function copyOverviewItem(roleId, type) {
     if (type === 'worldbook') {
         // 从角色世界书或独立世界书获取源数据
         let srcBook = null;
         let srcName = '';
         const role = ROLES_DATA.find(r => String(r.id) === String(roleId));
+        // 内置角色详情未加载时先按需加载
+        if (role && role.isBuiltin && typeof BuiltinCards !== 'undefined') {
+            await BuiltinCards.ensureDetails(role);
+        }
         if (role && role.sourceData?.characterBook) {
             srcBook = role.sourceData.characterBook;
             srcName = role.name || '未命名';
@@ -2467,6 +2520,9 @@ function copyOverviewItem(roleId, type) {
         let srcScripts = null;
         let srcName = '';
         const role = ROLES_DATA.find(r => String(r.id) === String(roleId));
+        if (role && role.isBuiltin && typeof BuiltinCards !== 'undefined') {
+            await BuiltinCards.ensureDetails(role);
+        }
         if (role && role.sourceData?.regexScripts?.length) {
             srcScripts = role.sourceData.regexScripts;
             srcName = role.name || '未命名';
@@ -2494,7 +2550,7 @@ function copyOverviewItem(roleId, type) {
     }
 }
 
-function exportOverviewItem(roleId, type) {
+async function exportOverviewItem(roleId, type) {
     const isStandalone = String(roleId).startsWith('standalone_');
     let data, filename;
 
@@ -2506,6 +2562,10 @@ function exportOverviewItem(roleId, type) {
             filename = `${wb.name}_worldbook.json`;
         } else {
             const role = ROLES_DATA.find(r => String(r.id) === String(roleId));
+            // 内置角色详情未加载时先按需加载
+            if (role && role.isBuiltin && typeof BuiltinCards !== 'undefined') {
+                await BuiltinCards.ensureDetails(role);
+            }
             if (!role || !role.sourceData?.characterBook) { showToast('该角色没有世界书数据'); return; }
             data = role.sourceData.characterBook;
             filename = `${role.name}_worldbook.json`;
@@ -2518,6 +2578,9 @@ function exportOverviewItem(roleId, type) {
             filename = `${rg.name}_regex.json`;
         } else {
             const role = ROLES_DATA.find(r => String(r.id) === String(roleId));
+            if (role && role.isBuiltin && typeof BuiltinCards !== 'undefined') {
+                await BuiltinCards.ensureDetails(role);
+            }
             if (!role || !role.sourceData?.regexScripts?.length) { showToast('该角色没有正则组数据'); return; }
             data = role.sourceData.regexScripts;
             filename = `${role.name}_regex.json`;
@@ -2552,9 +2615,14 @@ function deleteOverviewItem(roleId, type) {
         if (!role) return;
         if (type === 'worldbook') {
             if (role.sourceData) role.sourceData.characterBook = null;
+            // 详情未加载的内置角色：清除索引标志 + 打删除标记（水合时不恢复，与旧行为一致，仅本次会话生效）
+            if (role._meta) { role._meta.hasBook = false; role._meta.bookCount = 0; }
+            role._bookDeleted = true;
             showToast('世界书已删除');
         } else {
             if (role.sourceData) role.sourceData.regexScripts = [];
+            if (role._meta) { role._meta.hasRegex = false; role._meta.regexCount = 0; }
+            role._regexDeleted = true;
             showToast('正则组已删除');
         }
     }
@@ -2567,8 +2635,20 @@ function deleteOverviewItem(roleId, type) {
     }
 }
 
-function exportSelectedItems(type) {
+async function exportSelectedItems(type) {
     if (_overviewMultiSelectIds.size === 0) { showToast('请先选择条目'); return; }
+
+    // 并行加载选中内置角色的详情（未水合时 book/scripts 为空）
+    if (typeof BuiltinCards !== 'undefined') {
+        const pending = [];
+        _overviewMultiSelectIds.forEach(roleId => {
+            const role = ROLES_DATA.find(r => String(r.id) === String(roleId));
+            if (role && role.isBuiltin && !role._detailsLoaded) {
+                pending.push(BuiltinCards.ensureDetails(role));
+            }
+        });
+        if (pending.length > 0) await Promise.all(pending);
+    }
 
     const items = [];
     _overviewMultiSelectIds.forEach(roleId => {
@@ -2629,8 +2709,12 @@ function deleteSelectedItems(type) {
             if (!role) return;
             if (type === 'worldbook') {
                 if (role.sourceData) role.sourceData.characterBook = null;
+                if (role._meta) { role._meta.hasBook = false; role._meta.bookCount = 0; }
+                role._bookDeleted = true;
             } else {
                 if (role.sourceData) role.sourceData.regexScripts = [];
+                if (role._meta) { role._meta.hasRegex = false; role._meta.regexCount = 0; }
+                role._regexDeleted = true;
             }
             deletedCount++;
         }
@@ -2652,10 +2736,15 @@ function initSceneModal() {
     const sceneModalCancel = $('#sceneModalCancel');
     const sceneModalConfirm = $('#sceneModalConfirm');
 
-    sceneSelectBtn.addEventListener('click', () => {
+    sceneSelectBtn.addEventListener('click', async () => {
         const roleId = $('#startChatBtn').dataset.roleId;
         const role = ROLES_DATA.find(r => String(r.id) === String(roleId));
-        if (!role || !role.scenes || role.scenes.length === 0) return;
+        if (!role) return;
+        // 防御性水合（正常情况下 openRoleDetail 已加载详情）
+        if (role.isBuiltin && !role._detailsLoaded && typeof BuiltinCards !== 'undefined') {
+            await BuiltinCards.ensureDetails(role);
+        }
+        if (!role.scenes || role.scenes.length === 0) return;
         renderSceneModalList(role);
         sceneModal.classList.remove('hidden');
     });
