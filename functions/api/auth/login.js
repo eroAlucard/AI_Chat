@@ -16,8 +16,13 @@ export async function onRequestPost(context) {
 
     const secret = env?.AUTH_SECRET;
     const accountsJson = env?.AUTH_ACCOUNTS;
-    if (!secret || !accountsJson) {
-        return jsonResponse({ error: '服务端未配置 AUTH_SECRET / AUTH_ACCOUNTS 环境变量' }, 500);
+    const missing = [];
+    if (!secret) missing.push('AUTH_SECRET');
+    if (!accountsJson) missing.push('AUTH_ACCOUNTS');
+    if (missing.length) {
+        return jsonResponse({
+            error: `服务端缺少环境变量: ${missing.join('、')}（Cloudflare → Settings → Variables and Secrets → Production 配置后需重新部署）`
+        }, 500);
     }
 
     let accounts;
