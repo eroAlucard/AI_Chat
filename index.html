@@ -1304,8 +1304,8 @@
 
     <script src="js/roles-data.js"></script>
     <script src="js/card-parser.js"></script>
-    <!-- 内置角色卡 metadata 已改为运行时 fetch 加载 cards/*.json（见 builtin-cards.js），
-         不再通过 <script> 同步加载 26MB 的 js/cards-metadata-*.js -->
+    <!-- 内置角色卡数据：运行时动态注入 cards/cards-index.js（轻量索引）+ cards/data/*.js（每卡详情按需加载），
+         见 builtin-cards.js。<script> 方式在 file:// 双击直开与 Cloudflare 部署下均可用 -->
     <script src="js/image-store.js"></script>
     <script src="js/chat-store.js"></script>
     <script src="js/builtin-cards.js"></script>

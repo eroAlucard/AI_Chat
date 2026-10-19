@@ -13,7 +13,7 @@ const STATIC_ASSETS = [
   '/js/roles-data.js',
   '/js/builtin-cards.js',
   '/js/card-parser.js',
-  '/cards/cards-index.json',
+  '/cards/cards-index.js',
   '/js/image-store.js',
   '/js/chat-store.js',
   '/icons/icon-192.png',

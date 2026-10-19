@@ -20,8 +20,8 @@ if %ERRORLEVEL% EQU 0 (
     echo ================================================
     echo.
     echo 📋 已生成以下文件：
-    echo    - cards/cards-index.json（轻量索引）
-    echo    - cards/data/*.json（每卡详情）
+    echo    - cards/cards-index.js（轻量索引）
+    echo    - cards/data/*.js（每卡详情）
     echo    - cards/manifest.json
     echo.
     echo 💡 提示：

@@ -1,24 +1,26 @@
 /**
  * builtin-cards.js — 内置角色卡运行时加载（轻量索引 + 每卡按需详情）
  *
- * 数据结构：
- *   cards/cards-index.json — 轻量索引（~100KB）：id/名称/简介/标签/pov/世界书标志/详情文件路径
- *   cards/data/*.json      — 单卡完整数据（first_mes/system_prompt/character_book 等）
+ * 数据结构（JS 格式，通过动态 <script> 注入加载）：
+ *   cards/cards-index.js — 轻量索引（~100KB）：window.__CARDS_INDEX__
+ *   cards/data/*.js      — 单卡完整数据：window.__CARDS_DETAILS__[roleId]
+ *
+ * 为什么用 JS 而不是 JSON：<script> 标签在 file:// 协议下也能正常加载，
+ * 因此双击 index.html 直开、localhost、Cloudflare 部署三种环境全兼容，
+ * 无需 fetch（file:// 下被浏览器禁止）。
  *
  * 加载策略：
- *   1. 首屏只 fetch 索引，立即构建轻量角色对象（网格/筛选/搜索/聊天列表全部可用）
- *   2. 打开角色详情 / 进入聊天 / 操作世界书时，通过 ensureDetails(role) 按需加载单卡详情
+ *   1. 首屏只注入索引脚本，立即构建轻量角色对象（网格/筛选/搜索/聊天列表全部可用）
+ *   2. 打开角色详情 / 进入聊天 / 操作世界书时，通过 ensureDetails(role) 按需注入单卡详情
  *   3. 详情请求去重（并发调用共享同一 Promise），失败时下次调用自动重试
  *
- * 注意：file:// 协议下浏览器禁止 fetch 本地文件，请通过本地服务器访问
- *      （双击 启动.bat 或运行 node server.js 后打开 http://localhost:3000）。
  * 只有自定义角色才存 localStorage。
  */
 
 const BuiltinCards = (function() {
 
     const STORAGE_KEY = 'ai_builtin_cards_imported';
-    const INDEX_FILE = 'cards/cards-index.json';
+    const INDEX_FILE = 'cards/cards-index.js';
 
     // 内存缓存：轻量角色列表
     let _builtinRolesCache = null;
@@ -27,72 +29,57 @@ const BuiltinCards = (function() {
 
     // ==================== 基础加载 ====================
 
-    function xhrJson(url) {
+    /**
+     * 动态注入 <script> 加载数据文件（file:// 与 http(s) 全兼容）
+     */
+    function loadScript(url) {
         return new Promise((resolve, reject) => {
-            const xhr = new XMLHttpRequest();
-            xhr.open('GET', url, true);
-            xhr.responseType = 'json';
-            xhr.onload = () => {
-                if ((xhr.status >= 200 && xhr.status < 300) || xhr.status === 0) {
-                    resolve(xhr.response);
-                } else {
-                    reject(new Error(`HTTP ${xhr.status}`));
-                }
-            };
-            xhr.onerror = () => reject(new Error('网络错误'));
-            xhr.send();
+            const s = document.createElement('script');
+            s.src = url;
+            s.charset = 'utf-8';
+            s.async = true;
+            s.onload = () => { s.remove(); resolve(); };
+            s.onerror = () => { s.remove(); reject(new Error('脚本加载失败: ' + url)); };
+            (document.head || document.documentElement).appendChild(s);
         });
     }
 
-    async function fetchJson(url) {
-        try {
-            const resp = await fetch(url);
-            if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
-            return await resp.json();
-        } catch (e) {
-            // fetch 失败时回退 XHR（兼容部分环境）
-            return await xhrJson(url);
-        }
-    }
-
     /**
-     * file:// 协议下的可见提示（控制台日志用户看不到，必须页面提示）
+     * 数据文件加载失败时的可见提示（控制台日志用户看不到，必须页面提示）
      */
-    function showFileProtocolWarning() {
-        if (document.getElementById('fileProtocolWarning')) return;
+    function showLoadErrorHint() {
+        if (document.getElementById('builtinLoadErrorHint')) return;
         const box = document.createElement('div');
-        box.id = 'fileProtocolWarning';
+        box.id = 'builtinLoadErrorHint';
         box.style.cssText = 'position:fixed;inset:0;z-index:99999;display:flex;align-items:center;justify-content:center;background:rgba(10,10,26,.9);backdrop-filter:blur(10px);padding:24px;';
         box.innerHTML = `
             <div style="max-width:420px;width:100%;background:rgba(30,30,60,.95);border:1px solid rgba(255,255,255,.12);border-radius:20px;padding:28px 24px;color:#e8e8f0;font-size:14px;line-height:1.8;box-shadow:0 20px 60px rgba(0,0,0,.5);">
-                <div style="font-size:17px;font-weight:700;margin-bottom:12px;">⚠️ 无法加载角色卡数据</div>
-                <div style="color:#a8a8c0;">当前通过 <code style="color:#c0a8ff;">file://</code> 协议直接打开页面，浏览器禁止网页读取本地数据文件。</div>
-                <div style="margin-top:12px;color:#a8a8c0;">请改用本地服务器访问：</div>
+                <div style="font-size:17px;font-weight:700;margin-bottom:12px;">⚠️ 无法加载内置角色卡数据</div>
+                <div style="color:#a8a8c0;">请确认以下文件完整存在：</div>
                 <div style="margin-top:8px;padding:12px;background:rgba(0,0,0,.35);border-radius:10px;font-family:monospace;font-size:13px;color:#9be89b;">
-                    1. 双击项目目录中的「启动.bat」<br>
-                    2. 或手动运行：node server.js<br>
-                    3. 浏览器打开 http://localhost:3000
+                    cards/cards-index.js<br>
+                    cards/data/*.js（186 个详情文件）
                 </div>
-                <button id="fileWarnCloseBtn" style="margin-top:16px;width:100%;padding:10px;border:none;border-radius:10px;background:linear-gradient(135deg,#7c5cff,#a855f7);color:#fff;font-size:14px;cursor:pointer;">知道了（仅使用自定义角色）</button>
+                <div style="margin-top:12px;color:#a8a8c0;">如文件缺失，请在项目目录运行 <code style="color:#c0a8ff;">update-cards.bat</code> 重新生成。</div>
+                <button id="builtinLoadErrorCloseBtn" style="margin-top:16px;width:100%;padding:10px;border:none;border-radius:10px;background:linear-gradient(135deg,#7c5cff,#a855f7);color:#fff;font-size:14px;cursor:pointer;">知道了（仅使用自定义角色）</button>
             </div>`;
         document.body.appendChild(box);
-        document.getElementById('fileWarnCloseBtn').onclick = () => box.remove();
+        document.getElementById('builtinLoadErrorCloseBtn').onclick = () => box.remove();
     }
 
     async function loadIndex() {
         try {
-            const index = await fetchJson(INDEX_FILE);
+            await loadScript(INDEX_FILE);
+            const index = window.__CARDS_INDEX__;
             if (Array.isArray(index) && index.length > 0) {
                 console.log(`[BuiltinCards] 索引加载成功：${index.length} 张角色卡`);
                 return index;
             }
-            console.error('[BuiltinCards] 索引为空或格式错误');
+            console.error('[BuiltinCards] 索引数据为空或格式错误');
         } catch (e) {
             console.error('[BuiltinCards] 索引加载失败:', e.message);
         }
-        if (window.location.protocol === 'file:') {
-            showFileProtocolWarning();
-        }
+        showLoadErrorHint();
         return [];
     }
 
@@ -252,7 +239,13 @@ const BuiltinCards = (function() {
         }
         const p = (async () => {
             try {
-                const meta = await fetchJson('cards/' + role._dataFile);
+                // 已加载过的详情直接读全局缓存（二次打开无需重新注入脚本）
+                let meta = window.__CARDS_DETAILS__ && window.__CARDS_DETAILS__[role.id];
+                if (!meta) {
+                    await loadScript('cards/' + role._dataFile);
+                    meta = window.__CARDS_DETAILS__ && window.__CARDS_DETAILS__[role.id];
+                }
+                if (!meta) throw new Error('详情数据缺失: ' + role._dataFile);
                 role.systemPrompt = buildSystemPrompt(meta);
                 role.scenes = buildScenes(meta);
                 role.sourceData = {
@@ -268,9 +261,6 @@ const BuiltinCards = (function() {
                 role._detailsLoaded = true;
             } catch (e) {
                 console.warn(`[BuiltinCards] 加载角色详情失败 ${role.name}:`, e.message);
-                if (window.location.protocol === 'file:') {
-                    showFileProtocolWarning();
-                }
             } finally {
                 _detailsInflight.delete(role.id);
             }
