@@ -20,9 +20,9 @@ if %ERRORLEVEL% EQU 0 (
     echo ================================================
     echo.
     echo 📋 已生成以下文件：
-    echo    - cards/cards-metadata.json
+    echo    - cards/cards-metadata-female.json
+    echo    - cards/cards-metadata-male.json
     echo    - cards/manifest.json
-    echo    - js/cards-metadata.js
     echo.
     echo 💡 提示：
     echo    - 刷新浏览器即可看到新卡片

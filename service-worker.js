@@ -1,5 +1,5 @@
-const CACHE_NAME = 'ai-chat-v1.1.0';
-const STATIC_CACHE = 'ai-chat-static-v2';
+const CACHE_NAME = 'ai-chat-v1.2.0';
+const STATIC_CACHE = 'ai-chat-static-v3';
 const DYNAMIC_CACHE = 'ai-chat-dynamic-v2';
 
 // 需要缓存的静态资源
@@ -7,16 +7,16 @@ const STATIC_ASSETS = [
   '/',
   '/index.html',
   '/css/style.css',
+  '/css/glass-theme.css',
   '/js/app.js',
   '/js/chat.js',
   '/js/roles-data.js',
   '/js/builtin-cards.js',
   '/js/card-parser.js',
-  '/js/cards-metadata-female.js',
-  '/js/cards-metadata-male.js',
   '/cards/cards-metadata-female.json',
   '/cards/cards-metadata-male.json',
   '/js/image-store.js',
+  '/js/chat-store.js',
   '/icons/icon-192.png',
   '/icons/icon-512.png'
 ];

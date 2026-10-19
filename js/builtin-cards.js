@@ -1,11 +1,13 @@
 /**
  * builtin-cards.js — 内置角色卡运行时加载
  * 
- * 内置角色数据从 cards-metadata-female.json 和 cards-metadata-male.json 动态加载，不存入 localStorage（避免 5MB 限制）。
+ * 内置角色数据从 cards/cards-metadata-female.json 和 cards/cards-metadata-male.json 动态加载，
+ * 不存入 localStorage（避免 5MB 限制），也不通过 <script> 同步加载（避免 26MB JS 阻塞首屏）。
  * 加载策略（按优先级）：
- *   1. 全局变量 CARDS_METADATA（向后兼容，由 <script> 标签加载）
+ *   1. 全局变量 CARDS_METADATA_*（仅向后兼容，当前 index.html 不再加载对应 <script>）
  *   2. fetch 依次加载拆分后的多个 JSON 文件，合并结果
- *   3. XMLHttpRequest 回退（兼容部分 file:// 环境）
+ *   3. XMLHttpRequest 回退（兼容部分环境）
+ * 注意：file:// 协议下浏览器禁止 fetch 本地文件，请通过本地服务器（node server.js）访问。
  * 只有自定义角色才存 localStorage。
  */
 
@@ -104,6 +106,9 @@ const BuiltinCards = (function() {
         }
 
         console.error('[BuiltinCards] 所有加载方式均失败，无法加载内置角色');
+        if (window.location.protocol === 'file:') {
+            console.error('[BuiltinCards] 当前通过 file:// 协议打开，浏览器禁止跨文件 fetch。请改用本地服务器访问，例如：node server.js 后打开 http://localhost:3000');
+        }
         return [];
     }
 

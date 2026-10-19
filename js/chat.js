@@ -1601,10 +1601,11 @@ async function callLMApi(role, messages, useStream = true) {
     let fetchUrl, fetchHeaders;
     if (isDeployed) {
         // 同域代理：前端请求 /api/v1/chat/completions，由 Pages Function 转发
+        // 目标地址由服务端环境变量 LM_STUDIO_URL 配置，前端只携带登录 token
         fetchUrl = `${window.location.origin}/api/v1/chat/completions`;
         fetchHeaders = {
             'Content-Type': 'application/json',
-            'X-Target-URL': apiUrl  // 告诉代理目标地址
+            'Authorization': `Bearer ${getAuthToken()}`
         };
     } else {
         // 本地开发：直连 LM Studio，不走 Tunnel 避免公网绕行延迟

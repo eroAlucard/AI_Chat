@@ -896,7 +896,30 @@ select:focus-visible {
     outline: none;
 }
 
-/* ==================== 18. 减少动态效果偏好 ==================== */
+/* ==================== 18. 角色网格加载态 ==================== */
+.grid-loading {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 12px;
+    padding: 60px 20px;
+    color: var(--text-muted);
+    font-size: 14px;
+}
+
+.grid-loading .icon {
+    width: 32px;
+    height: 32px;
+    color: var(--accent-purple-light);
+    animation: gridLoadingSpin 1.2s linear infinite;
+}
+
+@keyframes gridLoadingSpin {
+    to { transform: rotate(360deg); }
+}
+
+/* ==================== 19. 减少动态效果偏好 ==================== */
 @media (prefers-reduced-motion: reduce) {
     *,
     *::before,

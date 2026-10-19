@@ -11,12 +11,8 @@ function getCustomRolesKey() {
     return user ? `ai_custom_roles_${user}` : 'ai_custom_roles';
 }
 
-// 预设账号列表（添加/删除用户直接改这里）
-const ACCOUNTS = {
-    'eroalucard': 'GOKO19921218',
-    'hanhan': 'hh1234',
-    'fazi': 'fz1234',
-};
+// 账号配置已移至服务端（Cloudflare 环境变量 AUTH_ACCOUNTS / AUTH_SECRET），
+// 前端不再保存任何密码。本地开发模式（http/file）下任意非空账号密码可登录。
 // 标签 -> 筛选分组映射
 const ROLE_TAG_FILTER_MAP = {
     '男性向': 'audience',
@@ -114,13 +110,79 @@ function getCurrentUser() {
     return sessionStorage.getItem('ai_chat_user') || '';
 }
 
+// ==================== 登录认证（服务端验证） ====================
+// 部署模式（https）：调用 Cloudflare Function /api/auth/login 服务端验证，
+//                    密码保存在服务端环境变量 AUTH_ACCOUNTS 中，前端不可见。
+// 本地模式（http/file）：开发模式，任意非空用户名/密码直接通过。
+
+function isDeployedMode() {
+    return window.location.protocol === 'https:';
+}
+
+function getAuthToken() {
+    return sessionStorage.getItem('ai_chat_token') || '';
+}
+
+function setAuthSession(username, token) {
+    sessionStorage.setItem('ai_chat_user', username);
+    if (token) sessionStorage.setItem('ai_chat_token', token);
+}
+
+function clearAuthSession() {
+    sessionStorage.removeItem('ai_chat_user');
+    sessionStorage.removeItem('ai_chat_token');
+}
+
+/** 解码 token payload（不验签，仅用于读取用户名/过期时间；签名由服务端在 API 调用时验证） */
+function decodeTokenPayload(token) {
+    try {
+        const payloadB64 = String(token).split('.')[0];
+        const b64 = payloadB64.replace(/-/g, '+').replace(/_/g, '/');
+        const bin = atob(b64 + '='.repeat((4 - (b64.length % 4)) % 4));
+        const bytes = new Uint8Array(bin.length);
+        for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+        return JSON.parse(new TextDecoder().decode(bytes));
+    } catch {
+        return null;
+    }
+}
+
 function checkLogin() {
     const user = getCurrentUser();
-    if (user && ACCOUNTS[user]) {
-        document.getElementById('loginOverlay').classList.add('hidden');
-        return true;
+    if (!user) return false;
+    if (isDeployedMode()) {
+        const payload = decodeTokenPayload(getAuthToken());
+        // token 缺失/过期/用户名不匹配 → 清除会话，要求重新登录
+        if (!payload || payload.u !== user || Date.now() > payload.exp) {
+            clearAuthSession();
+            return false;
+        }
     }
-    return false;
+    document.getElementById('loginOverlay').classList.add('hidden');
+    return true;
+}
+
+async function doLogin(username, password) {
+    if (!isDeployedMode()) {
+        // 本地开发模式：无服务端，直接放行
+        setAuthSession(username, '');
+        return { ok: true };
+    }
+    try {
+        const resp = await fetch('/api/auth/login', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ username, password })
+        });
+        const data = await resp.json().catch(() => ({}));
+        if (resp.ok && data.ok && data.token) {
+            setAuthSession(data.username || username, data.token);
+            return { ok: true };
+        }
+        return { ok: false, error: data.error || '账号或密码错误' };
+    } catch (e) {
+        return { ok: false, error: '网络错误，请稍后重试' };
+    }
 }
 
 function initLogin() {
@@ -130,23 +192,36 @@ function initLogin() {
     const usernameInput = document.getElementById('loginUsername');
     const passwordInput = document.getElementById('loginPassword');
     const error = document.getElementById('loginError');
+    const loginBtn = form.querySelector('.login-btn');
 
-    form.addEventListener('submit', (e) => {
+    function showLoginError(msg) {
+        error.textContent = msg;
+        error.classList.remove('hidden');
+        setTimeout(() => error.classList.add('hidden'), 3000);
+    }
+
+    form.addEventListener('submit', async (e) => {
         e.preventDefault();
         const username = usernameInput.value.trim().toLowerCase();
         const pwd = passwordInput.value;
-        if (ACCOUNTS[username] && ACCOUNTS[username] === pwd) {
-            sessionStorage.setItem('ai_chat_user', username);
+        if (!username || !pwd) {
+            showLoginError('请输入用户名和密码');
+            return;
+        }
+        if (loginBtn) loginBtn.disabled = true;
+        const result = await doLogin(username, pwd);
+        if (loginBtn) loginBtn.disabled = false;
+
+        if (result.ok) {
             document.getElementById('loginOverlay').classList.add('hidden');
             // 登录成功后重新加载数据（按用户隔离）
-            loadState();
+            await loadState();
             // 重新加载自定义角色（IIFE 在脚本加载时已执行，此时才拿到用户名）
             reloadCustomRoles();
         } else {
-            error.classList.remove('hidden');
+            showLoginError(result.error);
             passwordInput.value = '';
             usernameInput.focus();
-            setTimeout(() => error.classList.add('hidden'), 3000);
         }
     });
 }
@@ -159,6 +234,7 @@ const AppState = {
     collections: new Set(),
     filters: {},
     searchQuery: '',
+    builtinLoading: false, // 内置角色卡是否正在后台加载
     settings: {
         apiUrl: 'https://eroaichat.de5.net',
         modelName: '',
@@ -420,15 +496,15 @@ const $$ = (sel) => document.querySelectorAll(sel);
 // ==================== Initialize ====================
 document.addEventListener('DOMContentLoaded', async () => {
     initLogin();
-    loadState();
-    // 首次加载时自动导入内置角色卡（在 loadCustomRoles 之前）
-    await BuiltinCards.autoImport();
+    await loadState();
+    // 自定义角色先加载（立即可用）；内置角色改为后台异步加载，不阻塞首屏
     loadCustomRoles();
     initNavigation();
     initSearch();
     initFilterModal();
     renderQuickFilterChips();
     initRecentViewed(); // 初始化最近浏览
+    AppState.builtinLoading = true;
     renderRoleGrid();
     // 异步从 IndexedDB 加载自定义角色图片
     if (typeof ImageStore !== 'undefined') {
@@ -443,19 +519,64 @@ document.addEventListener('DOMContentLoaded', async () => {
     initCreateRoleModal();
     initMinePage();
     initSettings();
+
+    // 后台加载内置角色卡（metadata JSON 体积较大，通过 fetch 异步加载），
+    // 完成后重新渲染所有依赖 ROLES_DATA 的区域
+    BuiltinCards.autoImport().then(added => {
+        AppState.builtinLoading = false;
+        // 重新执行以将世界书覆盖数据应用到新加载的内置角色（幂等，自定义角色按 id 去重）
+        loadCustomRoles();
+        renderRoleGrid();
+        renderChatList();
+        if (added > 0) {
+            renderCollections();
+            renderRecentViewed();
+            if (typeof ImageStore !== 'undefined') {
+                ImageStore.applyImages(document.getElementById('roleGrid'));
+            }
+        }
+    }).catch(e => {
+        AppState.builtinLoading = false;
+        console.warn('[BuiltinCards] 内置角色加载失败:', e);
+        renderRoleGrid();
+    });
 });
 
-// ==================== LocalStorage ====================
+// ==================== 状态持久化（IndexedDB，兼容 localStorage 迁移） ====================
 function getStateKey() {
     const user = getCurrentUser();
     return user ? `ai_chat_state_${user}` : 'ai_chat_state';
 }
 
-function loadState() {
+async function loadState() {
     try {
-        const saved = localStorage.getItem(getStateKey());
-        if (saved) {
-            const data = JSON.parse(saved);
+        const key = getStateKey();
+        let data = null;
+
+        // 优先从 IndexedDB 读取
+        if (typeof ChatStore !== 'undefined') {
+            data = await ChatStore.load(key).catch(e => {
+                console.warn('[ChatStore] 读取失败:', e);
+                return null;
+            });
+        }
+
+        // IndexedDB 无数据时，尝试从 localStorage 迁移旧数据
+        if (!data) {
+            const saved = localStorage.getItem(key);
+            if (saved) {
+                data = JSON.parse(saved);
+                if (data && typeof ChatStore !== 'undefined') {
+                    try {
+                        await ChatStore.save(key, data);
+                        localStorage.removeItem(key);
+                        console.log('[ChatStore] 聊天记录已从 localStorage 迁移到 IndexedDB');
+                    } catch (e) { console.warn('[ChatStore] 迁移失败，保留 localStorage 数据:', e); }
+                }
+            }
+        }
+
+        if (data) {
             if (data.chatSessions) AppState.chatSessions = data.chatSessions;
             if (data.collections) AppState.collections = new Set(data.collections);
             if (data.settings) Object.assign(AppState.settings, data.settings);
@@ -463,17 +584,35 @@ function loadState() {
     } catch (e) { console.warn('Failed to load state:', e); }
 }
 
+// saveState 被高频调用（每条消息、每次操作），采用防抖合并写入
+let _saveStateTimer = null;
 function saveState() {
-    try {
-        // 排除以 _ 开头的临时属性（如 _generatingSwipeFor），避免持久化临时标记
-        localStorage.setItem(getStateKey(), JSON.stringify({
-            chatSessions: AppState.chatSessions,
-            collections: [...AppState.collections],
-            settings: AppState.settings
-            // 不保存 _generatingSwipeFor 等临时标记
-        }));
-    } catch (e) { console.warn('Failed to save state:', e); }
+    if (_saveStateTimer) clearTimeout(_saveStateTimer);
+    _saveStateTimer = setTimeout(flushState, 200);
 }
+
+function flushState() {
+    if (_saveStateTimer) { clearTimeout(_saveStateTimer); _saveStateTimer = null; }
+    const data = {
+        chatSessions: AppState.chatSessions,
+        collections: [...AppState.collections],
+        settings: AppState.settings
+        // 不保存 _generatingSwipeFor 等临时标记（结构化克隆/JSON 均只含数据属性）
+    };
+    if (typeof ChatStore !== 'undefined') {
+        ChatStore.save(getStateKey(), data).catch(e => console.warn('Failed to save state:', e));
+    } else {
+        // 极老浏览器无 IndexedDB 时回退 localStorage
+        try { localStorage.setItem(getStateKey(), JSON.stringify(data)); }
+        catch (e) { console.warn('Failed to save state:', e); }
+    }
+}
+
+// 页面隐藏/关闭前尽力刷盘，减少数据丢失窗口
+window.addEventListener('pagehide', flushState);
+document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'hidden') flushState();
+});
 
 // ==================== Navigation ====================
 function initNavigation() {
@@ -884,7 +1023,10 @@ function renderRoleGrid() {
     if (AppState.searchQuery && roles.length > 0) {
         grid.innerHTML = `<div class="search-results-hint">找到 ${roles.length} 个角色</div>` + roles.filter(r => r && r.id).map(role => renderRoleCard(role)).join('');
     } else if (roles.length === 0) {
-        grid.innerHTML = '<div style="grid-column:1/-1;text-align:center;padding:40px;color:var(--text-muted);">没有找到匹配的角色</div>';
+        // 内置角色后台加载中时显示加载提示，避免误以为没有数据
+        grid.innerHTML = AppState.builtinLoading
+            ? '<div class="grid-loading" style="grid-column:1/-1;">' + (typeof svgIcon === 'function' ? svgIcon('refresh') : '') + '<span>内置角色加载中…</span></div>'
+            : '<div style="grid-column:1/-1;text-align:center;padding:40px;color:var(--text-muted);">没有找到匹配的角色</div>';
     } else {
         grid.innerHTML = roles.filter(r => r && r.id).map(role => renderRoleCard(role)).join('');
     }
@@ -3618,7 +3760,7 @@ function closeDataManager() {
 }
 
 // 计算存储空间使用情况
-function calculateStorageUsage() {
+async function calculateStorageUsage() {
     const user = getCurrentUser();
     const dataTypes = [
         { key: `ai_chat_state_${user}`, name: '聊天记录', icon: 'chat' },
@@ -3634,9 +3776,22 @@ function calculateStorageUsage() {
     let totalSize = 0;
     const details = [];
 
-    dataTypes.forEach(type => {
-        const value = localStorage.getItem(type.key);
-        const size = value ? new Blob([value]).size : 0;
+    for (const type of dataTypes) {
+        let size = 0;
+        if (type.key.startsWith('ai_chat_state_') && typeof ChatStore !== 'undefined') {
+            // 聊天记录存储在 IndexedDB
+            const data = await ChatStore.load(type.key).catch(() => null);
+            if (data) {
+                size = ChatStore.estimateSize(data);
+            } else {
+                // 回退：尚未迁移的旧数据
+                const value = localStorage.getItem(type.key);
+                size = value ? new Blob([value]).size : 0;
+            }
+        } else {
+            const value = localStorage.getItem(type.key);
+            size = value ? new Blob([value]).size : 0;
+        }
         totalSize += size;
         if (size > 0) {
             details.push({
@@ -3645,7 +3800,7 @@ function calculateStorageUsage() {
                 size: size
             });
         }
-    });
+    }
 
     // 探测实际可用的localStorage容量
     const maxSize = detectLocalStorageLimit();
@@ -3753,12 +3908,20 @@ async function exportAllData() {
             `ai_chat_userid_${user}`
         ];
 
-        keys.forEach(key => {
+        for (const key of keys) {
+            // 聊天记录优先从 IndexedDB 导出（保持字符串格式，与旧版备份兼容）
+            if (key.startsWith('ai_chat_state_') && typeof ChatStore !== 'undefined') {
+                const data = await ChatStore.load(key).catch(() => null);
+                if (data) {
+                    exportData.data[key] = JSON.stringify(data);
+                    continue;
+                }
+            }
             const value = localStorage.getItem(key);
             if (value) {
                 exportData.data[key] = value;
             }
-        });
+        }
 
         // IndexedDB 图片数据
         if (typeof ImageStore !== 'undefined') {
@@ -3811,10 +3974,18 @@ function importAllData() {
 
             if (!confirm(confirmMsg)) return;
 
-            // 导入 localStorage 数据
-            Object.keys(importData.data).forEach(key => {
+            // 导入数据（聊天记录写入 IndexedDB，其余写 localStorage）
+            for (const key of Object.keys(importData.data)) {
+                if (key.startsWith('ai_chat_state_') && typeof ChatStore !== 'undefined') {
+                    try {
+                        await ChatStore.save(key, JSON.parse(importData.data[key]));
+                        continue;
+                    } catch (e) {
+                        console.warn('[ChatStore] 聊天记录导入失败，回退 localStorage:', e);
+                    }
+                }
                 localStorage.setItem(key, importData.data[key]);
-            });
+            }
 
             // 导入 IndexedDB 图片
             if (importData.images && typeof ImageStore !== 'undefined') {
@@ -3908,9 +4079,13 @@ function clearAllData() {
         const keys = Object.keys(localStorage).filter(k => k.includes(user));
         keys.forEach(k => localStorage.removeItem(k));
 
-        // 清除 IndexedDB
+        // 清除 IndexedDB（图片 + 聊天记录）
         if (typeof ImageStore !== 'undefined') {
             ImageStore.clear().catch(() => {});
+        }
+        if (typeof ChatStore !== 'undefined') {
+            ChatStore.remove(getStateKey()).catch(() => {});
+            ChatStore.remove('ai_chat_state').catch(() => {});
         }
 
         alert('✅ 所有数据已清空\n\n页面即将刷新...');
