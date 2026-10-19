@@ -421,7 +421,7 @@ function renderMessages(roleId) {
                     <button class="swipe-btn swipe-prev" data-msg-idx="${idx}" ${currentIdx === 0 ? 'disabled' : ''}>◀</button>
                     <span class="swipe-indicator">${currentIdx + 1}/${msg.swipes.length}</span>
                     <button class="swipe-btn swipe-next" data-msg-idx="${idx}" ${currentIdx === msg.swipes.length - 1 ? 'disabled' : ''}>▶</button>
-                    <button class="swipe-btn swipe-new" data-msg-idx="${idx}" title="生成新候选">➕</button>
+                    <button class="swipe-btn swipe-new" data-msg-idx="${idx}" title="生成新候选">${svgIcon('plus')}</button>
                 </div>
             `;
         }
@@ -655,23 +655,23 @@ function showMessageContextMenu(msgIdxOrElement, xOrMsgIdx, yOrButton) {
 
     // 用户消息：编辑
     if (isUser) {
-        menuHTML += `<button class="context-menu-item" onclick="editMessage(${msgIdx})">✏️ 编辑消息</button>`;
+        menuHTML += `<button class="context-menu-item" onclick="editMessage(${msgIdx})">${svgIcon('pencil')} 编辑消息</button>`;
     }
 
     // AI 消息：重新生成、生成新候选
     if (!isUser) {
-        menuHTML += `<button class="context-menu-item" onclick="regenerateMessage(${msgIdx})">🔄 重新生成</button>`;
-        menuHTML += `<button class="context-menu-item" onclick="generateNewSwipe(${msgIdx})">✨ 生成新候选</button>`;
+        menuHTML += `<button class="context-menu-item" onclick="regenerateMessage(${msgIdx})">${svgIcon('refresh')} 重新生成</button>`;
+        menuHTML += `<button class="context-menu-item" onclick="generateNewSwipe(${msgIdx})">${svgIcon('sparkle')} 生成新候选</button>`;
         // 如果是最后一条 AI 消息，显示"继续生成"
         if (isLastAI) {
-            menuHTML += `<button class="context-menu-item" onclick="continueGeneration('${AppState.currentChat}')">➕ 继续生成</button>`;
+            menuHTML += `<button class="context-menu-item" onclick="continueGeneration('${AppState.currentChat}')">${svgIcon('plus')} 继续生成</button>`;
         }
     }
 
     // 通用：复制、删除此后所有、删除
-    menuHTML += `<button class="context-menu-item" onclick="copyMessage(${msgIdx})">📋 复制内容</button>`;
-    menuHTML += `<button class="context-menu-item" onclick="deleteMessagesAfter(${msgIdx})">✂️ 删除此后所有</button>`;
-    menuHTML += `<button class="context-menu-item danger" onclick="deleteMessage(${msgIdx})">🗑️ 删除消息</button>`;
+    menuHTML += `<button class="context-menu-item" onclick="copyMessage(${msgIdx})">${svgIcon('copy')} 复制内容</button>`;
+    menuHTML += `<button class="context-menu-item" onclick="deleteMessagesAfter(${msgIdx})">${svgIcon('scissors')} 删除此后所有</button>`;
+    menuHTML += `<button class="context-menu-item danger" onclick="deleteMessage(${msgIdx})">${svgIcon('trash')} 删除消息</button>`;
 
     menu.innerHTML = menuHTML;
     document.body.appendChild(menu);
@@ -3213,7 +3213,7 @@ function renderQuickReplies(roleId) {
     // 0. 添加"常用语"按钮（放在最前面）
     const phrasesBtn = document.createElement('button');
     phrasesBtn.className = 'quick-reply-btn';
-    phrasesBtn.textContent = '📝 常用语';
+    phrasesBtn.innerHTML = `${svgIcon('pencil')} 常用语`;
     phrasesBtn.style.background = 'rgba(139, 92, 246, 0.15)';
     phrasesBtn.style.borderColor = 'rgba(139, 92, 246, 0.3)';
     phrasesBtn.addEventListener('click', () => {
@@ -3408,9 +3408,9 @@ function renderCommonPhrasesList() {
         <div class="common-phrase-item">
             <div class="common-phrase-text">${phrase}</div>
             <div class="common-phrase-actions">
-                <button class="common-phrase-btn use" data-idx="${idx}" title="使用">✓</button>
+                <button class="common-phrase-btn use" data-idx="${idx}" title="使用">${svgIcon('check')}</button>
                 <button class="common-phrase-btn edit" data-idx="${idx}" title="编辑">编辑</button>
-                <button class="common-phrase-btn delete" data-idx="${idx}" title="删除">✕</button>
+                <button class="common-phrase-btn delete" data-idx="${idx}" title="删除">${svgIcon('x')}</button>
             </div>
         </div>
     `).join('');
@@ -3594,9 +3594,9 @@ function renderWorldbookEntriesList(role) {
                         <span class="wb-manager-tag ${isConstant ? 'constant' : 'trigger'}">${isConstant ? '常驻' : '触发'}</span>
                     </div>
                     <div class="wb-manager-entry-actions">
-                        <button class="wb-action-btn edit" data-idx="${originalIdx}" title="编辑">✏️</button>
-                        <button class="wb-action-btn copy" data-idx="${originalIdx}" title="复制">📋</button>
-                        <button class="wb-action-btn delete" data-idx="${originalIdx}" title="删除">🗑️</button>
+                        <button class="wb-action-btn edit" data-idx="${originalIdx}" title="编辑">${svgIcon('pencil')}</button>
+                        <button class="wb-action-btn copy" data-idx="${originalIdx}" title="复制">${svgIcon('copy')}</button>
+                        <button class="wb-action-btn delete" data-idx="${originalIdx}" title="删除">${svgIcon('trash')}</button>
                         <label class="wb-toggle">
                             <input type="checkbox" class="wb-toggle-switch" data-idx="${originalIdx}" ${isEnabled ? 'checked' : ''}>
                             <span class="wb-toggle-slider"></span>

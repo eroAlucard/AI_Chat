@@ -23,6 +23,7 @@
     <link rel="stylesheet" href="css/style.css">
     <link rel="stylesheet" href="css/markdown-renderer.css">
     <link rel="stylesheet" href="css/status-panel.css">
+    <link rel="stylesheet" href="css/glass-theme.css">
 
 <style>
 /* 导入聊天文件选择器样式 */
@@ -66,10 +67,58 @@
 
 </head>
 <body>
+    <!-- SVG 图标雪碧图（Lucide 风格线性图标） -->
+    <svg xmlns="http://www.w3.org/2000/svg" style="display:none" aria-hidden="true">
+        <symbol id="i-home" viewBox="0 0 24 24"><path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></symbol>
+        <symbol id="i-chat" viewBox="0 0 24 24"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"/></symbol>
+        <symbol id="i-sparkle" viewBox="0 0 24 24"><path d="m12 3-1.9 5.8a2 2 0 0 1-1.3 1.3L3 12l5.8 1.9a2 2 0 0 1 1.3 1.3L12 21l1.9-5.8a2 2 0 0 1 1.3-1.3L21 12l-5.8-1.9a2 2 0 0 1-1.3-1.3Z"/><path d="M5 3v4"/><path d="M19 17v4"/><path d="M3 5h4"/><path d="M17 19h4"/></symbol>
+        <symbol id="i-user" viewBox="0 0 24 24"><path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></symbol>
+        <symbol id="i-search" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></symbol>
+        <symbol id="i-filter" viewBox="0 0 24 24"><line x1="21" y1="4" x2="14" y2="4"/><line x1="10" y1="4" x2="3" y2="4"/><line x1="21" y1="12" x2="12" y2="12"/><line x1="8" y1="12" x2="3" y2="12"/><line x1="21" y1="20" x2="16" y2="20"/><line x1="12" y1="20" x2="3" y2="20"/><line x1="14" y1="2" x2="14" y2="6"/><line x1="8" y1="10" x2="8" y2="14"/><line x1="16" y1="18" x2="16" y2="22"/></symbol>
+        <symbol id="i-x" viewBox="0 0 24 24"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></symbol>
+        <symbol id="i-arrow-left" viewBox="0 0 24 24"><path d="m12 19-7-7 7-7"/><path d="M19 12H5"/></symbol>
+        <symbol id="i-clock" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></symbol>
+        <symbol id="i-send" viewBox="0 0 24 24"><path d="m22 2-7 20-4-9-9-4Z"/><path d="M22 2 11 13"/></symbol>
+        <symbol id="i-book" viewBox="0 0 24 24"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/></symbol>
+        <symbol id="i-clipboard" viewBox="0 0 24 24"><rect x="8" y="2" width="8" height="4" rx="1" ry="1"/><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/></symbol>
+        <symbol id="i-heart" viewBox="0 0 24 24"><path d="M19 14c1.49-1.46 3-3.21 3-5.5A5.5 5.5 0 0 0 16.5 3c-1.76 0-3 .5-4.5 2-1.5-1.5-2.74-2-4.5-2A5.5 5.5 0 0 0 2 8.5c0 2.3 1.5 4.05 3 5.5l7 7Z"/></symbol>
+        <symbol id="i-smile" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M8 14s1.5 2 4 2 4-2 4-2"/><line x1="9" y1="9" x2="9.01" y2="9"/><line x1="15" y1="9" x2="15.01" y2="9"/></symbol>
+        <symbol id="i-card" viewBox="0 0 24 24"><rect x="2" y="5" width="20" height="14" rx="2"/><line x1="2" y1="10" x2="22" y2="10"/></symbol>
+        <symbol id="i-chart" viewBox="0 0 24 24"><path d="M3 3v18h18"/><path d="M18 17V9"/><path d="M13 17V5"/><path d="M8 17v-3"/></symbol>
+        <symbol id="i-database" viewBox="0 0 24 24"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/><path d="M3 12c0 1.66 4 3 9 3s9-1.34 9-3"/></symbol>
+        <symbol id="i-wrench" viewBox="0 0 24 24"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/></symbol>
+        <symbol id="i-gear" viewBox="0 0 24 24"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/><circle cx="12" cy="12" r="3"/></symbol>
+        <symbol id="i-upload" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="21"/></symbol>
+        <symbol id="i-download" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></symbol>
+        <symbol id="i-folder" viewBox="0 0 24 24"><path d="M20 20a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.69-.9L9.6 3.9A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2Z"/></symbol>
+        <symbol id="i-link" viewBox="0 0 24 24"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></symbol>
+        <symbol id="i-trash" viewBox="0 0 24 24"><path d="M3 6h18"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/></symbol>
+        <symbol id="i-alert" viewBox="0 0 24 24"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"/><path d="M12 9v4"/><path d="M12 17h.01"/></symbol>
+        <symbol id="i-plus" viewBox="0 0 24 24"><path d="M5 12h14"/><path d="M12 5v14"/></symbol>
+        <symbol id="i-chevron-right" viewBox="0 0 24 24"><path d="m9 18 6-6-6-6"/></symbol>
+        <symbol id="i-chevron-down" viewBox="0 0 24 24"><path d="m6 9 6 6 6-6"/></symbol>
+        <symbol id="i-copy" viewBox="0 0 24 24"><rect x="8" y="8" width="14" height="14" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></symbol>
+        <symbol id="i-pencil" viewBox="0 0 24 24"><path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/></symbol>
+        <symbol id="i-refresh" viewBox="0 0 24 24"><path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/><path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"/><path d="M8 16H3v5"/></symbol>
+        <symbol id="i-scissors" viewBox="0 0 24 24"><circle cx="6" cy="6" r="3"/><circle cx="6" cy="18" r="3"/><line x1="20" y1="4" x2="8.12" y2="15.88"/><line x1="14.47" y1="14.48" x2="20" y2="20"/><line x1="8.12" y1="8.12" x2="12" y2="12"/></symbol>
+        <symbol id="i-check-square" viewBox="0 0 24 24"><polyline points="9 11 12 14 22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></symbol>
+        <symbol id="i-image" viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><circle cx="9" cy="9" r="2"/><path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21"/></symbol>
+        <symbol id="i-info" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4"/><path d="M12 8h.01"/></symbol>
+        <symbol id="i-eye" viewBox="0 0 24 24"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/></symbol>
+        <symbol id="i-check" viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></symbol>
+        <symbol id="i-star" viewBox="0 0 24 24"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></symbol>
+        <symbol id="i-target" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2"/></symbol>
+        <symbol id="i-file-text" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></symbol>
+        <symbol id="i-calendar" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></symbol>
+        <symbol id="i-map-pin" viewBox="0 0 24 24"><path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z"/><circle cx="12" cy="10" r="3"/></symbol>
+        <symbol id="i-moon" viewBox="0 0 24 24"><path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"/></symbol>
+        <symbol id="i-palette" viewBox="0 0 24 24"><path d="M12 2C6.5 2 2 6.5 2 12s4.5 10 10 10c.926 0 1.648-.746 1.648-1.688 0-.437-.18-.835-.437-1.125-.29-.289-.438-.652-.438-1.125a1.64 1.64 0 0 1 1.668-1.668h1.996c3.051 0 5.555-2.503 5.555-5.554C21.965 6.012 17.461 2 12 2z"/><circle cx="7.5" cy="10.5" r="1"/><circle cx="12" cy="7.5" r="1"/><circle cx="16.5" cy="10.5" r="1"/></symbol>
+    </svg>
+
     <!-- 登录验证遮罩 -->
     <div id="loginOverlay" class="login-overlay">
         <div class="login-box">
-            <div class="login-logo">✦</div>
+            <div class="login-logo"><svg class="icon"><use href="#i-sparkle"/></svg></div>
             <h1 class="login-title">AI Chat</h1>
             <p class="login-subtitle">请输入账号和密码以继续</p>
             <form id="loginForm" class="login-form">
@@ -85,9 +134,9 @@
         <!-- 搜索栏 -->
         <div class="search-bar hidden" id="searchBar">
             <div class="search-bar-inner">
-                <span class="search-icon">🔍</span>
+                <span class="search-icon"><svg class="icon"><use href="#i-search"/></svg></span>
                 <input type="text" class="search-input" id="searchInput" placeholder="搜索角色名称、标签...">
-                <button class="search-clear hidden" id="searchClearBtn">✕</button>
+                <button class="search-clear hidden" id="searchClearBtn"><svg class="icon"><use href="#i-x"/></svg></button>
                 <button class="search-cancel" id="searchCancelBtn">取消</button>
             </div>
         </div>
@@ -110,11 +159,11 @@
                 <!-- 首页工具栏：搜索 + 筛选 -->
                 <div class="home-toolbar">
                     <button class="toolbar-btn" id="searchBtn" title="搜索">
-                        <span class="toolbar-icon">🔍</span>
+                        <span class="toolbar-icon"><svg class="icon"><use href="#i-search"/></svg></span>
                         <span class="toolbar-label">搜索</span>
                     </button>
                     <button class="toolbar-btn" id="filterBtn" title="筛选">
-                        <span class="toolbar-icon">⚙</span>
+                        <span class="toolbar-icon"><svg class="icon"><use href="#i-filter"/></svg></span>
                         <span class="toolbar-label">筛选</span>
                     </button>
                 </div>
@@ -170,7 +219,7 @@
                         <!-- 聊天列表由 JS 动态生成 -->
                     </div>
                     <div class="chat-list-empty" id="chatListEmpty">
-                        <div class="empty-icon">💬</div>
+                        <div class="empty-icon"><svg class="icon"><use href="#i-chat"/></svg></div>
                         <p>还没有对话</p>
                         <p class="empty-hint">去首页选择一个角色开始聊天吧</p>
                     </div>
@@ -179,7 +228,7 @@
                 <!-- 对话视图 -->
                 <div class="chat-view hidden" id="chatView">
                     <div class="chat-header">
-                        <button class="back-btn" id="chatBackBtn">←</button>
+                        <button class="back-btn" id="chatBackBtn"><svg class="icon"><use href="#i-arrow-left"/></svg></button>
                         <div class="chat-role-info">
                             <img class="chat-role-avatar" id="chatRoleAvatar" src="" alt="">
                             <div class="chat-role-detail">
@@ -204,17 +253,17 @@
                             <!-- 快捷选项由 JS 动态生成 -->
                         </div>
                         <div class="chat-input-wrapper">
-                            <button class="input-tool-btn" id="inputHistoryBtn" title="输入历史">🕒</button>
+                            <button class="input-tool-btn" id="inputHistoryBtn" title="输入历史"><svg class="icon"><use href="#i-clock"/></svg></button>
                             <textarea class="chat-input" id="chatInput" placeholder="输入消息..." rows="1"></textarea>
                             <button class="send-btn" id="sendBtn">
-                                <span class="send-icon">➤</span>
+                                <svg class="icon"><use href="#i-send"/></svg>
                             </button>
                         </div>
                         <!-- 输入历史弹窗 -->
                         <div class="input-history-panel hidden" id="inputHistoryPanel">
                             <div class="input-history-header">
                                 <span>输入历史</span>
-                                <button class="input-history-close" id="inputHistoryClose">✕</button>
+                                <button class="input-history-close" id="inputHistoryClose"><svg class="icon"><use href="#i-x"/></svg></button>
                             </div>
                             <div class="input-history-list" id="inputHistoryList">
                                 <!-- 历史记录由 JS 动态生成 -->
@@ -244,18 +293,18 @@
 
                                 <div class="chat-settings-item" id="settingScenario">
                                     <span class="setting-item-label">情景设定</span>
-                                    <span class="setting-item-arrow">→</span>
+                                    <span class="setting-item-arrow"><svg class="icon"><use href="#i-chevron-right"/></svg></span>
                                 </div>
 
                                 <div class="chat-settings-item" id="settingUserIdentity">
                                     <span class="setting-item-label">用户身份</span>
                                     <span class="setting-item-value" id="userIdentityValue">未设置</span>
-                                    <span class="setting-item-arrow">→</span>
+                                    <span class="setting-item-arrow"><svg class="icon"><use href="#i-chevron-right"/></svg></span>
                                 </div>
 
                                 <div class="chat-settings-item" id="settingChatTheme">
                                     <span class="setting-item-label">聊天主题</span>
-                                    <span class="setting-item-arrow">→</span>
+                                    <span class="setting-item-arrow"><svg class="icon"><use href="#i-chevron-right"/></svg></span>
                                 </div>
                             </div>
 
@@ -270,33 +319,33 @@
                                     <div class="chat-settings-item" id="settingPromptTemplate">
                                         <span class="setting-item-label">提示词模板</span>
                                         <span class="setting-item-value">默认</span>
-                                        <span class="setting-item-arrow">→</span>
+                                        <span class="setting-item-arrow"><svg class="icon"><use href="#i-chevron-right"/></svg></span>
                                     </div>
 
                                     <div class="chat-settings-item" id="settingWorldbook">
                                         <span class="setting-item-label">世界书</span>
                                         <span class="setting-item-value" id="worldbookValue">未设置</span>
-                                        <span class="setting-item-arrow">→</span>
+                                        <span class="setting-item-arrow"><svg class="icon"><use href="#i-chevron-right"/></svg></span>
                                     </div>
 
                                     <div class="chat-settings-item" id="settingExport">
                                         <span class="setting-item-label">导出聊天</span>
-                                        <span class="setting-item-arrow">→</span>
+                                        <span class="setting-item-arrow"><svg class="icon"><use href="#i-chevron-right"/></svg></span>
                                     </div>
 
                                     <div class="chat-settings-item" id="settingImport">
                                         <span class="setting-item-label">导入聊天</span>
-                                        <span class="setting-item-arrow">→</span>
+                                        <span class="setting-item-arrow"><svg class="icon"><use href="#i-chevron-right"/></svg></span>
                                     </div>
 
                                     <div class="chat-settings-item" id="settingClearChat">
                                         <span class="setting-item-label">清空记录</span>
-                                        <span class="setting-item-arrow">→</span>
+                                        <span class="setting-item-arrow"><svg class="icon"><use href="#i-chevron-right"/></svg></span>
                                     </div>
 
                                     <div class="chat-settings-item danger" id="settingDeleteChat">
                                         <span class="setting-item-label">删除对话</span>
-                                        <span class="setting-item-arrow">→</span>
+                                        <span class="setting-item-arrow"><svg class="icon"><use href="#i-chevron-right"/></svg></span>
                                     </div>
                                 </div>
                             </div>
@@ -307,7 +356,7 @@
                 <!-- 情景设定面板 -->
                 <div class="chat-detail-panel hidden" id="scenarioPanel">
                     <div class="chat-detail-header">
-                        <button class="back-btn" id="scenarioBackBtn">←</button>
+                        <button class="back-btn" id="scenarioBackBtn"><svg class="icon"><use href="#i-arrow-left"/></svg></button>
                         <h3>情景设定</h3>
                     </div>
                     <div class="chat-detail-body">
@@ -324,7 +373,7 @@
                 <!-- 用户身份设定面板 -->
                 <div class="chat-detail-panel hidden" id="userIdentityPanel">
                     <div class="chat-detail-header">
-                        <button class="back-btn" id="userIdentityBackBtn">←</button>
+                        <button class="back-btn" id="userIdentityBackBtn"><svg class="icon"><use href="#i-arrow-left"/></svg></button>
                         <h3>用户身份</h3>
                     </div>
                     <div class="chat-detail-body">
@@ -348,7 +397,7 @@
                 <!-- 聊天主题设定面板 -->
                 <div class="chat-detail-panel hidden" id="chatThemePanel">
                     <div class="chat-detail-header">
-                        <button class="back-btn" id="chatThemeBackBtn">←</button>
+                        <button class="back-btn" id="chatThemeBackBtn"><svg class="icon"><use href="#i-arrow-left"/></svg></button>
                         <h3>聊天主题</h3>
                     </div>
                     <div class="chat-detail-body">
@@ -387,7 +436,7 @@
                 <!-- 提示词模板面板 -->
                 <div class="chat-detail-panel hidden" id="promptTemplatePanel">
                     <div class="chat-detail-header">
-                        <button class="back-btn" id="promptTemplateBackBtn">←</button>
+                        <button class="back-btn" id="promptTemplateBackBtn"><svg class="icon"><use href="#i-arrow-left"/></svg></button>
                         <h3>提示词模板设置</h3>
                     </div>
                     <div class="chat-detail-body">
@@ -427,7 +476,7 @@
                 <!-- 导出聊天面板 -->
                 <div class="chat-detail-panel hidden" id="exportChatPanel">
                     <div class="chat-detail-header">
-                        <button class="back-btn" id="exportChatBackBtn">←</button>
+                        <button class="back-btn" id="exportChatBackBtn"><svg class="icon"><use href="#i-arrow-left"/></svg></button>
                         <h3>导出聊天记录</h3>
                     </div>
                     <div class="chat-detail-body">
@@ -461,7 +510,7 @@
                 <!-- 导入聊天面板 -->
                 <div class="chat-detail-panel hidden" id="importChatPanel">
                     <div class="chat-detail-header">
-                        <button class="back-btn" id="importChatBackBtn">←</button>
+                        <button class="back-btn" id="importChatBackBtn"><svg class="icon"><use href="#i-arrow-left"/></svg></button>
                         <h3>导入聊天记录</h3>
                     </div>
                     <div class="chat-detail-body">
@@ -471,7 +520,7 @@
                         <div class="setting-item">
                             <label class="setting-label">选择文件</label>
                             <div class="import-file-wrapper">
-                                <button type="button" class="import-file-btn" id="importFileBtn">📁 选择文件</button>
+                                <button type="button" class="import-file-btn" id="importFileBtn"><svg class="icon"><use href="#i-folder"/></svg> 选择文件</button>
                                 <span class="import-file-name" id="importFileName">未选择文件</span>
                                 <input type="file" id="importChatFile" accept=".json,.txt,.md,.html,.htm" class="import-file-hidden">
                             </div>
@@ -496,7 +545,7 @@
                 <!-- 世界书管理面板 -->
                 <div class="worldbook-manager-panel hidden" id="worldbookManagerPanel">
                     <div class="worldbook-manager-header">
-                        <button class="back-btn" id="worldbookManagerBackBtn">←</button>
+                        <button class="back-btn" id="worldbookManagerBackBtn"><svg class="icon"><use href="#i-arrow-left"/></svg></button>
                         <h3>世界书</h3>
                     </div>
                     <div class="worldbook-manager-body">
@@ -507,15 +556,15 @@
                         <div class="worldbook-manager-controls">
                             <div class="worldbook-search-box">
                                 <input type="text" class="worldbook-search-input" id="worldbookSearchInput" placeholder="搜索条目...">
-                                <span class="worldbook-search-icon">🔍</span>
+                                <span class="worldbook-search-icon"><svg class="icon"><use href="#i-search"/></svg></span>
                             </div>
-                            <button class="btn-add-entry" id="addWorldbookEntryBtn">+ 添加条目</button>
+                            <button class="btn-add-entry" id="addWorldbookEntryBtn"><svg class="icon"><use href="#i-plus"/></svg> 添加条目</button>
                         </div>
                         <div class="worldbook-entries-list" id="worldbookEntriesList">
                             <!-- 条目列表由 JS 动态生成 -->
                         </div>
                         <div class="worldbook-empty" id="worldbookEmpty">
-                            <div class="empty-icon">📖</div>
+                            <div class="empty-icon"><svg class="icon"><use href="#i-book"/></svg></div>
                             <p>暂无世界书条目</p>
                             <p class="empty-hint">点击"添加条目"创建第一个条目</p>
                         </div>
@@ -525,7 +574,7 @@
                 <!-- 世界书条目编辑面板 -->
                 <div class="worldbook-entry-editor hidden" id="worldbookEntryEditor">
                     <div class="worldbook-editor-header">
-                        <button class="back-btn" id="worldbookEditorBackBtn">←</button>
+                        <button class="back-btn" id="worldbookEditorBackBtn"><svg class="icon"><use href="#i-arrow-left"/></svg></button>
                         <h3 id="worldbookEditorTitle">编辑条目</h3>
                     </div>
                     <div class="worldbook-editor-body">
@@ -571,7 +620,7 @@
             <div class="role-detail-modal hidden" id="roleDetailModal">
                 <div class="role-detail-overlay"></div>
                 <div class="role-detail-panel">
-                    <button class="close-btn" id="closeRoleDetail">✕</button>
+                    <button class="close-btn" id="closeRoleDetail"><svg class="icon"><use href="#i-x"/></svg></button>
                     <div class="role-detail-hero">
                         <img class="role-detail-avatar" id="roleDetailAvatar" src="" alt="">
                         <div class="role-detail-rarity" id="roleDetailRarity"></div>
@@ -586,13 +635,13 @@
                     </div>
                     <div class="role-detail-actions">
                         <div class="role-detail-actions-row">
-                            <button class="btn-worldbook hidden" id="worldbookBtn">📖 世界书</button>
-                            <button class="btn-scene-select hidden" id="sceneSelectBtn">📋 选择开场白</button>
+                            <button class="btn-worldbook hidden" id="worldbookBtn"><svg class="icon"><use href="#i-book"/></svg> 世界书</button>
+                            <button class="btn-scene-select hidden" id="sceneSelectBtn"><svg class="icon"><use href="#i-clipboard"/></svg> 选择开场白</button>
                         </div>
                         <div class="role-detail-actions-row">
                             <button class="btn-start-chat" id="startChatBtn">开始对话</button>
                             <button class="btn-continue-chat hidden" id="continueChatBtn">继续对话</button>
-                            <button class="btn-collect" id="collectBtn">♡ 收藏</button>
+                            <button class="btn-collect" id="collectBtn"><svg class="icon"><use href="#i-heart"/></svg> 收藏</button>
                         </div>
                     </div>
                 </div>
@@ -620,7 +669,7 @@
                 <div class="scene-modal-panel">
                     <div class="scene-modal-header">
                         <button class="scene-modal-cancel" id="worldbookModalClose">关闭</button>
-                        <span class="scene-modal-title">📖 世界书</span>
+                        <span class="scene-modal-title"><svg class="icon"><use href="#i-book"/></svg> 世界书</span>
                         <span></span>
                     </div>
                     <div class="scene-modal-list" id="worldbookModalList">
@@ -635,7 +684,7 @@
                 <div class="draw-page-content">
                     <h2>AI 绘图</h2>
                     <p class="draw-hint">功能开发中，敬请期待...</p>
-                    <div class="draw-placeholder">🎨</div>
+                    <div class="draw-placeholder"><svg class="icon"><use href="#i-palette"/></svg></div>
                 </div>
             </section>
 
@@ -652,42 +701,42 @@
                 </div>
                 <div class="mine-shortcuts">
                     <button class="shortcut-btn" data-action="create-role">
-                        <span class="shortcut-icon">✨</span>
+                        <span class="shortcut-icon"><svg class="icon"><use href="#i-sparkle"/></svg></span>
                         <span>创建角色</span>
                     </button>
                     <button class="shortcut-btn" data-action="import-card">
-                        <span class="shortcut-icon">🃏</span>
+                        <span class="shortcut-icon"><svg class="icon"><use href="#i-card"/></svg></span>
                         <span>导入人物卡</span>
                     </button>
                     <button class="shortcut-btn" data-action="quick-replies">
-                        <span class="shortcut-icon">💬</span>
+                        <span class="shortcut-icon"><svg class="icon"><use href="#i-chat"/></svg></span>
                         <span>常用语</span>
                     </button>
                     <button class="shortcut-btn" data-action="view-behavior">
-                        <span class="shortcut-icon">📊</span>
+                        <span class="shortcut-icon"><svg class="icon"><use href="#i-chart"/></svg></span>
                         <span>我的偏好</span>
                     </button>
                     <button class="shortcut-btn" data-action="data-manager">
-                        <span class="shortcut-icon">💾</span>
+                        <span class="shortcut-icon"><svg class="icon"><use href="#i-database"/></svg></span>
                         <span>数据管理</span>
                     </button>
                     <button class="shortcut-btn" data-action="worldbook-overview">
-                        <span class="shortcut-icon">📖</span>
+                        <span class="shortcut-icon"><svg class="icon"><use href="#i-book"/></svg></span>
                         <span>世界书</span>
                     </button>
                     <button class="shortcut-btn" data-action="regex-overview">
-                        <span class="shortcut-icon">🔧</span>
+                        <span class="shortcut-icon"><svg class="icon"><use href="#i-wrench"/></svg></span>
                         <span>正则组</span>
                     </button>
                     <button class="shortcut-btn" data-action="settings">
-                        <span class="shortcut-icon">⚙️</span>
+                        <span class="shortcut-icon"><svg class="icon"><use href="#i-gear"/></svg></span>
                         <span>设置</span>
                     </button>
                 </div>
                 <div class="mine-section-title">自定义角色</div>
                 <div class="mine-content" id="customRolesContent">
                     <div class="collection-empty" id="customRolesEmpty">
-                        <div class="empty-icon">🎭</div>
+                        <div class="empty-icon"><svg class="icon"><use href="#i-smile"/></svg></div>
                         <p>还没有自定义角色</p>
                         <p class="empty-hint">点击上方"创建角色"开始</p>
                     </div>
@@ -697,7 +746,7 @@
                 <div class="mine-section-title">我的收藏</div>
                 <div class="mine-content" id="mineContent">
                     <div class="collection-empty" id="collectionEmpty">
-                        <div class="empty-icon">♡</div>
+                        <div class="empty-icon"><svg class="icon"><use href="#i-heart"/></svg></div>
                         <p>还没有收藏的角色</p>
                         <p class="empty-hint">在角色详情页点收藏按钮</p>
                     </div>
@@ -711,7 +760,7 @@
                     <div class="settings-overlay" id="settingsOverlay"></div>
                     <div class="settings-content">
                         <div class="settings-header">
-                            <button class="back-btn" id="settingsBackBtn">←</button>
+                            <button class="back-btn" id="settingsBackBtn"><svg class="icon"><use href="#i-arrow-left"/></svg></button>
                             <h3>设置</h3>
                         </div>
                         <div class="settings-body">
@@ -757,20 +806,20 @@
         <!-- 底部导航栏 -->
         <nav class="bottom-nav">
             <button class="nav-item active" data-page="home">
-                <span class="nav-icon">🏠</span>
+                <span class="nav-icon"><svg class="icon"><use href="#i-home"/></svg></span>
                 <span class="nav-label">首页</span>
             </button>
             <button class="nav-item" data-page="chat">
-                <span class="nav-icon">💬</span>
+                <span class="nav-icon"><svg class="icon"><use href="#i-chat"/></svg></span>
                 <span class="nav-label">聊天</span>
                 <span class="nav-badge hidden" id="chatBadge">0</span>
             </button>
             <button class="nav-item" data-page="draw">
-                <span class="nav-icon">✨</span>
+                <span class="nav-icon"><svg class="icon"><use href="#i-sparkle"/></svg></span>
                 <span class="nav-label">绘图</span>
             </button>
             <button class="nav-item" data-page="mine">
-                <span class="nav-icon">👤</span>
+                <span class="nav-icon"><svg class="icon"><use href="#i-user"/></svg></span>
                 <span class="nav-label">我的</span>
             </button>
         </nav>
@@ -782,9 +831,9 @@
         <div class="role-detail-modal hidden" id="behaviorModal">
             <div class="role-detail-overlay" onclick="document.getElementById('behaviorModal').classList.add('hidden')"></div>
             <div class="role-detail-panel" style="max-height:85vh;overflow-y:auto">
-                <button class="close-btn" onclick="document.getElementById('behaviorModal').classList.add('hidden')">✕</button>
+                <button class="close-btn" onclick="document.getElementById('behaviorModal').classList.add('hidden')"><svg class="icon"><use href="#i-x"/></svg></button>
                 <div class="role-detail-info" style="padding:20px">
-                    <h2 style="margin-bottom:16px">📊 我的偏好分析</h2>
+                    <h2 style="margin-bottom:16px"><svg class="icon"><use href="#i-chart"/></svg> 我的偏好分析</h2>
                     <p style="color:var(--text-secondary);margin-bottom:20px;font-size:14px">基于你的浏览、搜索和筛选行为，智能推荐个性化标签</p>
 
                     <div id="behaviorContent" style="margin-top:20px">
@@ -807,18 +856,18 @@
         <div class="role-detail-modal hidden" id="quickRepliesModal">
             <div class="role-detail-overlay" onclick="document.getElementById('quickRepliesModal').classList.add('hidden')"></div>
             <div class="role-detail-panel" style="max-height:85vh;overflow-y:auto">
-                <button class="close-btn" onclick="document.getElementById('quickRepliesModal').classList.add('hidden')">✕</button>
+                <button class="close-btn" onclick="document.getElementById('quickRepliesModal').classList.add('hidden')"><svg class="icon"><use href="#i-x"/></svg></button>
                 <div class="role-detail-info" style="padding:20px">
-                    <h2 style="margin-bottom:16px">💬 常用语管理</h2>
+                    <h2 style="margin-bottom:16px"><svg class="icon"><use href="#i-chat"/></svg> 常用语管理</h2>
                     <p style="color:var(--text-secondary);margin-bottom:20px;font-size:14px">管理你的常用回复，支持导出和导入备份</p>
 
                     <!-- 导入导出按钮 -->
                     <div style="display:flex;gap:10px;margin-bottom:20px">
                         <button class="btn-save-settings" onclick="exportQuickReplies()" style="flex:1;background:var(--bg-card);color:var(--text-primary)">
-                            📤 导出备份
+                            <svg class="icon"><use href="#i-upload"/></svg> 导出备份
                         </button>
                         <button class="btn-save-settings" onclick="document.getElementById('importQuickRepliesFile').click()" style="flex:1;background:var(--bg-card);color:var(--text-primary)">
-                            📥 导入备份
+                            <svg class="icon"><use href="#i-download"/></svg> 导入备份
                         </button>
                         <input type="file" id="importQuickRepliesFile" accept=".json" style="display:none" onchange="importQuickReplies(event)">
                     </div>
@@ -838,7 +887,7 @@
                     <button class="btn-save-settings" onclick="addNewQuickReply()" style="width:100%">添加常用语</button>
 
                     <p style="margin-top:16px;color:var(--text-muted);font-size:12px;line-height:1.5">
-                        💡 提示：常用语数据存储在本地浏览器中，建议定期导出备份<br>
+                        <svg class="icon"><use href="#i-info"/></svg> 提示：常用语数据存储在本地浏览器中，建议定期导出备份<br>
                         📌 支持场景：防止浏览器清理缓存、更换设备、重装浏览器等情况导致数据丢失
                     </p>
                 </div>
@@ -849,7 +898,7 @@
         <div class="role-detail-modal hidden" id="editPhraseModal" style="z-index:9999">
             <div class="role-detail-overlay" onclick="closeEditPhraseModal()" style="z-index:9998"></div>
             <div class="role-detail-panel" style="max-width:500px;max-height:300px;z-index:9999">
-                <button class="close-btn" onclick="closeEditPhraseModal()">✕</button>
+                <button class="close-btn" onclick="closeEditPhraseModal()"><svg class="icon"><use href="#i-x"/></svg></button>
                 <div class="role-detail-info" style="padding:20px">
                     <h2 style="margin-bottom:16px">编辑常用语</h2>
                     <div class="setting-item">
@@ -872,13 +921,13 @@
         <div class="role-detail-modal hidden" id="dataManagerModal">
             <div class="role-detail-overlay" onclick="closeDataManager()"></div>
             <div class="role-detail-panel" style="max-width:600px;max-height:90vh">
-                <button class="close-btn" onclick="closeDataManager()">✕</button>
+                <button class="close-btn" onclick="closeDataManager()"><svg class="icon"><use href="#i-x"/></svg></button>
                 <div class="role-detail-info" style="padding:20px">
-                    <h2 style="margin-bottom:16px">💾 数据管理</h2>
+                    <h2 style="margin-bottom:16px"><svg class="icon"><use href="#i-database"/></svg> 数据管理</h2>
 
                     <!-- 存储空间统计 -->
                     <div class="data-section">
-                        <h3 style="font-size:16px;margin-bottom:12px;color:var(--text-primary)">📊 存储空间</h3>
+                        <h3 style="font-size:16px;margin-bottom:12px;color:var(--text-primary)"><svg class="icon"><use href="#i-chart"/></svg> 存储空间</h3>
                         <div class="storage-stats" id="storageStats">
                             <div class="storage-bar">
                                 <div class="storage-used" id="storageUsedBar"></div>
@@ -895,23 +944,23 @@
 
                     <!-- 备份与恢复 -->
                     <div class="data-section">
-                        <h3 style="font-size:16px;margin-bottom:12px;color:var(--text-primary)">💼 备份与恢复</h3>
+                        <h3 style="font-size:16px;margin-bottom:12px;color:var(--text-primary)"><svg class="icon"><use href="#i-folder"/></svg> 备份与恢复</h3>
                         <div class="backup-actions">
                             <button class="btn-save-settings" onclick="exportAllData()" style="flex:1">
-                                📤 导出完整备份
+                                <svg class="icon"><use href="#i-upload"/></svg> 导出完整备份
                             </button>
                             <button class="btn-save-settings" onclick="importAllData()" style="flex:1;background:var(--bg-card);color:var(--text-primary)">
-                                📥 导入备份
+                                <svg class="icon"><use href="#i-download"/></svg> 导入备份
                             </button>
                         </div>
                         <div class="backup-hint" style="margin-top:8px;font-size:12px;color:var(--text-secondary)">
-                            💡 建议定期导出备份，防止数据丢失
+                            <svg class="icon"><use href="#i-info"/></svg> 建议定期导出备份，防止数据丢失
                         </div>
                     </div>
 
                     <!-- 数据清理 -->
                     <div class="data-section">
-                        <h3 style="font-size:16px;margin-bottom:12px;color:var(--text-primary)">🗑️ 数据清理</h3>
+                        <h3 style="font-size:16px;margin-bottom:12px;color:var(--text-primary)"><svg class="icon"><use href="#i-trash"/></svg> 数据清理</h3>
                         <div class="clean-actions">
                             <button class="clean-btn" onclick="cleanSearchHistory()">
                                 清除搜索历史
@@ -926,7 +975,7 @@
                                 清除行为数据
                             </button>
                             <button class="clean-btn danger" onclick="clearAllData()">
-                                ⚠️ 清空所有数据
+                                <svg class="icon"><use href="#i-alert"/></svg> 清空所有数据
                             </button>
                         </div>
                     </div>
@@ -938,10 +987,10 @@
         <div class="role-detail-modal hidden" id="createRoleModal">
             <div class="role-detail-overlay"></div>
             <div class="role-detail-panel" style="max-height:90vh">
-                <button class="close-btn" id="closeCreateRole">✕</button>
+                <button class="close-btn" id="closeCreateRole"><svg class="icon"><use href="#i-x"/></svg></button>
                 <div class="role-detail-info" style="padding:20px">
                     <div style="text-align:center;margin-bottom:20px">
-                        <button class="back-btn" id="createRoleBackBtn" style="position:absolute;left:20px;top:20px;width:32px;height:32px;background:rgba(255,255,255,0.1);border:none;border-radius:50%;color:var(--text-primary);font-size:18px;cursor:pointer;display:flex;align-items:center;justify-content:center">←</button>
+                        <button class="back-btn" id="createRoleBackBtn" style="position:absolute;left:20px;top:20px;width:32px;height:32px;background:rgba(255,255,255,0.1);border:none;border-radius:50%;color:var(--text-primary);font-size:18px;cursor:pointer;display:flex;align-items:center;justify-content:center"><svg class="icon"><use href="#i-arrow-left"/></svg></button>
                         <h2 style="margin:0 0 24px 0;font-size:16px;font-weight:600">新建角色</h2>
 
                         <!-- 头像上传 -->
@@ -949,9 +998,9 @@
                             <input type="file" id="crAvatarInput" accept="image/*" style="display:none">
                             <div id="crAvatarPreview" style="width:80px;height:80px;border-radius:50%;background:linear-gradient(135deg,#1a1a3e,#2d1b4e);overflow:hidden;cursor:pointer;position:relative">
                                 <img id="crAvatarImg" style="width:100%;height:100%;object-fit:cover;display:none">
-                                <div id="crAvatarPlaceholder" style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;font-size:36px">👤</div>
+                                <div id="crAvatarPlaceholder" style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;font-size:36px"><svg class="icon" style="width:36px;height:36px"><use href="#i-user"/></svg></div>
                             </div>
-                            <button id="crAvatarUploadBtn" style="position:absolute;right:-4px;bottom:-4px;width:28px;height:28px;border-radius:50%;background:var(--accent-purple);border:3px solid var(--bg-secondary);color:white;font-size:16px;cursor:pointer;display:flex;align-items:center;justify-content:center;padding:0">+</button>
+                            <button id="crAvatarUploadBtn" style="position:absolute;right:-4px;bottom:-4px;width:28px;height:28px;border-radius:50%;background:var(--accent-purple);border:3px solid var(--bg-secondary);color:white;font-size:16px;cursor:pointer;display:flex;align-items:center;justify-content:center;padding:0"><svg class="icon" style="width:14px;height:14px"><use href="#i-plus"/></svg></button>
                         </div>
                     </div>
 
@@ -974,7 +1023,7 @@
                     <div class="setting-item">
                         <div class="cr-advanced-toggle" id="crAdvancedToggle" style="display:flex;align-items:center;justify-content:space-between;cursor:pointer;padding:8px 0;user-select:none">
                             <span class="setting-label" style="margin:0">高级定义</span>
-                            <span class="cr-toggle-icon" style="font-size:12px;color:var(--text-muted);transition:transform 0.2s">▼</span>
+                            <span class="cr-toggle-icon" style="font-size:12px;color:var(--text-muted);transition:transform 0.2s;display:inline-flex"><svg class="icon"><use href="#i-chevron-down"/></svg></span>
                         </div>
                         <div class="cr-advanced-content" id="crAdvancedContent" style="display:none;margin-top:12px">
                             <div class="setting-item">
@@ -1042,7 +1091,7 @@
         <div class="role-detail-modal hidden" id="importFileModal">
             <div class="role-detail-overlay"></div>
             <div class="role-detail-panel" style="max-height:90vh;max-width:500px">
-                <button class="close-btn" id="closeImportFile">✕</button>
+                <button class="close-btn" id="closeImportFile"><svg class="icon"><use href="#i-x"/></svg></button>
                 <div class="role-detail-info" style="padding:0;display:flex;flex-direction:column;height:100%">
                     <!-- 头部 -->
                     <div style="padding:20px 20px 0">
@@ -1051,10 +1100,10 @@
                         <!-- 切换按钮 -->
                         <div style="display:flex;gap:8px;margin-bottom:16px">
                             <button class="import-switch-btn active" data-target="file" style="flex:1;padding:10px;border-radius:12px;border:1px solid var(--border-color);background:var(--accent-gradient);color:white;font-size:14px;font-weight:500;cursor:pointer;transition:all 0.2s">
-                                📁 从文件导入
+                                <svg class="icon"><use href="#i-folder"/></svg> 从文件导入
                             </button>
                             <button class="import-switch-btn" data-target="url" style="flex:1;padding:10px;border-radius:12px;border:1px solid var(--border-color);background:transparent;color:var(--text-secondary);font-size:14px;font-weight:500;cursor:pointer;transition:all 0.2s">
-                                🔗 从URL导入
+                                <svg class="icon"><use href="#i-link"/></svg> 从URL导入
                             </button>
                         </div>
                     </div>
@@ -1063,7 +1112,7 @@
                     <div style="flex:1;overflow-y:auto;padding:0 20px 20px">
                         <!-- 拖放上传区域 -->
                         <div id="importFileDrop" style="border:2px dashed rgba(255,255,255,0.2);border-radius:16px;padding:60px 20px;text-align:center;cursor:pointer;transition:all 0.3s;background:rgba(147,51,234,0.05)">
-                            <div style="width:80px;height:80px;margin:0 auto 16px;background:var(--accent-purple);border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:36px">+</div>
+                            <div style="width:80px;height:80px;margin:0 auto 16px;background:var(--accent-purple);border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:36px"><svg class="icon" style="width:36px;height:36px"><use href="#i-plus"/></svg></div>
                             <p style="color:var(--text-primary);margin:0 0 8px;font-size:16px;font-weight:500">导入角色卡</p>
                             <p style="color:var(--text-muted);margin:0;font-size:13px">支持 JSON 或 角色卡图片文件</p>
                         </div>
@@ -1110,7 +1159,7 @@
         <div class="role-detail-modal hidden" id="importUrlModal">
             <div class="role-detail-overlay"></div>
             <div class="role-detail-panel" style="max-height:90vh;max-width:500px">
-                <button class="close-btn" id="closeImportUrl">✕</button>
+                <button class="close-btn" id="closeImportUrl"><svg class="icon"><use href="#i-x"/></svg></button>
                 <div class="role-detail-info" style="padding:0;display:flex;flex-direction:column;height:100%">
                     <!-- 头部 -->
                     <div style="padding:20px 20px 0">
@@ -1119,10 +1168,10 @@
                         <!-- 切换按钮 -->
                         <div style="display:flex;gap:8px;margin-bottom:16px">
                             <button class="import-switch-btn" data-target="file" style="flex:1;padding:10px;border-radius:12px;border:1px solid var(--border-color);background:transparent;color:var(--text-secondary);font-size:14px;font-weight:500;cursor:pointer;transition:all 0.2s">
-                                📁 从文件导入
+                                <svg class="icon"><use href="#i-folder"/></svg> 从文件导入
                             </button>
                             <button class="import-switch-btn active" data-target="url" style="flex:1;padding:10px;border-radius:12px;border:1px solid var(--border-color);background:var(--accent-gradient);color:white;font-size:14px;font-weight:500;cursor:pointer;transition:all 0.2s">
-                                🔗 从URL导入
+                                <svg class="icon"><use href="#i-link"/></svg> 从URL导入
                             </button>
                         </div>
                     </div>
@@ -1133,7 +1182,7 @@
                         <textarea id="importUrlInput" rows="4" placeholder="在此处粘贴或输入角色链接，支持：&#10;• Chub.ai 角色页面链接&#10;• PNG/JSON 文件直链" style="width:100%;padding:12px;border-radius:12px;border:1px solid var(--border-color);background:var(--bg-card);color:var(--text-primary);font-size:14px;resize:vertical;font-family:inherit"></textarea>
 
                         <div style="display:flex;gap:8px;margin-top:12px">
-                            <button id="pasteFromClipboard" style="flex:1;padding:12px;border-radius:12px;border:1px solid var(--border-color);background:var(--bg-card);color:var(--text-primary);font-size:14px;cursor:pointer">📋 粘贴剪贴板</button>
+                            <button id="pasteFromClipboard" style="flex:1;padding:12px;border-radius:12px;border:1px solid var(--border-color);background:var(--bg-card);color:var(--text-primary);font-size:14px;cursor:pointer"><svg class="icon"><use href="#i-clipboard"/></svg> 粘贴剪贴板</button>
                             <button id="importFromUrl" style="flex:1;padding:12px;border-radius:12px;background:var(--accent-gradient);color:white;font-size:14px;font-weight:600;border:none;cursor:pointer">导入</button>
                         </div>
 
@@ -1179,8 +1228,8 @@
         <div class="modal-overlay hidden" id="fileImportMethodModal">
             <div class="modal-content" style="max-width:320px;border-radius:16px;padding:24px">
                 <h3 style="margin:0 0 20px;font-size:16px;text-align:center">选择导入方式</h3>
-                <button id="selectFromFiles" class="btn-save-settings" style="width:100%;margin-bottom:12px;padding:14px;font-size:15px">📁 从文件选择</button>
-                <button id="selectFromGallery" class="btn-save-settings" style="width:100%;background:var(--bg-card);border:1px solid var(--border-color);color:var(--text-primary);padding:14px;font-size:15px">📱 从相册导入</button>
+                <button id="selectFromFiles" class="btn-save-settings" style="width:100%;margin-bottom:12px;padding:14px;font-size:15px"><svg class="icon"><use href="#i-folder"/></svg> 从文件选择</button>
+                <button id="selectFromGallery" class="btn-save-settings" style="width:100%;background:var(--bg-card);border:1px solid var(--border-color);color:var(--text-primary);padding:14px;font-size:15px"><svg class="icon"><use href="#i-image"/></svg> 从相册导入</button>
             </div>
         </div>
 
@@ -1188,9 +1237,9 @@
         <div class="role-detail-modal hidden" id="commonPhrasesModal">
             <div class="role-detail-overlay"></div>
             <div class="role-detail-panel" style="max-height:85vh">
-                <button class="close-btn" id="closeCommonPhrases">✕</button>
+                <button class="close-btn" id="closeCommonPhrases"><svg class="icon"><use href="#i-x"/></svg></button>
                 <div class="role-detail-info" style="padding:20px">
-                    <h2 style="margin-bottom:16px">📝 常用语管理</h2>
+                    <h2 style="margin-bottom:16px"><svg class="icon"><use href="#i-chat"/></svg> 常用语管理</h2>
                     <div class="common-phrases-list" id="commonPhrasesList">
                         <!-- 常用语列表由 JS 动态生成 -->
                     </div>
@@ -1209,20 +1258,20 @@
         <div class="role-detail-modal hidden" id="worldbookOverviewModal">
             <div class="role-detail-overlay"></div>
             <div class="overview-panel">
-                <button class="close-btn" id="closeWorldbookOverview">✕</button>
+                <button class="close-btn" id="closeWorldbookOverview"><svg class="icon"><use href="#i-x"/></svg></button>
                 <div class="overview-header">
                     <h2>世界书</h2>
                     <button class="overview-add-btn" id="addWorldbookBtn">+ 新建</button>
                 </div>
                 <div class="overview-search">
-                    <span class="overview-search-icon">🔍</span>
+                    <span class="overview-search-icon"><svg class="icon"><use href="#i-search"/></svg></span>
                     <input type="text" class="overview-search-input" id="worldbookOverviewSearch" placeholder="搜索世界书">
                 </div>
                 <div class="overview-list" id="worldbookOverviewList">
                     <!-- 由 JS 动态生成 -->
                 </div>
                 <div class="overview-empty hidden" id="worldbookOverviewEmpty">
-                    <div style="font-size:48px;opacity:0.3;margin-bottom:12px">📖</div>
+                    <div style="font-size:48px;opacity:0.3;margin-bottom:12px;display:flex;justify-content:center"><svg class="icon" style="width:48px;height:48px"><use href="#i-book"/></svg></div>
                     <p>还没有世界书</p>
                     <p style="font-size:13px;color:var(--text-muted)">点击右上角"+ 新建"创建</p>
                 </div>
@@ -1233,20 +1282,20 @@
         <div class="role-detail-modal hidden" id="regexOverviewModal">
             <div class="role-detail-overlay"></div>
             <div class="overview-panel">
-                <button class="close-btn" id="closeRegexOverview">✕</button>
+                <button class="close-btn" id="closeRegexOverview"><svg class="icon"><use href="#i-x"/></svg></button>
                 <div class="overview-header">
                     <h2>正则组</h2>
                     <button class="overview-add-btn" id="addRegexGroupBtn">+ 新建</button>
                 </div>
                 <div class="overview-search">
-                    <span class="overview-search-icon">🔍</span>
+                    <span class="overview-search-icon"><svg class="icon"><use href="#i-search"/></svg></span>
                     <input type="text" class="overview-search-input" id="regexOverviewSearch" placeholder="搜索正则组">
                 </div>
                 <div class="overview-list" id="regexOverviewList">
                     <!-- 由 JS 动态生成 -->
                 </div>
                 <div class="overview-empty hidden" id="regexOverviewEmpty">
-                    <div style="font-size:48px;opacity:0.3;margin-bottom:12px">🔧</div>
+                    <div style="font-size:48px;opacity:0.3;margin-bottom:12px;display:flex;justify-content:center"><svg class="icon" style="width:48px;height:48px"><use href="#i-wrench"/></svg></div>
                     <p>暂无正则组</p>
                     <p style="font-size:13px;color:var(--text-muted)">导入的角色卡中未包含正则脚本</p>
                 </div>

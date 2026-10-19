@@ -3681,8 +3681,14 @@ input:checked + .slider:before {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    padding: 16px 20px;
+    /* 右侧预留空间给绝对定位的关闭按钮，避免与"+ 新建"按钮重叠 */
+    padding: 16px 58px 16px 20px;
     border-bottom: 1px solid var(--border-color);
+}
+/* 总览面板的关闭按钮与"+ 新建"按钮垂直居中对齐 */
+.overview-panel > .close-btn {
+    top: 16px;
+    right: 14px;
 }
 .overview-header h2 {
     font-size: 18px;

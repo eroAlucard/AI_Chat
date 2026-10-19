@@ -58,13 +58,13 @@ function showInstallButton() {
     banner.className = 'pwa-install-banner';
     banner.innerHTML = `
         <div class="pwa-banner-content">
-            <div class="pwa-banner-icon">✦</div>
+            <div class="pwa-banner-icon">${window.svgIcon ? svgIcon('sparkle') : '✦'}</div>
             <div class="pwa-banner-text">
                 <div class="pwa-banner-title">安装 AI Chat</div>
                 <div class="pwa-banner-subtitle">获得更好的使用体验</div>
             </div>
             <button class="pwa-install-btn" id="pwaInstallBtn">安装</button>
-            <button class="pwa-close-btn" id="pwaCloseBtn">✕</button>
+            <button class="pwa-close-btn" id="pwaCloseBtn">${window.svgIcon ? svgIcon('x') : '✕'}</button>
         </div>
     `;
 

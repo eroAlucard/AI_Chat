@@ -1,5 +1,10 @@
 // ==================== Login Auth ====================
 
+// SVG 图标辅助函数（图标雪碧图定义在 index.html 中）
+window.svgIcon = function (name, cls) {
+    return `<svg class="icon${cls ? ' ' + cls : ''}" aria-hidden="true"><use href="#i-${name}"></use></svg>`;
+};
+
 // 自定义角色存储 key（按用户隔离）
 function getCustomRolesKey() {
     const user = getCurrentUser();
@@ -628,7 +633,7 @@ function renderSearchHistory() {
         <div class="search-history-list">
             ${history.map(item => `
                 <div class="search-history-item" data-query="${item}">
-                    <span class="search-history-icon">🔍</span>
+                    <span class="search-history-icon">${svgIcon('search')}</span>
                     <span class="search-history-text">${item}</span>
                 </div>
             `).join('')}
@@ -911,7 +916,7 @@ function renderRoleCard(role) {
         <div class="role-card" data-role-id="${role.id}">
             ${coverHtml}
             <span class="role-card-rarity rarity-${(role.rarity || "N").toLowerCase()}">${role.rarity}</span>
-            ${role.isNew ? '<span class="role-card-new">✨ NEW</span>' : ''}
+            ${role.isNew ? `<span class="role-card-new">${svgIcon('sparkle')} NEW</span>` : ''}
             <div class="role-card-info">
                 <div class="role-card-title">${safeTitle}</div>
                 <div class="role-card-desc">${safeDesc}</div>
@@ -1133,7 +1138,7 @@ function openRoleDetail(roleId) {
     $('#collectBtn').dataset.roleId = roleId;
 
     const isCollected = AppState.collections.has(roleId);
-    $('#collectBtn').textContent = isCollected ? '♥ 已收藏' : '♡ 收藏';
+    $('#collectBtn').innerHTML = isCollected ? `${svgIcon('heart')} 已收藏` : `${svgIcon('heart')} 收藏`;
     $('#collectBtn').classList.toggle('collected', isCollected);
 
     // 继续对话按钮：已有对话时显示
@@ -1171,7 +1176,7 @@ function parseSystemPromptRules(systemPrompt) {
     const sections = systemPrompt.split(/(?=【[^】]+】)/).filter(s => s.trim());
     if (sections.length === 0) return '';
 
-    let html = '<div class="rules-section"><h3 class="rules-title">🎮 玩法规则</h3>';
+    let html = `<div class="rules-section"><h3 class="rules-title">${svgIcon('file-text')} 玩法规则</h3>`;
     sections.forEach(section => {
         const titleMatch = section.match(/【([^】]+)】/);
         if (titleMatch) {
@@ -1220,7 +1225,7 @@ function renderWorldBookInfo(role) {
     worldbookBtn.classList.remove('hidden');
     const constantCount = entries.filter(e => e.constant === true || (!e.keys || e.keys.length === 0)).length;
     const triggerCount = entries.length - constantCount;
-    worldbookBtn.textContent = `📖 世界书 (${entries.length}条)`;
+    worldbookBtn.innerHTML = `${svgIcon('book')} 世界书 (${entries.length}条)`;
 
     // 渲染条目列表
     renderWorldBookEntries(role);
@@ -1396,7 +1401,7 @@ function toggleCollect(roleId) {
     saveState();
 
     const isCollected = AppState.collections.has(roleId);
-    $('#collectBtn').textContent = isCollected ? '♥ 已收藏' : '♡ 收藏';
+    $('#collectBtn').innerHTML = isCollected ? `${svgIcon('heart')} 已收藏` : `${svgIcon('heart')} 收藏`;
     $('#collectBtn').classList.toggle('collected', isCollected);
 
     renderCollections();
@@ -1461,7 +1466,7 @@ function openBehaviorModal() {
     const now = Date.now();
 
     let html = '<div style="margin-bottom:20px">';
-    html += `<h3 style="margin-bottom:10px">🎯 为你推荐的标签</h3>`;
+    html += `<h3 style="margin-bottom:10px">${svgIcon('target')} 为你推荐的标签</h3>`;
 
     if (recommendedTags.length === 0) {
         html += `<p style="color:var(--text-secondary)">暂无数据，多浏览、搜索和筛选角色卡后会自动生成个性化推荐</p>`;
@@ -1484,7 +1489,7 @@ function openBehaviorModal() {
     const totalFilters = Object.values(data.tagHistory).reduce((sum, t) => sum + t.filters, 0);
 
     html += '<div style="margin-bottom:20px">';
-    html += `<h3 style="margin-bottom:10px">📈 行为统计</h3>`;
+    html += `<h3 style="margin-bottom:10px">${svgIcon('chart')} 行为统计</h3>`;
     html += `<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px">`;
     html += `<div style="background:var(--bg-card);padding:15px;border-radius:8px;text-align:center">
         <div style="font-size:24px;font-weight:600;color:var(--accent-purple)">${data.recentRoles.length}</div>
@@ -1502,7 +1507,7 @@ function openBehaviorModal() {
 
     // Top标签详情
     html += '<div>';
-    html += `<h3 style="margin-bottom:10px">🏆 偏好标签详情</h3>`;
+    html += `<h3 style="margin-bottom:10px">${svgIcon('star')} 偏好标签详情</h3>`;
     if (Object.keys(data.tagHistory).length === 0) {
         html += `<p style="color:var(--text-secondary)">暂无标签数据</p>`;
     } else {
@@ -1654,7 +1659,7 @@ function renderQuickRepliesList() {
                 <div class="common-phrase-text">${escapeHtml(reply)}</div>
                 <div class="common-phrase-actions">
                     <button class="common-phrase-btn edit" onclick="editQuickReply(${index})" title="编辑">编辑</button>
-                    <button class="common-phrase-btn delete" onclick="deleteQuickReply(${index})" title="删除">✕</button>
+                    <button class="common-phrase-btn delete" onclick="deleteQuickReply(${index})" title="删除">${svgIcon('x')}</button>
                 </div>
             </div>
         `;
@@ -2105,12 +2110,12 @@ function showOverviewContextMenu(btn, roleId, type) {
     menu.className = 'overview-context-menu';
     const typeName = type === 'worldbook' ? '世界书' : '正则组';
     menu.innerHTML = `
-        <button class="ctx-item" data-action="select"><span class="ctx-icon">☑️</span>多选</button>
-        ${!isStandalone ? '<button class="ctx-item" data-action="edit"><span class="ctx-icon">✏️</span>编辑</button>' : ''}
-        <button class="ctx-item" data-action="copy"><span class="ctx-icon">📋</span>复制</button>
+        <button class="ctx-item" data-action="select"><span class="ctx-icon">${svgIcon('check-square')}</span>多选</button>
+        ${!isStandalone ? `<button class="ctx-item" data-action="edit"><span class="ctx-icon">${svgIcon('pencil')}</span>编辑</button>` : ''}
+        <button class="ctx-item" data-action="copy"><span class="ctx-icon">${svgIcon('copy')}</span>复制</button>
         <div class="ctx-divider"></div>
-        <button class="ctx-item" data-action="export"><span class="ctx-icon">📤</span>导出</button>
-        <button class="ctx-item danger" data-action="delete"><span class="ctx-icon">🗑️</span>删除</button>
+        <button class="ctx-item" data-action="export"><span class="ctx-icon">${svgIcon('upload')}</span>导出</button>
+        <button class="ctx-item danger" data-action="delete"><span class="ctx-icon">${svgIcon('trash')}</span>删除</button>
     `;
 
     // 定位菜单
@@ -2230,8 +2235,8 @@ function showMultiSelectBar(type) {
     bar.innerHTML = `
         <span class="overview-multi-count">已选 0 项</span>
         <div class="overview-multi-actions">
-            <button class="overview-multi-btn" data-action="export-selected">📤 导出</button>
-            <button class="overview-multi-btn danger" data-action="delete-selected">🗑️ 删除</button>
+            <button class="overview-multi-btn" data-action="export-selected">${svgIcon('upload')} 导出</button>
+            <button class="overview-multi-btn danger" data-action="delete-selected">${svgIcon('trash')} 删除</button>
             <button class="overview-multi-btn cancel" data-action="cancel-select">取消</button>
         </div>
     `;
@@ -2961,8 +2966,8 @@ function renderCustomRoles() {
                 <div class="role-card-desc" style="font-size:11px">${role.title}</div>
             </div>
             <div class="custom-role-actions">
-                <button class="cr-action-btn" data-action="edit" data-id="${role.id}">✏️</button>
-                <button class="cr-action-btn" data-action="delete" data-id="${role.id}">🗑️</button>
+                <button class="cr-action-btn" data-action="edit" data-id="${role.id}">${svgIcon('pencil')}</button>
+                <button class="cr-action-btn" data-action="delete" data-id="${role.id}">${svgIcon('trash')}</button>
             </div>
         </div>
     `).join('');
@@ -3616,14 +3621,14 @@ function closeDataManager() {
 function calculateStorageUsage() {
     const user = getCurrentUser();
     const dataTypes = [
-        { key: `ai_chat_state_${user}`, name: '聊天记录', icon: '💬' },
-        { key: `ai_custom_roles_${user}`, name: '自定义角色', icon: '✨' },
-        { key: `ai_chat_common_phrases_${user}`, name: '常用语', icon: '📝' },
-        { key: `user_behavior_${user}`, name: '行为数据', icon: '📊' },
-        { key: `ai_search_history_${user}`, name: '搜索历史', icon: '🔍' },
-        { key: `ai_recent_viewed_${user}`, name: '浏览记录', icon: '👁️' },
-        { key: `ai_chat_drafts_${user}`, name: '输入草稿', icon: '📄' },
-        { key: `ai_chat_input_history_${user}`, name: '输入历史', icon: '⌨️' },
+        { key: `ai_chat_state_${user}`, name: '聊天记录', icon: 'chat' },
+        { key: `ai_custom_roles_${user}`, name: '自定义角色', icon: 'sparkle' },
+        { key: `ai_chat_common_phrases_${user}`, name: '常用语', icon: 'pencil' },
+        { key: `user_behavior_${user}`, name: '行为数据', icon: 'chart' },
+        { key: `ai_search_history_${user}`, name: '搜索历史', icon: 'search' },
+        { key: `ai_recent_viewed_${user}`, name: '浏览记录', icon: 'eye' },
+        { key: `ai_chat_drafts_${user}`, name: '输入草稿', icon: 'pencil' },
+        { key: `ai_chat_input_history_${user}`, name: '输入历史', icon: 'clock' },
     ];
 
     let totalSize = 0;
@@ -3667,7 +3672,7 @@ function calculateStorageUsage() {
             .sort((a, b) => b.size - a.size)
             .map(d => `
                 <div class="storage-item">
-                    <span class="storage-item-name">${d.icon} ${d.name}</span>
+                    <span class="storage-item-name">${svgIcon(d.icon)} ${d.name}</span>
                     <span class="storage-item-size">${formatBytes(d.size)}</span>
                 </div>
             `).join('');

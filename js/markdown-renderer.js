@@ -169,17 +169,17 @@ const MarkdownRenderer = (function() {
             // 第一行：时间 + 地点
             if (yearPart || timePart || locationPart) {
                 html += '<div class="md-scene-row">';
-                if (yearPart) html += `<span class="md-scene-date">📅 ${escapeHtml(yearPart)}</span>`;
-                if (timePart) html += `<span class="md-scene-time">🕐 ${escapeHtml(timePart)}</span>`;
-                if (locationPart) html += `<span class="md-scene-location">📍 ${escapeHtml(locationPart)}</span>`;
+                if (yearPart) html += `<span class="md-scene-date">${svgIcon('calendar')} ${escapeHtml(yearPart)}</span>`;
+                if (timePart) html += `<span class="md-scene-time">${svgIcon('clock')} ${escapeHtml(timePart)}</span>`;
+                if (locationPart) html += `<span class="md-scene-location">${svgIcon('map-pin')} ${escapeHtml(locationPart)}</span>`;
                 html += '</div>';
             }
             
             // 第二行：天气 + 氛围
             if (weatherPart || atmospherePart) {
                 html += '<div class="md-scene-row md-scene-row-sub">';
-                if (weatherPart) html += `<span class="md-scene-weather">🌙 ${escapeHtml(weatherPart)}</span>`;
-                if (atmospherePart) html += `<span class="md-scene-atmosphere">✨ ${escapeHtml(atmospherePart)}</span>`;
+                if (weatherPart) html += `<span class="md-scene-weather">${svgIcon('moon')} ${escapeHtml(weatherPart)}</span>`;
+                if (atmospherePart) html += `<span class="md-scene-atmosphere">${svgIcon('sparkle')} ${escapeHtml(atmospherePart)}</span>`;
                 html += '</div>';
             }
 
@@ -203,7 +203,7 @@ const MarkdownRenderer = (function() {
         } else {
             // 折叠显示
             text = text.replace(/<UpdateVariable>([\s\S]*?)<\/UpdateVariable>/gi, (match, content) => {
-                return `<details class="md-state-block"><summary class="md-state-summary">📊 状态更新</summary><div class="md-state-content">${escapeHtml(content.trim())}</div></details>`;
+                return `<details class="md-state-block"><summary class="md-state-summary">${svgIcon('chart')} 状态更新</summary><div class="md-state-content">${escapeHtml(content.trim())}</div></details>`;
             });
         }
 
@@ -223,7 +223,7 @@ const MarkdownRenderer = (function() {
             text = text.replace(/<JSONPatch\s*\/?>/gi, '');
         } else {
             text = text.replace(/<JSONPatch>([\s\S]*?)<\/JSONPatch>/gi, (match, content) => {
-                return `<details class="md-state-block"><summary class="md-state-summary">📋 JSON Patch</summary><div class="md-state-content"><pre>${escapeHtml(content.trim())}</pre></div></details>`;
+                return `<details class="md-state-block"><summary class="md-state-summary">${svgIcon('clipboard')} JSON Patch</summary><div class="md-state-content"><pre>${escapeHtml(content.trim())}</pre></div></details>`;
             });
         }
 
