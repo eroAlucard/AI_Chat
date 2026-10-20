@@ -249,10 +249,12 @@ const BuiltinCards = (function() {
                 role.systemPrompt = buildSystemPrompt(meta);
                 role.scenes = buildScenes(meta);
                 role.sourceData = {
-                    characterBook: meta.character_book || null,
+                    // 深拷贝：会话内的编辑（增删改/导入合并）不得污染 __CARDS_DETAILS__ 缓存，
+                    // 「恢复原书」依赖缓存始终为卡片原始数据
+                    characterBook: meta.character_book ? JSON.parse(JSON.stringify(meta.character_book)) : null,
                     postHistoryInstructions: meta.post_history_instructions || '',
-                    alternateGreetings: meta.alternate_greetings || [],
-                    regexScripts: meta.regex_scripts || [],
+                    alternateGreetings: meta.alternate_greetings ? JSON.parse(JSON.stringify(meta.alternate_greetings)) : [],
+                    regexScripts: meta.regex_scripts ? JSON.parse(JSON.stringify(meta.regex_scripts)) : [],
                 };
                 applyWorldbookOverride(role);
                 // 尊重会话内删除标记（删除仅本次会话有效，与旧行为一致；页面重载后恢复）

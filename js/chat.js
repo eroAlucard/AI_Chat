@@ -3541,6 +3541,12 @@ async function openWorldbookManager() {
         };
     }
 
+    // 自定义角色：首次打开管理器时快照原始世界书（供「恢复原书」使用；
+    // 内置角色无需快照，可随时从卡片数据重新水合）
+    if (!role.isBuiltin && !role.sourceData._originalCharacterBook) {
+        role.sourceData._originalCharacterBook = JSON.parse(JSON.stringify(role.sourceData.characterBook));
+    }
+
     const managerPanel = $('#worldbookManagerPanel');
     const chatView = $('#chatView');
 
@@ -3634,6 +3640,11 @@ async function importWorldbookToRole(wbId, mode) {
     }
     if (!role.sourceData) role.sourceData = {};
 
+    // 自定义角色：改动前确保已有原始世界书快照（防御路径，正常已在打开管理器时创建）
+    if (!role.isBuiltin && role.sourceData.characterBook && !role.sourceData._originalCharacterBook) {
+        role.sourceData._originalCharacterBook = JSON.parse(JSON.stringify(role.sourceData.characterBook));
+    }
+
     const imported = JSON.parse(JSON.stringify(data.entries)); // 深拷贝，避免污染书库缓存
     // 标记导入来源：区分卡片原生条目与外部导入条目（_ 前缀为应用内部元数据，随世界书覆盖数据持久化）
     imported.forEach(e => { e._imported = true; e._importedFrom = data.name || '外部世界书'; });
@@ -3662,6 +3673,94 @@ async function importWorldbookToRole(wbId, mode) {
     if (nameInput) nameInput.value = role.sourceData.characterBook.name || '';
     renderWorldbookEntriesList(role);
     closeWorldbookLibrary();
+}
+
+/**
+ * 恢复原书：丢弃当前世界书的全部修改（含导入条目、增删改），恢复为角色原始世界书。
+ * - 内置角色：删除 localStorage 覆盖数据后从卡片数据重新水合（ensureDetails 深拷贝，缓存始终纯净）
+ * - 自定义角色：从首次打开管理器时创建的快照恢复
+ */
+async function restoreOriginalWorldbook() {
+    const role = ROLES_DATA.find(r => String(r.id) === String(AppState.currentChat));
+    if (!role) return;
+
+    if (role.isBuiltin) {
+        const hasCardBook = role._meta && role._meta.hasBook;
+        const msg = hasCardBook
+            ? `确定恢复为「${role.name}」卡片自带的原始世界书吗？\n当前的全部修改（含导入条目、增删改）将被丢弃。`
+            : `「${role.name}」卡片本身不带世界书，恢复将清空当前全部条目。确定继续吗？`;
+        if (!confirm(msg)) return;
+
+        // 1. 删除该角色的世界书覆盖数据
+        try {
+            const user = (typeof getCurrentUser === 'function') ? getCurrentUser() : '';
+            const key = user ? `ai_worldbook_overrides_${user}` : 'ai_worldbook_overrides';
+            const overrides = JSON.parse(localStorage.getItem(key) || '{}');
+            delete overrides[role.id];
+            localStorage.setItem(key, JSON.stringify(overrides));
+        } catch (e) { /* 覆盖数据读取失败不阻塞恢复 */ }
+
+        // 2. 从卡片数据重新水合（systemPrompt/正则脚本等一并还原）
+        role._detailsLoaded = false;
+        role._bookDeleted = false;
+        if (typeof BuiltinCards !== 'undefined') {
+            await BuiltinCards.ensureDetails(role);
+        }
+
+        // 卡片无世界书时补建空书，管理器可继续添加条目
+        if (!role.sourceData) role.sourceData = {};
+        if (!role.sourceData.characterBook) {
+            role.sourceData.characterBook = { name: `${role.name}的世界书`, entries: [] };
+        }
+        showToast('已恢复卡片原始世界书');
+    } else {
+        const snap = role.sourceData && role.sourceData._originalCharacterBook;
+        if (!snap) {
+            showToast('该角色没有可恢复的原始世界书快照');
+            return;
+        }
+        if (!confirm(`确定恢复为「${role.name}」的原始世界书吗？\n当前的全部修改（含导入条目、增删改）将被丢弃。`)) return;
+        role.sourceData.characterBook = JSON.parse(JSON.stringify(snap));
+        saveRolesData();
+        showToast('已恢复原始世界书');
+    }
+
+    // 刷新管理器界面
+    worldbookSourceFilter = 'all';
+    const nameInput = $('#worldbookNameInput');
+    if (nameInput) nameInput.value = role.sourceData.characterBook.name || `${role.name}的世界书`;
+    renderWorldbookEntriesList(role);
+}
+
+/**
+ * 清除导入：一键删除全部带 _imported 标记的外部导入条目（卡片原生条目不受影响）。
+ */
+function clearImportedWorldbookEntries() {
+    const role = ROLES_DATA.find(r => String(r.id) === String(AppState.currentChat));
+    if (!role || !role.sourceData || !role.sourceData.characterBook) return;
+
+    const book = role.sourceData.characterBook;
+    const entries = Array.isArray(book.entries) ? book.entries : [];
+    const importedEntries = entries.filter(e => e._imported);
+    if (importedEntries.length === 0) {
+        showToast('没有外部导入的条目');
+        return;
+    }
+
+    const sources = [...new Set(importedEntries.map(e => e._importedFrom || '外部世界书'))];
+    let msg = `确定删除全部 ${importedEntries.length} 条外部导入条目吗？\n来源：${sources.map(s => `《${s}》`).join('、')}`;
+    if (importedEntries.length === entries.length) {
+        msg += '\n\n注意：当前世界书全部为导入条目，清除后将为空。如需找回卡片原书，请使用「恢复原书」。';
+    }
+    if (!confirm(msg)) return;
+
+    book.entries = entries.filter(e => !e._imported);
+    role._bookDeleted = false;
+    saveRolesData();
+
+    worldbookSourceFilter = 'all';
+    renderWorldbookEntriesList(role);
+    showToast(`已删除 ${importedEntries.length} 条导入条目`);
 }
 
 function renderWorldbookEntriesList(role) {
@@ -4020,6 +4119,10 @@ function initWorldbookManager() {
 
     const importBtn = $('#importWorldbookBtn');
     if (importBtn) importBtn.addEventListener('click', () => openWorldbookLibrary());
+    const restoreBtn = $('#restoreWorldbookBtn');
+    if (restoreBtn) restoreBtn.addEventListener('click', () => restoreOriginalWorldbook());
+    const clearImportsBtn = $('#clearImportedBtn');
+    if (clearImportsBtn) clearImportsBtn.addEventListener('click', () => clearImportedWorldbookEntries());
     const libCloseBtn = $('#worldbookLibraryClose');
     if (libCloseBtn) libCloseBtn.addEventListener('click', closeWorldbookLibrary);
     const libOverlay = $('#worldbookLibraryOverlay');
