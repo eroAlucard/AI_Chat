@@ -1836,6 +1836,60 @@ body {
     display: none;
 }
 
+/* 世界书库导入 */
+.wb-library-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 12px;
+    border-radius: var(--radius-md);
+    border: 1px solid var(--border-light);
+    background: var(--bg-card);
+}
+.wb-library-info {
+    min-width: 0;
+    flex: 1;
+}
+.wb-library-name {
+    font-size: var(--font-sm);
+    font-weight: 600;
+    color: var(--text-primary);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+.wb-library-meta {
+    font-size: 11px;
+    color: var(--text-muted);
+    margin-top: 3px;
+}
+.wb-library-actions {
+    display: flex;
+    gap: 8px;
+    flex-shrink: 0;
+}
+.wb-import-btn {
+    padding: 6px 14px;
+    border-radius: 8px;
+    border: 1px solid var(--border-light);
+    background: var(--bg-secondary);
+    color: var(--text-secondary);
+    font-size: 12px;
+    cursor: pointer;
+    transition: all 0.15s ease;
+}
+.wb-import-btn:hover {
+    border-color: var(--accent-purple);
+    color: var(--accent-purple);
+    background: rgba(139, 92, 246, 0.1);
+}
+.wb-import-btn.replace:hover {
+    border-color: #f87171;
+    color: #f87171;
+    background: rgba(248, 113, 113, 0.1);
+}
+
 .worldbook-toggle-btn {
     width: 100%;
     display: flex;

@@ -1,4 +1,5 @@
-tmp/
+tmp/*
+!tmp/generate-card-metadata.py
 小程序原型参考/
 server.js
 package-lock.json
@@ -9,3 +10,4 @@ tools/
 node_modules/
 *.bak
 启动.bat
+

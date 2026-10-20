@@ -559,6 +559,7 @@
                                 <span class="worldbook-search-icon"><svg class="icon"><use href="#i-search"/></svg></span>
                             </div>
                             <button class="btn-add-entry" id="addWorldbookEntryBtn"><svg class="icon"><use href="#i-plus"/></svg> 添加条目</button>
+                            <button class="btn-add-entry" id="importWorldbookBtn"><svg class="icon"><use href="#i-book"/></svg> 导入世界书</button>
                         </div>
                         <div class="worldbook-entries-list" id="worldbookEntriesList">
                             <!-- 条目列表由 JS 动态生成 -->
@@ -675,6 +676,21 @@
                     <div class="scene-modal-list" id="worldbookModalList">
                         <div class="worldbook-modal-hint">关键词触发条目（匹配对话内容自动注入）</div>
                         <div class="worldbook-entries" id="worldbookEntries"></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 世界书库选择面板（从 cards/世界书/ 导入到当前角色） -->
+            <div class="scene-modal hidden" id="worldbookLibraryModal">
+                <div class="scene-modal-overlay" id="worldbookLibraryOverlay"></div>
+                <div class="scene-modal-panel">
+                    <div class="scene-modal-header">
+                        <button class="scene-modal-cancel" id="worldbookLibraryClose">关闭</button>
+                        <span class="scene-modal-title"><svg class="icon"><use href="#i-book"/></svg> 导入世界书</span>
+                        <span></span>
+                    </div>
+                    <div class="scene-modal-list" id="worldbookLibraryList">
+                        <!-- 由 JS 动态生成 -->
                     </div>
                 </div>
             </div>

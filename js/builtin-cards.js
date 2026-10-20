@@ -326,6 +326,57 @@ const BuiltinCards = (function() {
         _builtinRolesCache = null;
     }
 
+    // ==================== 世界书库（cards/世界书/ 转换生成） ====================
+
+    const WB_INDEX_FILE = 'cards/worldbooks-index.js';
+    let _worldbooksCache = null;
+    const _wbInflight = new Map();
+
+    /**
+     * 获取世界书库索引，首次调用时注入索引脚本
+     * 返回 [{id, name, entries, constant, trigger, data}]
+     */
+    async function getWorldbooks() {
+        if (_worldbooksCache) return _worldbooksCache;
+        try {
+            await loadScript(WB_INDEX_FILE);
+            const idx = window.__WORLDBOOKS_INDEX__;
+            _worldbooksCache = Array.isArray(idx) ? idx : [];
+        } catch (e) {
+            console.warn('[BuiltinCards] 世界书索引加载失败:', e.message);
+            _worldbooksCache = [];
+        }
+        return _worldbooksCache;
+    }
+
+    /**
+     * 按需加载单本世界书完整数据，返回 {id, name, entries}（失败返回 null）
+     */
+    async function ensureWorldbookDetails(wb) {
+        if (!wb) return null;
+        if (wb._details) return wb._details;
+        if (_wbInflight.has(wb.id)) return _wbInflight.get(wb.id);
+        const p = (async () => {
+            try {
+                let data = window.__WORLDBOOKS_DETAILS__ && window.__WORLDBOOKS_DETAILS__[wb.id];
+                if (!data) {
+                    await loadScript('cards/' + wb.data);
+                    data = window.__WORLDBOOKS_DETAILS__ && window.__WORLDBOOKS_DETAILS__[wb.id];
+                }
+                if (!data) throw new Error('世界书数据缺失: ' + wb.data);
+                wb._details = data;
+                return data;
+            } catch (e) {
+                console.warn(`[BuiltinCards] 世界书加载失败 ${wb.name}:`, e.message);
+                return null;
+            } finally {
+                _wbInflight.delete(wb.id);
+            }
+        })();
+        _wbInflight.set(wb.id, p);
+        return p;
+    }
+
     return {
         isImported,
         markImported,
@@ -333,5 +384,7 @@ const BuiltinCards = (function() {
         autoImport,
         loadBuiltinRoles,
         ensureDetails,
+        getWorldbooks,
+        ensureWorldbookDetails,
     };
 })();

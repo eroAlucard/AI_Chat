@@ -22,6 +22,8 @@ if %ERRORLEVEL% EQU 0 (
     echo 📋 已生成以下文件：
     echo    - cards/cards-index.js（轻量索引）
     echo    - cards/data/*.js（每卡详情）
+    echo    - cards/worldbooks-index.js（世界书索引）
+    echo    - cards/worldbooks/*.js（世界书数据）
     echo    - cards/manifest.json
     echo.
     echo 💡 提示：

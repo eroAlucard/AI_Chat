@@ -3566,6 +3566,97 @@ function closeWorldbookManager() {
     openChatSettingsSidebar();
 }
 
+// ==================== 世界书库导入（cards/世界书/） ====================
+
+async function openWorldbookLibrary() {
+    const modal = $('#worldbookLibraryModal');
+    const list = $('#worldbookLibraryList');
+    modal.classList.remove('hidden');
+    list.innerHTML = '<div class="worldbook-empty"><p>正在加载世界书库...</p></div>';
+
+    const books = (typeof BuiltinCards !== 'undefined') ? await BuiltinCards.getWorldbooks() : [];
+    if (modal.classList.contains('hidden')) return; // 加载期间已被关闭
+
+    if (!books.length) {
+        list.innerHTML = `
+            <div class="worldbook-empty">
+                <div class="empty-icon"><svg class="icon"><use href="#i-book"/></svg></div>
+                <p>暂无可用世界书</p>
+                <p class="empty-hint">将 SillyTavern 导出的世界书 JSON 放入 cards/世界书/ 目录，运行 update-cards.bat 生成</p>
+            </div>`;
+        return;
+    }
+
+    list.innerHTML = books.map(wb => `
+        <div class="wb-library-item">
+            <div class="wb-library-info">
+                <div class="wb-library-name">${wb.name}</div>
+                <div class="wb-library-meta">${wb.entries} 个条目 · 常驻 ${wb.constant} · 触发 ${wb.trigger}</div>
+            </div>
+            <div class="wb-library-actions">
+                <button class="wb-import-btn" data-wb-id="${wb.id}" data-mode="merge">合并</button>
+                <button class="wb-import-btn replace" data-wb-id="${wb.id}" data-mode="replace">替换</button>
+            </div>
+        </div>
+    `).join('');
+
+    list.querySelectorAll('.wb-import-btn').forEach(btn => {
+        btn.addEventListener('click', () => importWorldbookToRole(btn.dataset.wbId, btn.dataset.mode));
+    });
+}
+
+function closeWorldbookLibrary() {
+    $('#worldbookLibraryModal').classList.add('hidden');
+}
+
+async function importWorldbookToRole(wbId, mode) {
+    const role = ROLES_DATA.find(r => String(r.id) === String(AppState.currentChat));
+    if (!role) return;
+
+    const books = await BuiltinCards.getWorldbooks();
+    const wb = books.find(b => b.id === wbId);
+    if (!wb) return;
+
+    const data = await BuiltinCards.ensureWorldbookDetails(wb);
+    if (!data || !Array.isArray(data.entries) || data.entries.length === 0) {
+        showToast('世界书加载失败或为空');
+        return;
+    }
+
+    // 内置角色确保详情已水合（避免后续水合覆盖导入结果）
+    if (role.isBuiltin && typeof BuiltinCards !== 'undefined') {
+        await BuiltinCards.ensureDetails(role);
+    }
+    if (!role.sourceData) role.sourceData = {};
+
+    const imported = JSON.parse(JSON.stringify(data.entries)); // 深拷贝，避免污染书库缓存
+    if (mode === 'replace') {
+        role.sourceData.characterBook = { name: data.name, entries: imported };
+        role._bookDeleted = false;
+        showToast(`已导入《${data.name}》：替换为 ${imported.length} 个条目`);
+    } else {
+        if (!role.sourceData.characterBook) {
+            role.sourceData.characterBook = { name: `${role.name}的世界书`, entries: [] };
+        }
+        const book = role.sourceData.characterBook;
+        if (!Array.isArray(book.entries)) book.entries = [];
+        const existingNames = new Set(book.entries.map(e => e.name));
+        const toAdd = imported.filter(e => !existingNames.has(e.name));
+        book.entries.push(...toAdd);
+        role._bookDeleted = false;
+        const skipped = imported.length - toAdd.length;
+        showToast(toAdd.length > 0
+            ? `已合并《${data.name}》：新增 ${toAdd.length} 条${skipped ? `，跳过同名 ${skipped} 条` : ''}`
+            : `《${data.name}》没有新条目可合并（全部同名）`);
+    }
+
+    saveRolesData();
+    const nameInput = $('#worldbookNameInput');
+    if (nameInput) nameInput.value = role.sourceData.characterBook.name || '';
+    renderWorldbookEntriesList(role);
+    closeWorldbookLibrary();
+}
+
 function renderWorldbookEntriesList(role) {
     const container = $('#worldbookEntriesList');
     const emptyEl = $('#worldbookEmpty');
@@ -3870,6 +3961,13 @@ function initWorldbookManager() {
     addBtn.addEventListener('click', () => {
         openWorldbookEntryEditor(null);
     });
+
+    const importBtn = $('#importWorldbookBtn');
+    if (importBtn) importBtn.addEventListener('click', () => openWorldbookLibrary());
+    const libCloseBtn = $('#worldbookLibraryClose');
+    if (libCloseBtn) libCloseBtn.addEventListener('click', closeWorldbookLibrary);
+    const libOverlay = $('#worldbookLibraryOverlay');
+    if (libOverlay) libOverlay.addEventListener('click', closeWorldbookLibrary);
 
     searchInput.addEventListener('input', () => {
         const role = ROLES_DATA.find(r => String(r.id) === String(AppState.currentChat));

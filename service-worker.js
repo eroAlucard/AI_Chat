@@ -14,6 +14,7 @@ const STATIC_ASSETS = [
   '/js/builtin-cards.js',
   '/js/card-parser.js',
   '/cards/cards-index.js',
+  '/cards/worldbooks-index.js',
   '/js/image-store.js',
   '/js/chat-store.js',
   '/icons/icon-192.png',
