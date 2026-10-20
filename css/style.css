@@ -1996,6 +1996,13 @@ body {
     border: 1px solid rgba(100,150,255,0.3);
 }
 
+/* 外部导入条目标签（聊天内世界书弹窗） */
+.wb-imported {
+    background: rgba(245,158,11,0.15);
+    color: #fbbf24;
+    border: 1px solid rgba(245,158,11,0.3);
+}
+
 .wb-keys {
     display: flex;
     flex-wrap: wrap;
@@ -2910,6 +2917,49 @@ body {
 .wb-manager-tag.trigger {
     background: rgba(168, 85, 247, 0.15);
     color: #c084fc;
+}
+
+/* 外部导入条目徽章（琥珀色，区分于常驻蓝/触发紫） */
+.wb-manager-tag.imported {
+    background: rgba(245, 158, 11, 0.15);
+    color: #fbbf24;
+    flex-shrink: 0;
+}
+
+/* 世界书条目来源筛选栏（全部/卡片原生/外部导入） */
+.wb-source-filter {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 12px;
+}
+
+.wb-source-tab {
+    flex: 1;
+    padding: 6px 10px;
+    border-radius: var(--radius-sm);
+    border: 1px solid var(--border-light);
+    background: var(--bg-input);
+    color: var(--text-secondary);
+    font-size: 12px;
+    cursor: pointer;
+    transition: var(--transition);
+    white-space: nowrap;
+}
+
+.wb-source-tab:hover {
+    color: var(--text-primary);
+    border-color: rgba(139, 92, 246, 0.3);
+}
+
+.wb-source-tab.active {
+    background: rgba(139, 92, 246, 0.15);
+    border-color: rgba(139, 92, 246, 0.4);
+    color: var(--text-accent);
+}
+
+.wb-source-count {
+    opacity: 0.7;
+    font-size: 11px;
 }
 
 .wb-manager-entry-actions {

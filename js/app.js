@@ -1431,12 +1431,13 @@ function renderWorldBookEntries(role) {
         // 内容/关键词必须转义：卡片内容常含 <xxx> 伪标签，未转义会破坏 DOM 结构
         const contentPreview = escapeHtml(replaceVars((entry.content || '').substring(0, 150)).replace(/\n/g, ' '));
         const typeLabel = isConstant ? '<span class="wb-tag wb-constant">常驻</span>' : '<span class="wb-tag wb-trigger">触发</span>';
+        const importedTag = entry._imported ? `<span class="wb-tag wb-imported" title="导入自：${escapeHtml(entry._importedFrom || '外部世界书')}">导入</span>` : '';
         const enabledClass = isEnabled ? 'wb-enabled' : 'wb-disabled';
 
         html += `<div class="wb-entry ${enabledClass}" data-entry-idx="${idx}">
             <div class="wb-entry-header">
                 <div class="wb-entry-left">
-                    ${typeLabel}
+                    ${typeLabel}${importedTag}
                     ${keys.length > 0 ? '<span class="wb-keys">' + keys.map(k => '<span class="wb-key">' + escapeHtml(k) + '</span>').join('') + '</span>' : '<span class="wb-keys-empty">无关键词（常驻注入）</span>'}
                 </div>
                 <label class="wb-switch">

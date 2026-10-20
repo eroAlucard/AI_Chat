@@ -561,6 +561,11 @@
                             <button class="btn-add-entry" id="addWorldbookEntryBtn"><svg class="icon"><use href="#i-plus"/></svg> 添加条目</button>
                             <button class="btn-add-entry" id="importWorldbookBtn"><svg class="icon"><use href="#i-book"/></svg> 导入世界书</button>
                         </div>
+                        <div class="wb-source-filter hidden" id="wbSourceFilter">
+                            <button class="wb-source-tab active" data-filter="all">全部 <span class="wb-source-count"></span></button>
+                            <button class="wb-source-tab" data-filter="native">卡片原生 <span class="wb-source-count"></span></button>
+                            <button class="wb-source-tab" data-filter="imported">外部导入 <span class="wb-source-count"></span></button>
+                        </div>
                         <div class="worldbook-entries-list" id="worldbookEntriesList">
                             <!-- 条目列表由 JS 动态生成 -->
                         </div>

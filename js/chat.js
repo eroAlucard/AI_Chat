@@ -3519,6 +3519,7 @@ function initCommonPhrases() {
 
 // ==================== Worldbook Manager ====================
 let currentEditingEntryIndex = null;
+let worldbookSourceFilter = 'all'; // 世界书条目来源筛选：all 全部 / native 卡片原生 / imported 外部导入
 
 async function openWorldbookManager() {
     if (!AppState.currentChat) return;
@@ -3545,6 +3546,9 @@ async function openWorldbookManager() {
 
     // 填充世界书名称
     $('#worldbookNameInput').value = role.sourceData.characterBook.name || `${role.name}的世界书`;
+
+    // 重置来源筛选为「全部」
+    worldbookSourceFilter = 'all';
 
     // 渲染条目列表
     renderWorldbookEntriesList(role);
@@ -3631,6 +3635,8 @@ async function importWorldbookToRole(wbId, mode) {
     if (!role.sourceData) role.sourceData = {};
 
     const imported = JSON.parse(JSON.stringify(data.entries)); // 深拷贝，避免污染书库缓存
+    // 标记导入来源：区分卡片原生条目与外部导入条目（_ 前缀为应用内部元数据，随世界书覆盖数据持久化）
+    imported.forEach(e => { e._imported = true; e._importedFrom = data.name || '外部世界书'; });
     if (mode === 'replace') {
         role.sourceData.characterBook = { name: data.name, entries: imported };
         role._bookDeleted = false;
@@ -3672,13 +3678,26 @@ function renderWorldbookEntriesList(role) {
     const entries = role.sourceData.characterBook.entries;
     const searchTerm = searchInput.value.toLowerCase();
 
-    // 过滤搜索
-    const filteredEntries = entries.filter(entry => {
+    // 来源筛选（全部/卡片原生/外部导入）：更新标签页计数与可见性
+    const importedCount = entries.filter(e => e._imported).length;
+    const nativeCount = entries.length - importedCount;
+    updateSourceFilterTabs(nativeCount, importedCount);
+    // 无导入条目时筛选栏已隐藏；若当前停留在「外部导入」则回退到「全部」，避免列表意外为空
+    if (importedCount === 0 && worldbookSourceFilter === 'imported') worldbookSourceFilter = 'all';
+
+    // 来源过滤
+    let filteredEntries = entries;
+    if (worldbookSourceFilter === 'native') filteredEntries = filteredEntries.filter(e => !e._imported);
+    else if (worldbookSourceFilter === 'imported') filteredEntries = filteredEntries.filter(e => e._imported);
+
+    // 过滤搜索（含导入来源名，可通过世界书名定位导入条目）
+    filteredEntries = filteredEntries.filter(entry => {
         if (!searchTerm) return true;
         const name = (entry.name || '').toLowerCase();
         const content = (entry.content || '').toLowerCase();
         const keys = (entry.keys || []).join(',').toLowerCase();
-        return name.includes(searchTerm) || content.includes(searchTerm) || keys.includes(searchTerm);
+        const source = (entry._importedFrom || '').toLowerCase();
+        return name.includes(searchTerm) || content.includes(searchTerm) || keys.includes(searchTerm) || source.includes(searchTerm);
     });
 
     if (filteredEntries.length === 0) {
@@ -3705,6 +3724,7 @@ function renderWorldbookEntriesList(role) {
                 <div class="wb-manager-entry-header">
                     <div class="wb-manager-entry-left">
                         <span class="wb-manager-entry-name">${name}</span>
+                        ${entry._imported ? `<span class="wb-manager-tag imported" title="导入自：${escapeHtml(entry._importedFrom || '外部世界书')}">导入</span>` : ''}
                         <span class="wb-manager-tag ${isConstant ? 'constant' : 'trigger'}">${isConstant ? '常驻' : '触发'}</span>
                     </div>
                     <div class="wb-manager-entry-actions">
@@ -3727,6 +3747,29 @@ function renderWorldbookEntriesList(role) {
 
     // 绑定事件
     attachWorldbookEntryEvents();
+}
+
+/**
+ * 更新来源筛选标签页的计数与选中态。
+ * 没有外部导入条目时隐藏整个筛选栏（大多数卡片自带世界书、无导入，保持界面干净）。
+ */
+function updateSourceFilterTabs(nativeCount, importedCount) {
+    const filterBar = $('#wbSourceFilter');
+    if (!filterBar) return;
+
+    if (importedCount === 0) {
+        filterBar.classList.add('hidden');
+        return;
+    }
+    filterBar.classList.remove('hidden');
+
+    const counts = { all: nativeCount + importedCount, native: nativeCount, imported: importedCount };
+    $$('#wbSourceFilter .wb-source-tab').forEach(tab => {
+        const f = tab.dataset.filter;
+        tab.classList.toggle('active', f === worldbookSourceFilter);
+        const countEl = tab.querySelector('.wb-source-count');
+        if (countEl) countEl.textContent = `(${counts[f]})`;
+    });
 }
 
 function attachWorldbookEntryEvents() {
@@ -3861,7 +3904,13 @@ function saveWorldbookEntry() {
     };
 
     if (currentEditingEntryIndex !== null) {
-        // 更新现有条目
+        // 更新现有条目（保留 _ 前缀内部元数据，如导入来源标记 _imported/_importedFrom）
+        const oldEntry = role.sourceData.characterBook.entries[currentEditingEntryIndex];
+        if (oldEntry) {
+            Object.keys(oldEntry).forEach(k => {
+                if (k.startsWith('_')) entry[k] = oldEntry[k];
+            });
+        }
         role.sourceData.characterBook.entries[currentEditingEntryIndex] = entry;
     } else {
         // 添加新条目
@@ -3887,7 +3936,8 @@ function copyWorldbookEntry(idx) {
     if (!entry) return;
 
     const newEntry = JSON.parse(JSON.stringify(entry));
-    newEntry.name = `${newEntry.name} (副本)`;
+    // 无名条目（许多卡片条目无 name）用「条目 N」兜底，避免生成 "undefined (副本)"
+    newEntry.name = `${newEntry.name || `条目 ${idx + 1}`} (副本)`;
 
     role.sourceData.characterBook.entries.push(newEntry);
     saveRolesData();
@@ -3978,6 +4028,16 @@ function initWorldbookManager() {
     searchInput.addEventListener('input', () => {
         const role = ROLES_DATA.find(r => String(r.id) === String(AppState.currentChat));
         if (role) renderWorldbookEntriesList(role);
+    });
+
+    // 来源筛选标签页（全部/卡片原生/外部导入）
+    $$('#wbSourceFilter .wb-source-tab').forEach(tab => {
+        tab.addEventListener('click', () => {
+            if (worldbookSourceFilter === tab.dataset.filter) return;
+            worldbookSourceFilter = tab.dataset.filter;
+            const role = ROLES_DATA.find(r => String(r.id) === String(AppState.currentChat));
+            if (role) renderWorldbookEntriesList(role);
+        });
     });
 }
 
