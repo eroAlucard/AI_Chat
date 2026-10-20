@@ -2787,6 +2787,7 @@ body {
 
 .worldbook-manager-controls {
     display: flex;
+    flex-wrap: wrap; /* 窄屏允许换行：搜索框独占一行、按钮均分下一行 */
     gap: 12px;
     margin-bottom: 16px;
 }
@@ -2935,7 +2936,9 @@ body {
 }
 
 .wb-source-tab {
-    flex: 1;
+    /* basis 用 auto（而非 flex:1 的 0%）：换行判定按内容宽度计算，
+       避免 nowrap 文本在窄屏把整行撑出屏幕 */
+    flex: 1 1 auto;
     padding: 6px 10px;
     border-radius: var(--radius-sm);
     border: 1px solid var(--border-light);
@@ -4168,5 +4171,32 @@ input:checked + .slider:before {
     .role-detail-actions .btn-collect {
         padding: 10px 14px;
         font-size: 13px;
+    }
+
+    /* 世界书管理器控制行：搜索框独占一行，三个按钮均分下一行（放不下时自动换行） */
+    .worldbook-manager-controls {
+        gap: 8px;
+    }
+    .worldbook-search-box {
+        flex: 1 1 100%;
+    }
+    .worldbook-manager-controls .btn-add-entry {
+        flex: 1 1 auto;
+        min-width: 0;
+        padding: 9px 10px;
+        font-size: 13px;
+    }
+
+    /* 来源筛选栏：紧凑内边距，清除按钮与标签页同行放不下时换行 */
+    .wb-source-filter {
+        gap: 6px;
+    }
+    .wb-source-tab {
+        padding: 6px 8px;
+        font-size: 11px;
+    }
+    .wb-clear-imports {
+        padding: 6px 8px;
+        font-size: 11px;
     }
 }
