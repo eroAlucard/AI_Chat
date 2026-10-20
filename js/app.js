@@ -1408,7 +1408,8 @@ function renderWorldBookEntries(role) {
         return;
     }
 
-    const entries = role.sourceData.characterBook.entries.filter(e => e.content && e.content.trim());
+    const allEntries = role.sourceData.characterBook.entries;
+    const entries = allEntries.filter(e => e.content && e.content.trim());
     const charName = role.name || '角色';
     // 获取用户名用于模板变量替换
     const userName = (AppState.settings && AppState.settings.defaultUserName) || '用户';
@@ -1421,11 +1422,14 @@ function renderWorldBookEntries(role) {
     };
 
     let html = '';
-    entries.forEach((entry, idx) => {
+    entries.forEach((entry) => {
+        // 使用原始数组索引（开关处理器按原始数组读取；过滤后索引会错位）
+        const idx = allEntries.indexOf(entry);
         const isConstant = entry.constant === true || (!entry.keys || entry.keys.length === 0);
         const isEnabled = entry.enabled !== false;
         const keys = (entry.keys || []).filter(k => k.trim());
-        const contentPreview = replaceVars((entry.content || '').substring(0, 150)).replace(/\n/g, ' ');
+        // 内容/关键词必须转义：卡片内容常含 <xxx> 伪标签，未转义会破坏 DOM 结构
+        const contentPreview = escapeHtml(replaceVars((entry.content || '').substring(0, 150)).replace(/\n/g, ' '));
         const typeLabel = isConstant ? '<span class="wb-tag wb-constant">常驻</span>' : '<span class="wb-tag wb-trigger">触发</span>';
         const enabledClass = isEnabled ? 'wb-enabled' : 'wb-disabled';
 
@@ -1433,7 +1437,7 @@ function renderWorldBookEntries(role) {
             <div class="wb-entry-header">
                 <div class="wb-entry-left">
                     ${typeLabel}
-                    ${keys.length > 0 ? '<span class="wb-keys">' + keys.map(k => '<span class="wb-key">' + k + '</span>').join('') + '</span>' : '<span class="wb-keys-empty">无关键词（常驻注入）</span>'}
+                    ${keys.length > 0 ? '<span class="wb-keys">' + keys.map(k => '<span class="wb-key">' + escapeHtml(k) + '</span>').join('') + '</span>' : '<span class="wb-keys-empty">无关键词（常驻注入）</span>'}
                 </div>
                 <label class="wb-switch">
                     <input type="checkbox" ${isEnabled ? 'checked' : ''} data-entry-idx="${idx}" class="wb-toggle">
@@ -2163,7 +2167,7 @@ function openWorldbookOverview() {
             <div class="overview-item" data-role-id="${wb.id}">
                 <div class="overview-item-icon">${wb.emoji}</div>
                 <div class="overview-item-info">
-                    <div class="overview-item-name">${wb.name}'s Lorebook</div>
+                    <div class="overview-item-name">${escapeHtml(wb.name)}'s Lorebook</div>
                     <div class="overview-item-desc">${wb.entryCount} 条目</div>
                 </div>
                 <button class="overview-item-menu-btn" data-role-id="${wb.id}" title="更多操作"><svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="5" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="12" cy="19" r="2"/></svg></button>
@@ -2255,7 +2259,7 @@ function openRegexOverview() {
             <div class="overview-item" data-role-id="${g.id}">
                 <div class="overview-item-icon">(.*)</div>
                 <div class="overview-item-info">
-                    <div class="overview-item-name">${g.name}'s Regex</div>
+                    <div class="overview-item-name">${escapeHtml(g.name)}'s Regex</div>
                     <div class="overview-item-desc">${g.scriptCount} 规则</div>
                 </div>
                 <button class="overview-item-menu-btn" data-role-id="${g.id}" title="更多操作"><svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="5" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="12" cy="19" r="2"/></svg></button>
@@ -2831,7 +2835,7 @@ function renderSceneSelector(role) {
     container.innerHTML = scenes.map((scene, idx) => `
         <div class="scene-item ${idx === 0 ? 'selected' : ''}" data-index="${idx}" data-opener="${encodeURIComponent(replaceVars(scene.opener) || '')}">
             <div class="scene-item-label">${idx === 0 ? '默认' : '备选 ' + idx}${idx === 0 ? ' 已选中' : ''}</div>
-            <div class="scene-item-text">${replaceVars(scene.preview)}</div>
+            <div class="scene-item-text">${escapeHtml(replaceVars(scene.preview))}</div>
         </div>
     `).join('');
 

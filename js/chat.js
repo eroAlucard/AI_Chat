@@ -149,7 +149,7 @@ function renderInputHistory() {
     historyEmpty.style.display = 'none';
     historyList.innerHTML = history.map((item, idx) => {
         const preview = item.length > 100 ? item.substring(0, 100) + '...' : item;
-        return `<div class="input-history-item" data-idx="${idx}">${preview}</div>`;
+        return `<div class="input-history-item" data-idx="${idx}">${escapeHtml(preview)}</div>`;
     }).join('');
 
     // 绑定点击事件
@@ -2025,16 +2025,17 @@ function renderChatList() {
         const msgCount = session.messages.length;
 
         const checkboxHtml = chatBatchMode ? `<div class="chat-item-checkbox" data-role-id="${session.roleId}"></div>` : '';
+        const safeName = escapeHtml(role.name || '');
         const avatarHtml = role.image 
-            ? `<img class="chat-list-item-avatar" src="${role.image}" alt="${role.name}" loading="lazy" onerror="this.style.display='none';this.nextElementSibling.style.display='flex'"><div class="chat-list-item-avatar-placeholder" style="display:none">${role.emoji || '💬'}</div>`
-            : `<div class="chat-list-item-avatar-placeholder">${role.emoji || '💬'}</div>`;
+            ? `<img class="chat-list-item-avatar" src="${escapeHtml(role.image)}" alt="${safeName}" loading="lazy" onerror="this.style.display='none';this.nextElementSibling.style.display='flex'"><div class="chat-list-item-avatar-placeholder" style="display:none">${escapeHtml(role.emoji || '💬')}</div>`
+            : `<div class="chat-list-item-avatar-placeholder">${escapeHtml(role.emoji || '💬')}</div>`;
         return `
             <div class="chat-list-item ${chatBatchMode ? 'batch-mode' : ''}" data-role-id="${session.roleId}">
                 ${checkboxHtml}
                 ${avatarHtml}
                 <div class="chat-list-item-content">
-                    <div class="chat-list-item-title">${role.name}</div>
-                    <div class="chat-list-item-preview">${preview}</div>
+                    <div class="chat-list-item-title">${safeName}</div>
+                    <div class="chat-list-item-preview">${escapeHtml(preview)}</div>
                 </div>
                 <div class="chat-list-item-meta">
                     <span class="chat-list-item-time">${timeStr}</span>
@@ -3694,8 +3695,10 @@ function renderWorldbookEntriesList(role) {
         const isEnabled = entry.enabled !== false;
         const isConstant = entry.constant === true || (!entry.keys || entry.keys.length === 0);
         const keys = (entry.keys || []).filter(k => k.trim());
-        const contentPreview = (entry.content || '').substring(0, 100).replace(/\n/g, ' ');
-        const name = entry.name || `条目 ${originalIdx + 1}`;
+        // 内容/名称/关键词必须转义：卡片世界书内容常含 <xxx> 伪标签，
+        // 未转义会破坏 DOM 结构（截断的 < 标签会吞掉后续闭合标签，导致条目嵌套、点击错位）
+        const contentPreview = escapeHtml((entry.content || '').substring(0, 100).replace(/\n/g, ' '));
+        const name = escapeHtml(entry.name || `条目 ${originalIdx + 1}`);
 
         html += `
             <div class="wb-manager-entry ${isEnabled ? '' : 'disabled'}" data-idx="${originalIdx}">
@@ -3714,7 +3717,7 @@ function renderWorldbookEntriesList(role) {
                         </label>
                     </div>
                 </div>
-                ${keys.length > 0 ? `<div class="wb-manager-keys">${keys.map(k => `<span class="wb-key-tag">${k}</span>`).join('')}</div>` : ''}
+                ${keys.length > 0 ? `<div class="wb-manager-keys">${keys.map(k => `<span class="wb-key-tag">${escapeHtml(k)}</span>`).join('')}</div>` : ''}
                 <div class="wb-manager-content">${contentPreview}</div>
             </div>
         `;
@@ -3767,6 +3770,8 @@ function attachWorldbookEntryEvents() {
         entry.addEventListener('click', (e) => {
             // 如果点击的是按钮或开关，不触发
             if (e.target.closest('.wb-manager-entry-actions')) return;
+            // 阻止冒泡：防止 DOM 异常嵌套时触发外层条目的编辑器（打开错误条目）
+            e.stopPropagation();
             const idx = parseInt(entry.dataset.idx);
             openWorldbookEntryEditor(idx);
         });
@@ -3833,7 +3838,8 @@ function saveWorldbookEntry() {
     const insertionOrder = parseInt($('#entryOrderInput').value) || 100;
     const enabled = $('#entryEnabledSwitch').checked;
 
-    if (!name) {
+    // 编辑已有条目时允许保持空名称（许多卡片的条目本身无 name，界面按「条目 N」显示）
+    if (!name && currentEditingEntryIndex === null) {
         showToast('请输入条目名称');
         return;
     }
